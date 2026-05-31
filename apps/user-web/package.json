@@ -1,5 +1,5 @@
 {
-  "name": "@bookmyvenue/user-web",
+  "name": "@venue404/user-web",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,8 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@bookmyvenue/api-client": "workspace:*",
-    "@bookmyvenue/ui": "workspace:*",
+    "@venue404/api-client": "workspace:*",
+    "@venue404/ui": "workspace:*",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.23.0"
