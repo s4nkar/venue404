@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16
@@ -12,18 +10,25 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   api:
     build: ./apps/api
     restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     env_file:
-      - .env
+      - ./apps/api/.env
     ports:
       - "8000:8000"
     volumes:
       - ./apps/api:/app
-
+      - /app/.venv
+      
 volumes:
   pgdata:
