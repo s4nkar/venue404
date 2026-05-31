@@ -1,0 +1,161 @@
+bookmyvenue/
+│
+├── package.json                    # Workspace config + shared dev deps
+├── pnpm-workspace.yaml             # Declares apps/* and packages/* as workspaces
+├── pnpm-lock.yaml                  # ONE lockfile for the whole monorepo
+├── tsconfig.base.json              # Shared TS config (apps extend this)
+├── .prettierrc                     # Shared code formatting
+├── eslint.config.js                # Shared linting rules
+├── .editorconfig                   # Cross-editor indentation/whitespace
+├── .gitignore
+├── .dockerignore
+├── .env.example                    # Template for env vars (committed)
+├── docker-compose.yml              # Postgres + FastAPI for local dev
+├── README.md                       # Setup + run instructions
+│
+├── apps/
+│   │
+│   ├── user-web/                   # React SPA — end users browse + book
+│   │   ├── package.json
+│   │   ├── vite.config.ts
+│   │   ├── tsconfig.json
+│   │   ├── index.html
+│   │   ├── .env.example
+│   │   ├── public/
+│   │   └── src/
+│   │       ├── main.tsx
+│   │       ├── App.tsx
+│   │       ├── routes.tsx
+│   │       ├── pages/              # Home, VenueDetails, MyBookings, etc.
+│   │       ├── components/         # App-specific (not shared)
+│   │       ├── hooks/
+│   │       ├── lib/
+│   │       └── styles/
+│   │
+│   ├── owner-portal/               # Same shape as user-web
+│   │   └── ...
+│   │
+│   ├── admin-panel/                # Same shape as user-web
+│   │   └── ...
+│   │
+│   └── api/                        # FastAPI modular monolith
+│       ├── Dockerfile
+│       ├── pyproject.toml          # Python deps + project config
+│       ├── .python-version         # Locks Python version (like .nvmrc)
+│       ├── .env.example
+│       ├── alembic.ini             # DB migrations config
+│       ├── alembic/
+│       │   └── versions/           # Migration files
+│       ├── tests/
+│       │   ├── conftest.py
+│       │   ├── test_booking.py
+│       │   ├── test_venue.py
+│       │   └── ...
+│       └── app/
+│           ├── __init__.py
+│           ├── main.py             # FastAPI entry — wires routers, middleware
+│           │
+│           ├── core/               # Cross-cutting infrastructure
+│           │   ├── config.py       # Settings loaded from env vars
+│           │   ├── database.py     # SQLAlchemy engine + session
+│           │   ├── security.py     # JWT encode/decode, password hashing
+│           │   ├── exceptions.py   # Custom exception classes
+│           │   └── middleware.py   # CORS, request ID, error handlers
+│           │
+│           ├── shared/             # Reusable across modules (NOT business logic)
+│           │   ├── models.py       # Base SQLAlchemy model, timestamp mixin
+│           │   ├── pagination.py
+│           │   └── utils.py
+│           │
+│           ├── modules/            # ← THE MODULAR MONOLITH LIVES HERE
+│           │   ├── auth/
+│           │   │   ├── __init__.py
+│           │   │   ├── routes.py        # FastAPI router (endpoints)
+│           │   │   ├── schemas.py       # Pydantic request/response models
+│           │   │   ├── service.py       # Business logic
+│           │   │   └── dependencies.py  # get_current_user, require_role, etc.
+│           │   │
+│           │   ├── profile/             # users, owners, admins
+│           │   │   ├── routes.py
+│           │   │   ├── schemas.py
+│           │   │   ├── models.py        # SQLAlchemy: User, Profile
+│           │   │   └── service.py
+│           │   │
+│           │   ├── venue/               # venue CRUD, photos, approval state
+│           │   │   ├── routes.py
+│           │   │   ├── schemas.py
+│           │   │   ├── models.py        # Venue, VenuePhoto
+│           │   │   └── service.py
+│           │   │
+│           │   ├── search/              # filters, discovery
+│           │   │   ├── routes.py
+│           │   │   ├── schemas.py
+│           │   │   └── service.py       # No own models — reads from venue/
+│           │   │
+│           │   ├── booking/             # request, accept, confirm, cancel
+│           │   │   ├── routes.py
+│           │   │   ├── schemas.py
+│           │   │   ├── models.py        # Booking, StatusHistory
+│           │   │   ├── service.py       # The big state machine we designed
+│           │   │   └── state_machine.py # Status transitions
+│           │   │
+│           │   ├── availability/        # slots, blocked dates, overlap checks
+│           │   │   ├── routes.py
+│           │   │   ├── schemas.py
+│           │   │   ├── models.py        # Slot, BlockedDate
+│           │   │   └── service.py
+│           │   │
+│           │   ├── notification/        # email + in-app
+│           │   │   ├── routes.py
+│           │   │   ├── schemas.py
+│           │   │   ├── models.py        # InAppNotification
+│           │   │   ├── service.py
+│           │   │   └── templates/       # Email templates
+│           │   │
+│           │   ├── admin/               # venue approval, suspend, audit
+│           │   │   ├── routes.py
+│           │   │   ├── schemas.py
+│           │   │   └── service.py
+│           │   │
+│           │   └── payment/             # Stripe integration
+│           │       ├── routes.py
+│           │       ├── schemas.py
+│           │       ├── models.py        # Payment, Refund
+│           │       ├── service.py
+│           │       └── webhooks.py      # Stripe webhook handlers
+│           │
+│           └── jobs/                    # APScheduler background jobs
+│               ├── scheduler.py         # Sets up APScheduler
+│               ├── hold_expiry.py       # 24-hr advance payment expiry
+│               ├── stale_requests.py    # 7-day request auto-expiry
+│               ├── payment_reminders.py # T-7, T-3, T-1 reminders
+│               └── booking_completion.py# Mark as completed after event date
+│
+└── packages/
+    │
+    ├── ui/                         # Shared React components
+    │   ├── package.json            # name: "@bookmyvenue/ui"
+    │   ├── tsconfig.json
+    │   └── src/
+    │       ├── index.ts            # Re-exports everything
+    │       ├── Button.tsx
+    │       ├── Input.tsx
+    │       ├── Card.tsx
+    │       ├── Modal.tsx
+    │       ├── DatePicker.tsx
+    │       └── ...
+    │
+    └── api-client/                 # Typed FastAPI client
+        ├── package.json            # name: "@bookmyvenue/api-client"
+        ├── tsconfig.json
+        ├── scripts/
+        │   └── generate.ts         # Regenerates types from /openapi.json
+        └── src/
+            ├── index.ts
+            ├── client.ts           # fetch wrapper with auth, base URL
+            ├── types.ts            # AUTO-GENERATED — do not edit
+            └── endpoints/
+                ├── auth.ts
+                ├── venues.ts
+                ├── bookings.ts
+                └── payments.ts
