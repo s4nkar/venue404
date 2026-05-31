@@ -3,7 +3,8 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "pnpm --parallel -r dev",
+    "dev": "concurrently -n user,owner,admin -c blue,green,magenta \"pnpm --filter user-web dev\" \"pnpm --filter owner-portal dev\" \"pnpm --filter admin-panel dev\"",
+    "dev:all": "concurrently -n docker,user,owner,admin -c yellow,blue,green,magenta \"docker compose up\" \"pnpm --filter user-web dev\" \"pnpm --filter owner-portal dev\" \"pnpm --filter admin-panel dev\"",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
@@ -11,6 +12,7 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
+    "concurrently": "^10.0.0",
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
     "typescript": "^5.4.0"
