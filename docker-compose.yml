@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: bookmyvenue
+      POSTGRES_DB: venue404
     ports:
       - "5432:5432"
     volumes:

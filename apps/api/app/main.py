@@ -10,7 +10,7 @@ from app.modules.notification.routes import router as notification_router
 from app.modules.admin.routes import router as admin_router
 from app.modules.payment.routes import router as payment_router
 
-app = FastAPI(title="BookMyVenue API")
+app = FastAPI(title="Venue404 API")
 
 register_middleware(app)
 
