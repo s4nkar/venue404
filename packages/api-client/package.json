@@ -1,0 +1,14 @@
+{
+  "name": "@venue404/api-client",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "generate": "tsx scripts/generate.ts",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.4.0"
+  }
+}
