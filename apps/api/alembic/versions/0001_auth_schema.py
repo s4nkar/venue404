@@ -8,7 +8,7 @@ Create Date: 2026-06-02
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, ENUM as PgEnum
 
 revision: str = "0001"
 down_revision: Union[str, None] = None
@@ -17,11 +17,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # enums
-    profile_status = sa.Enum("active", "suspended", name="profile_status")
-    user_role = sa.Enum("customer", "venue_owner", "super_admin", name="user_role")
-    profile_status.create(op.get_bind(), checkfirst=True)
-    user_role.create(op.get_bind(), checkfirst=True)
+    # create enums via raw SQL — DO block silently skips if already exists
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE profile_status AS ENUM ('active', 'suspended');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE user_role AS ENUM ('customer', 'venue_owner', 'super_admin');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
 
     # profiles — id mirrors auth.users.id (Supabase manages auth.users)
     op.create_table(
@@ -32,7 +40,7 @@ def upgrade() -> None:
         sa.Column("avatar_url", sa.String, nullable=True),
         sa.Column(
             "status",
-            sa.Enum("active", "suspended", name="profile_status", create_type=False),
+            PgEnum("active", "suspended", name="profile_status", create_type=False),
             nullable=False,
             server_default="active",
         ),
@@ -64,7 +72,7 @@ def upgrade() -> None:
         sa.Column("user_id", UUID(as_uuid=True), nullable=False),
         sa.Column(
             "role",
-            sa.Enum("customer", "venue_owner", "super_admin", name="user_role", create_type=False),
+            PgEnum("customer", "venue_owner", "super_admin", name="user_role", create_type=False),
             nullable=False,
         ),
         sa.Column(
