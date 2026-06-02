@@ -1,15 +1,11 @@
-from fastapi import APIRouter
-from app.modules.auth.schemas import LoginRequest, TokenResponse, RegisterRequest
+from fastapi import APIRouter, Depends
+from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.schemas import AuthMeResponse
 from app.modules.auth import service
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=TokenResponse)
-def register(body: RegisterRequest):
-    return service.register(body)
-
-
-@router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest):
-    return service.login(body)
+@router.get("/me", response_model=AuthMeResponse)
+async def me(current_user=Depends(get_current_user)):
+    return await service.get_me(current_user)
