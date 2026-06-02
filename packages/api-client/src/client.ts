@@ -1,16 +1,37 @@
+import { getAccessToken, signOut } from './auth'
+
 const BASE_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_BASE_URL) ?? 'http://localhost:8000'
 
-export function createClient(token?: string) {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
+export class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
 
+export function createClient() {
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const token = await getAccessToken()
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
     const res = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
       body: body != null ? JSON.stringify(body) : undefined,
     })
-    if (!res.ok) throw new Error(`${method} ${path} → ${res.status}`)
+
+    if (res.status === 401) {
+      await signOut()
+      throw new ApiError(401, 'Session expired — signed out')
+    }
+
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new ApiError(res.status, detail?.detail ?? `${method} ${path} → ${res.status}`)
+    }
+
     return res.json() as Promise<T>
   }
 

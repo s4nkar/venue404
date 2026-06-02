@@ -1,4 +1,4 @@
-export { createClient } from './client'
+export { createClient, ApiError } from './client'
 export { supabase } from './supabase'
 export * from './auth'
 export * from './types'
