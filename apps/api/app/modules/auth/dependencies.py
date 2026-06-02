@@ -7,10 +7,10 @@ def get_current_user(authorization: str = Header(...)):
     try:
         scheme, token = authorization.split()
         if scheme.lower() != "bearer":
-            raise UnauthorizedError()
+            raise UnauthorizedError("Invalid authentication scheme")
         return decode_token(token)
-    except Exception:
-        raise UnauthorizedError()
+    except Exception as e:
+        raise UnauthorizedError(f"Authentication failed: {e}")
 
 
 def require_role(*roles: str):
