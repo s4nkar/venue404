@@ -6,7 +6,7 @@ from app.modules.auth.providers.base import AuthProvider, ProviderUser
 
 
 class SupabaseAuthProvider(AuthProvider):
-    async def verify_token(self, token: str) -> ProviderUser:
+    def verify_token(self, token: str) -> ProviderUser:
         try:
             payload = jwt.decode(
                 token,

@@ -11,7 +11,7 @@ class ProviderUser:
 
 class AuthProvider(ABC):
     @abstractmethod
-    async def verify_token(self, token: str) -> ProviderUser:
+    def verify_token(self, token: str) -> ProviderUser:
         """Verify the token and return a normalized ProviderUser.
         Raise UnauthorizedError if the token is invalid or expired.
         """
