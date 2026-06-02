@@ -1,4 +1,6 @@
 export { createClient } from './client'
+export { supabase } from './supabase'
+export * from './auth'
 export * from './types'
 export * from './endpoints/auth'
 export * from './endpoints/venues'
