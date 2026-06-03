@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.core.middleware import register_middleware
 from app.modules.auth.routes import router as auth_router
@@ -9,8 +10,16 @@ from app.modules.availability.routes import router as availability_router
 from app.modules.notification.routes import router as notification_router
 from app.modules.admin.routes import router as admin_router
 from app.modules.payment.routes import router as payment_router
+from app.modules.admin.service import seed_super_admin
 
-app = FastAPI(title="Venue404 API")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    seed_super_admin()
+    yield
+
+
+app = FastAPI(title="Venue404 API", lifespan=lifespan)
 
 register_middleware(app)
 

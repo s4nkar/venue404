@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
+    super_admin_email: str = ""
+    super_admin_password: str = ""
 
     class Config:
         env_file = ".env"
