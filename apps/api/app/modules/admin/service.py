@@ -1,5 +1,8 @@
+import json
 import logging
-from supabase import create_client
+import urllib.request
+import urllib.error
+import uuid
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -16,7 +19,7 @@ def approve_venue(venue_id: str, body: VenueApprovalRequest) -> None:
 
 def seed_super_admin() -> None:
     """
-    Idempotent. Creates the super admin user in Supabase on first run. 
+    Idempotent. Creates the super admin user in Supabase on first run.
     Skipped entirely if SUPER_ADMIN_EMAIL or SUPER_ADMIN_PASSWORD
     are not set in the environment.
     """
@@ -35,12 +38,8 @@ def seed_super_admin() -> None:
 
 
 def _seed(db: Session, email: str, password: str) -> None:
-    supabase = create_client(settings.supabase_url, settings.supabase_service_role_key)
+    auth_user_id = _resolve_supabase_user(email, password)
 
-    # Step 1: resolve or create the Supabase auth user
-    auth_user_id = _resolve_supabase_user(supabase, email, password)
-
-    # Step 2: ensure profile row exists
     profile = db.query(Profile).filter(Profile.id == auth_user_id).first()
     if not profile:
         profile = Profile(
@@ -52,7 +51,6 @@ def _seed(db: Session, email: str, password: str) -> None:
         db.flush()
         logger.info("Created profile for super admin %s", email)
 
-    # Step 3: ensure super_admin role row exists
     role_exists = db.query(UserRoleAssignment).filter(
         UserRoleAssignment.user_id == auth_user_id,
         UserRoleAssignment.role == UserRole.super_admin,
@@ -66,34 +64,48 @@ def _seed(db: Session, email: str, password: str) -> None:
     logger.info("Super admin seed complete for %s", email)
 
 
-def _resolve_supabase_user(supabase, email: str, password: str):
-    """
-    Returns the UUID of the Supabase auth user, creating them if they don't
-    exist. Uses admin API so no confirmation email is triggered.
-    """
-    import uuid
+def _supabase_admin_request(method: str, path: str, body: dict | None = None) -> dict:
+    """Makes a request to the Supabase Auth Admin REST API."""
+    url = f"{settings.supabase_url}/auth/v1/admin/{path}"
+    data = json.dumps(body).encode() if body else None
+    req = urllib.request.Request(
+        url,
+        data=data,
+        method=method,
+        headers={
+            "Authorization": f"Bearer {settings.supabase_service_role_key}",
+            "apikey": settings.supabase_service_role_key,
+            "Content-Type": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+        return json.loads(resp.read())
 
-    # Try listing users to find by email (admin API)
-    # Supabase admin.list_users() returns paginated results
+
+def _resolve_supabase_user(email: str, password: str) -> uuid.UUID:
+    """
+    Returns the UUID of the Supabase auth user, creating them if they
+    don't exist. Uses the Admin API so no confirmation email is triggered.
+    """
+    # List users and search by email
     page = 1
     per_page = 1000
     while True:
-        response = supabase.auth.admin.list_users(page=page, per_page=per_page)
-        users = response if isinstance(response, list) else getattr(response, 'users', [])
+        data = _supabase_admin_request("GET", f"users?page={page}&per_page={per_page}")
+        users = data.get("users", [])
         for u in users:
-            if u.email == email:
+            if u.get("email") == email:
                 logger.info("Super admin already exists in Supabase: %s", email)
-                return uuid.UUID(str(u.id))
+                return uuid.UUID(u["id"])
         if len(users) < per_page:
             break
         page += 1
 
-    # Not found — create via admin API (skips email confirmation)
-    result = supabase.auth.admin.create_user({
+    # Not found — create via Admin API (email_confirm skips verification email)
+    result = _supabase_admin_request("POST", "users", {
         "email": email,
         "password": password,
         "email_confirm": True,
     })
-    created = result.user if hasattr(result, 'user') else result
     logger.info("Created Supabase auth user for super admin: %s", email)
-    return uuid.UUID(str(created.id))
+    return uuid.UUID(result["id"])
