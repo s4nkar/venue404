@@ -1,21 +1,61 @@
-from sqlalchemy import String, Enum
-from sqlalchemy.orm import mapped_column, Mapped
-from app.core.database import Base
-from app.shared.models import TimestampMixin
 import enum
+import uuid
+from datetime import datetime
+from sqlalchemy import String, Enum, DateTime, Text, ForeignKey, JSON, UniqueConstraint, func
+from sqlalchemy.orm import mapped_column, Mapped
+from sqlalchemy.dialects.postgresql import UUID
+from app.core.database import Base
+
+
+class ProfileStatus(str, enum.Enum):
+    active = "active"
+    suspended = "suspended"
 
 
 class UserRole(str, enum.Enum):
-    user = "user"
-    owner = "owner"
-    admin = "admin"
+    customer = "customer"
+    venue_owner = "venue_owner"
+    super_admin = "super_admin"
 
 
-class User(Base, TimestampMixin):
-    __tablename__ = "users"
+class Profile(Base):
+    __tablename__ = "profiles"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String, nullable=False)
-    full_name: Mapped[str] = mapped_column(String, nullable=False)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.user)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    full_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String, nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[ProfileStatus] = mapped_column(
+        Enum(ProfileStatus, name="profile_status", create_constraint=False),
+        nullable=False,
+        default=ProfileStatus.active,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now(), onupdate=func.now())
+
+
+class UserRoleAssignment(Base):
+    __tablename__ = "user_roles"
+    __table_args__ = (UniqueConstraint("user_id", "role", name="uq_user_roles_user_role"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="user_role", create_constraint=False),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
+
+
+class AdminAction(Base):
+    __tablename__ = "admin_actions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    admin_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="RESTRICT"), nullable=False)
+    action_type: Mapped[str] = mapped_column(String, nullable=False)
+    target_type: Mapped[str] = mapped_column(String, nullable=False)
+    target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    action_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())

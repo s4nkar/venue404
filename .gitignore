@@ -35,3 +35,6 @@ Thumbs.db
 
 # ---- Misc ----
 prd.txt
+auth-prd.md
+.claude/
+claude.md

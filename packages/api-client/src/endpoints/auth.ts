@@ -1,8 +1,17 @@
 import { createClient } from '../client'
 
+export type AuthUser = {
+  id: string
+  email: string | null
+  profile: {
+    full_name: string | null
+    phone: string | null
+    avatar_url: string | null
+    status: 'active' | 'suspended'
+  }
+  roles: string[]
+}
+
 export const authEndpoints = (client: ReturnType<typeof createClient>) => ({
-  register: (body: { email: string; password: string; full_name: string }) =>
-    client.post<{ access_token: string; token_type: string }>('/api/auth/register', body),
-  login: (body: { email: string; password: string }) =>
-    client.post<{ access_token: string; token_type: string }>('/api/auth/login', body),
+  me: () => client.get<AuthUser>('/api/auth/me'),
 })

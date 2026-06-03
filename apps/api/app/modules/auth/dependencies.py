@@ -1,21 +1,113 @@
+from dataclasses import dataclass
+from uuid import UUID
 from fastapi import Depends, Header
-from app.core.security import decode_token
-from app.core.exceptions import UnauthorizedError
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.core.exceptions import UnauthorizedError, ForbiddenError
+from app.modules.auth.providers.supabase import SupabaseAuthProvider
+from app.modules.profile.models import Profile, UserRoleAssignment
+
+_auth_provider = SupabaseAuthProvider()
 
 
-def get_current_user(authorization: str = Header(...)):
-    try:
-        scheme, token = authorization.split()
-        if scheme.lower() != "bearer":
-            raise UnauthorizedError()
-        return decode_token(token)
-    except Exception:
-        raise UnauthorizedError()
+@dataclass
+class AuthContext:
+    user_id: UUID
+    email: str | None
+    full_name: str | None
+    phone: str | None
+    avatar_url: str | None
+    status: str
+    roles: list[str]
+
+    def has_role(self, role: str) -> bool:
+        return role in self.roles
+
+    def is_admin(self) -> bool:
+        return "super_admin" in self.roles
+
+    def is_owner(self) -> bool:
+        return "venue_owner" in self.roles or self.is_admin()
+
+
+def _extract_bearer_token(authorization: str) -> str:
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise UnauthorizedError("Invalid authorization header")
+    return parts[1]
+
+
+def get_current_user(
+    authorization: str = Header(...),
+    db: Session = Depends(get_db),
+) -> AuthContext:
+    token = _extract_bearer_token(authorization)
+    provider_user = _auth_provider.verify_token(token)
+
+    profile = db.query(Profile).filter(
+        Profile.id == provider_user.id,
+        Profile.deleted_at.is_(None),
+    ).first()
+
+    if not profile:
+        raise ForbiddenError("Account not found")
+
+    if profile.status.value == "suspended":
+        raise ForbiddenError("Account suspended")
+
+    role_rows = db.query(UserRoleAssignment).filter(
+        UserRoleAssignment.user_id == provider_user.id
+    ).all()
+
+    return AuthContext(
+        user_id=profile.id,
+        email=provider_user.email,
+        full_name=profile.full_name,
+        phone=profile.phone,
+        avatar_url=profile.avatar_url,
+        status=profile.status.value,
+        roles=[r.role.value for r in role_rows],
+    )
+
+
+def require_auth(
+    current_user: AuthContext = Depends(get_current_user),
+) -> AuthContext:
+    return current_user
 
 
 def require_role(*roles: str):
-    def dependency(user=Depends(get_current_user)):
-        if user.get("role") not in roles:
-            raise UnauthorizedError("Insufficient permissions")
-        return user
+    def dependency(
+        current_user: AuthContext = Depends(get_current_user),
+    ) -> AuthContext:
+        if not any(r in current_user.roles for r in roles):
+            raise ForbiddenError("Insufficient permissions")
+        return current_user
     return dependency
+
+
+def require_any_role(roles: list[str]):
+    def dependency(
+        current_user: AuthContext = Depends(get_current_user),
+    ) -> AuthContext:
+        if not any(r in current_user.roles for r in roles):
+            raise ForbiddenError("Insufficient permissions")
+        return current_user
+    return dependency
+
+
+def require_admin(
+    current_user: AuthContext = Depends(get_current_user),
+) -> AuthContext:
+    if not current_user.is_admin():
+        raise ForbiddenError("Admin access required")
+    return current_user
+
+
+def require_owner(
+    current_user: AuthContext = Depends(get_current_user),
+) -> AuthContext:
+    if not current_user.is_owner():
+        raise ForbiddenError("Venue owner access required")
+    return current_user
