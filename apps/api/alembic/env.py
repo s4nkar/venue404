@@ -6,6 +6,7 @@ from app.core.database import Base
 
 # import all models so Base.metadata is populated for autogenerate
 import app.modules.profile.models  # noqa: F401
+import app.modules.admin.models  # noqa: F401
 
 config = context.config
 

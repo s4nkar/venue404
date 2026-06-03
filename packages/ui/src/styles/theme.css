@@ -1,0 +1,97 @@
+/**
+ * Venue404 — Shared Design System
+ *
+ * Import order in every app:
+ *   1. @import "tailwindcss";
+ *   2. @import "@venue404/ui/theme.css";
+ *   3. @source "<path-to-packages/ui/src>";
+ *
+ * Palette  : zinc neutrals  +  blue-600 accent  (no AI-purple, no gradients)
+ * Font     : Geist Variable (variable font, weights 100–900)
+ * Sidebar  : zinc-950 background, zinc-800 borders
+ * Content  : zinc-50 background, white cards, zinc-200 borders
+ * Motion   : Emil-style press feedback (scale 0.97), expo easing, stagger entry
+ */
+
+@import "@fontsource-variable/geist";
+
+/* ─── Design tokens ─────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    /* Layout */
+    --sidebar-width: 248px;
+    --topbar-height: 60px;
+
+    /* Easing (Emil Kowalski) */
+    --ease-out-expo:    cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out-expo: cubic-bezier(0.77, 0, 0.175, 1);
+
+    /* Brand */
+    --color-brand:       #2563eb;  /* blue-600  */
+    --color-brand-hover: #1d4ed8;  /* blue-700  */
+    --color-sidebar:     #09090b;  /* zinc-950  */
+    --color-surface:     #ffffff;  /* white     */
+    --color-bg:          #fafafa;  /* zinc-50   */
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Geist Variable', system-ui, -apple-system, sans-serif;
+    background-color: var(--color-bg);
+    color: #18181b; /* zinc-900 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+/* ─── Press feedback (Emil Kowalski) ────────────────────────────────────── */
+@layer utilities {
+  .press {
+    transition: transform 150ms var(--ease-out-expo);
+  }
+  .press:active {
+    transform: scale(0.97);
+  }
+}
+
+/* ─── Card stagger entry ─────────────────────────────────────────────────── */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.card-enter {
+  animation: card-in 400ms var(--ease-out-expo) both;
+}
+.card-enter:nth-child(1) { animation-delay:   0ms; }
+.card-enter:nth-child(2) { animation-delay:  60ms; }
+.card-enter:nth-child(3) { animation-delay: 120ms; }
+.card-enter:nth-child(4) { animation-delay: 180ms; }
+.card-enter:nth-child(5) { animation-delay: 240ms; }
+.card-enter:nth-child(6) { animation-delay: 300ms; }
+
+/* ─── Page fade-in ───────────────────────────────────────────────────────── */
+@keyframes page-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.page-enter {
+  animation: page-in 250ms var(--ease-out-expo) both;
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .card-enter,
+  .page-enter {
+    animation: none;
+  }
+}

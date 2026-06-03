@@ -1,5 +1,44 @@
+// Design tokens (JS mirror of theme.css)
+export * from './tokens'
+
+// Primitives (existing)
 export { default as Button } from './Button'
 export { default as Input } from './Input'
 export { default as Card } from './Card'
 export { default as Modal } from './Modal'
 export { default as DatePicker } from './DatePicker'
+
+// Utilities
+export { cn } from './lib/utils'
+
+// Brand
+export { Logo, BrandMark } from './components/brand/Logo'
+
+// Auth
+export { AuthLayout } from './components/auth/AuthLayout'
+export { AuthCard } from './components/auth/AuthCard'
+export { AuthStatusPanel } from './components/auth/AuthStatusPanel'
+
+// Feedback
+export { LoadingScreen } from './components/feedback/LoadingScreen'
+export { ErrorState } from './components/feedback/ErrorState'
+export { ForbiddenState } from './components/feedback/ForbiddenState'
+export { NotFoundState } from './components/feedback/NotFoundState'
+
+// Empty state
+export { EmptyState } from './components/empty-state/EmptyState'
+
+// App shell
+export { AppShell } from './components/app-shell/AppShell'
+export { AppSidebar } from './components/app-shell/AppSidebar'
+export { AppTopbar } from './components/app-shell/AppTopbar'
+export { NavItem } from './components/app-shell/NavItem'
+export { UserMenu } from './components/app-shell/UserMenu'
+export type { NavItemConfig } from './components/app-shell/NavItem'
+
+// Dashboard
+export { MetricCard } from './components/dashboard/MetricCard'
+export { ActivityItem } from './components/dashboard/ActivityItem'
+export { StatusBadge } from './components/dashboard/StatusBadge'
+export { SectionHeader } from './components/dashboard/SectionHeader'
+export type { DashboardMetric, MetricCardAccent } from './components/dashboard/MetricCard'
