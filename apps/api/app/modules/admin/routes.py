@@ -7,5 +7,5 @@ router = APIRouter()
 
 
 @router.patch("/venues/{venue_id}/approve", status_code=204)
-def approve_venue(venue_id: str, body: VenueApprovalRequest, user=Depends(require_role("admin"))):
+def approve_venue(venue_id: str, body: VenueApprovalRequest, _=Depends(require_role("super_admin"))):
     service.approve_venue(venue_id, body)
