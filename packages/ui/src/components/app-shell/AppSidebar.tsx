@@ -1,0 +1,95 @@
+import { cn } from '../../lib/utils'
+import { NavItem, type NavItemConfig } from './NavItem'
+import { UserMenu } from './UserMenu'
+
+type AppSidebarProps = {
+  navItems: NavItemConfig[]
+  activePath: string
+  onNavigate: (href: string) => void
+  brand?: React.ReactNode
+  user?: { name: string; email: string; role?: string }
+  onSignOut?: () => void
+  className?: string
+  mobileOpen?: boolean
+  onMobileClose?: () => void
+}
+
+export function AppSidebar({
+  navItems,
+  activePath,
+  onNavigate,
+  brand,
+  user,
+  onSignOut,
+  className,
+  mobileOpen,
+  onMobileClose,
+}: AppSidebarProps) {
+  const sidebar = (
+    <aside
+      className={cn(
+        'flex h-full w-[var(--sidebar-width,248px)] flex-col bg-zinc-950',
+        className,
+      )}
+    >
+      {/* Brand */}
+      {brand && (
+        <div className="flex h-[60px] shrink-0 items-center border-b border-zinc-800/60 px-4">
+          {brand}
+        </div>
+      )}
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Main navigation">
+        {/* Optional nav group label */}
+        <p className="mb-1.5 px-2.5 text-[10.5px] font-semibold uppercase tracking-widest text-zinc-600">
+          Management
+        </p>
+        <ul className="space-y-0.5">
+          {navItems.map((item) => (
+            <li key={item.href}>
+              <NavItem
+                {...item}
+                active={
+                  item.href === '/'
+                    ? activePath === item.href
+                    : activePath === item.href || activePath.startsWith(item.href + '/')
+                }
+                onClick={() => {
+                  onNavigate(item.href)
+                  onMobileClose?.()
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/* User */}
+      {user && (
+        <div className="shrink-0 border-t border-zinc-800/60 p-2">
+          <UserMenu {...user} onSignOut={onSignOut} />
+        </div>
+      )}
+    </aside>
+  )
+
+  return (
+    <>
+      {/* Desktop: fixed sidebar */}
+      <div className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:z-20">{sidebar}</div>
+
+      {/* Mobile: drawer */}
+      {mobileOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
+            onClick={onMobileClose}
+            aria-hidden="true"
+          />
+          <div className="fixed inset-y-0 left-0 z-40 flex lg:hidden">{sidebar}</div>
+        </>
+      )}
+    </>
+  )
+}
