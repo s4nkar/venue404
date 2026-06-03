@@ -1,7 +1,7 @@
 from app.modules.auth.schemas import AuthMeResponse, ProfileResponse
 
 
-async def get_me(current_user) -> AuthMeResponse:
+def get_me(current_user) -> AuthMeResponse:
     return AuthMeResponse(
         id=current_user.user_id,
         email=current_user.email,
