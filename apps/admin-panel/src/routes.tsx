@@ -6,6 +6,7 @@ import LoginSuccess from './pages/LoginSuccess'
 import Forbidden from './pages/Forbidden'
 import NotFound from './pages/NotFound'
 import ComingSoon from './pages/ComingSoon'
+import Users from './pages/Users'
 
 export const router = createBrowserRouter([
   // Auth
@@ -36,10 +37,7 @@ export const router = createBrowserRouter([
     path: '/users',
     element: (
       <ProtectedRoute>
-        <ComingSoon
-          title="User Management"
-          description="View and manage customer accounts, suspend users, and review activity. Coming soon."
-        />
+        <Users />
       </ProtectedRoute>
     ),
   },
