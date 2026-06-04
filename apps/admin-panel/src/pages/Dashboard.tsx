@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout } from '../components/AdminLayout'
-import { createClient } from '@venue404/api-client'
+import { createClient, ApiError } from '@venue404/api-client'
 import { adminActionEndpoints } from '@venue404/api-client'
 import type { AdminAction } from '@venue404/api-client'
 
@@ -99,7 +99,7 @@ export default function Dashboard() {
   useEffect(() => {
     actionsApi.listActions({ limit: 8 })
       .then((res) => setRecentActions(res.items))
-      .catch(() => { /* silent — dashboard degrades gracefully */ })
+      .catch((e) => { if (e instanceof ApiError && (e.status === 401 || e.status === 403)) throw e })
       .finally(() => setActionsLoading(false))
   }, [])
 

@@ -113,11 +113,13 @@ export default function Users() {
     setSuspendTarget(null)
     setSuspendReason('')
     setSuspendError(null)
+    setSuspendLoading(false)
   }
 
   function closeReactivateModal() {
     setReactivateTarget(null)
     setReactivateError(null)
+    setReactivateLoading(false)
   }
 
   async function handleSuspend() {

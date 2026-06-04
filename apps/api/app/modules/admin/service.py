@@ -67,11 +67,10 @@ def list_users(
 
     # Global stats — always reflect platform-wide counts regardless of filters
     stats_row = base.with_entities(
+        func.count(Profile.id).label("total"),
         func.count(case((Profile.status == ProfileStatus.active, 1))).label("active"),
         func.count(case((Profile.status == ProfileStatus.suspended, 1))).label("suspended"),
     ).one()
-    total_active = stats_row.active
-    total_suspended = stats_row.suspended
 
     profiles = (
         filtered.order_by(Profile.created_at.desc())
@@ -104,9 +103,9 @@ def list_users(
         "page_size": page_size,
         "total_pages": math.ceil(total / page_size) if total else 1,
         "stats": {
-            "total": total_active + total_suspended,
-            "active": total_active,
-            "suspended": total_suspended,
+            "total": stats_row.total,
+            "active": stats_row.active,
+            "suspended": stats_row.suspended,
         },
     }
 
