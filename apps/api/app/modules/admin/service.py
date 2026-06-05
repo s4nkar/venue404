@@ -1,20 +1,208 @@
 import json
 import logging
+import math
 import urllib.request
-import urllib.error
 import uuid
 from sqlalchemy.orm import Session
+from sqlalchemy import func, case
 
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.core.exceptions import NotFoundError, ForbiddenError, ConflictError
+from app.modules.admin.models import AdminAction
 from app.modules.admin.schemas import VenueApprovalRequest
 from app.modules.profile.models import Profile, UserRoleAssignment, UserRole, ProfileStatus
 
 logger = logging.getLogger(__name__)
 
-
 def approve_venue(venue_id: str, body: VenueApprovalRequest) -> None:
     raise NotImplementedError
+
+
+def _build_user_dict(
+    profile: Profile,
+    roles: list[str],
+    email: str | None,
+) -> dict:
+    return {
+        "id": profile.id,
+        "full_name": profile.full_name,
+        "email": email,
+        "phone": profile.phone,
+        "status": profile.status.value,
+        "roles": roles,
+        "created_at": profile.created_at,
+        "is_super_admin": "super_admin" in roles,
+    }
+
+
+def list_users(
+    db: Session,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+    search: str | None = None,
+    status: str | None = None,
+    role: str | None = None,
+) -> dict:
+    base = db.query(Profile).filter(Profile.deleted_at.is_(None))
+
+    filtered = base
+    if search:
+        pattern = f"%{search}%"
+        filtered = filtered.filter(
+            Profile.full_name.ilike(pattern) | Profile.email.ilike(pattern)
+        )
+    if status:
+        filtered = filtered.filter(Profile.status == ProfileStatus(status))
+    if role:
+        role_subq = (
+            db.query(UserRoleAssignment.user_id)
+            .filter(UserRoleAssignment.role == UserRole(role))
+            .subquery()
+        )
+        filtered = filtered.filter(Profile.id.in_(role_subq))
+
+    total = filtered.with_entities(func.count(Profile.id)).scalar()
+
+    # Global stats — always reflect platform-wide counts regardless of filters
+    stats_row = base.with_entities(
+        func.count(Profile.id).label("total"),
+        func.count(case((Profile.status == ProfileStatus.active, 1))).label("active"),
+        func.count(case((Profile.status == ProfileStatus.suspended, 1))).label("suspended"),
+    ).one()
+
+    profiles = (
+        filtered.order_by(Profile.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    profile_ids = [p.id for p in profiles]
+
+    role_rows = (
+        db.query(UserRoleAssignment)
+        .filter(UserRoleAssignment.user_id.in_(profile_ids))
+        .all()
+    )
+    roles_by_user: dict[uuid.UUID, list[str]] = {pid: [] for pid in profile_ids}
+    for rr in role_rows:
+        if rr.user_id in roles_by_user:
+            roles_by_user[rr.user_id].append(rr.role.value)
+
+    items = [
+        _build_user_dict(p, roles_by_user.get(p.id, []), p.email)
+        for p in profiles
+    ]
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": math.ceil(total / page_size) if total else 1,
+        "stats": {
+            "total": stats_row.total,
+            "active": stats_row.active,
+            "suspended": stats_row.suspended,
+        },
+    }
+
+
+def get_user(db: Session, user_id: uuid.UUID) -> dict:
+    profile = db.query(Profile).filter(
+        Profile.id == user_id,
+        Profile.deleted_at.is_(None),
+    ).first()
+    if not profile:
+        raise NotFoundError("User not found")
+
+    role_rows = db.query(UserRoleAssignment).filter(
+        UserRoleAssignment.user_id == user_id,
+    ).all()
+    roles = [r.role.value for r in role_rows]
+    return _build_user_dict(profile, roles, profile.email)
+
+
+def suspend_user(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    user_id: uuid.UUID,
+    reason: str,
+) -> None:
+    if not reason.strip():
+        raise ConflictError("Reason is required")
+
+    profile = db.query(Profile).filter(
+        Profile.id == user_id,
+        Profile.deleted_at.is_(None),
+    ).first()
+    if not profile:
+        raise NotFoundError("User not found")
+
+    is_super_admin = db.query(UserRoleAssignment).filter(
+        UserRoleAssignment.user_id == user_id,
+        UserRoleAssignment.role == UserRole.super_admin,
+    ).first()
+    if is_super_admin:
+        raise ForbiddenError("Super admin accounts cannot be suspended")
+
+    if profile.status == ProfileStatus.suspended:
+        raise ConflictError("User is already suspended")
+
+    profile.status = ProfileStatus.suspended
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="user_suspended",
+        target_type="user",
+        target_id=user_id,
+        reason=reason,
+    ))
+    db.commit()
+
+
+def reactivate_user(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    user_id: uuid.UUID,
+    reason: str = "",
+) -> None:
+    profile = db.query(Profile).filter(
+        Profile.id == user_id,
+        Profile.deleted_at.is_(None),
+    ).first()
+    if not profile:
+        raise NotFoundError("User not found")
+
+    if profile.status == ProfileStatus.active:
+        raise ConflictError("User is already active")
+
+    profile.status = ProfileStatus.active
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="user_reactivated",
+        target_type="user",
+        target_id=user_id,
+        reason=reason,
+    ))
+    db.commit()
+
+
+def list_actions(
+    db: Session,
+    *,
+    limit: int = 20,
+    target_type: str | None = None,
+) -> dict:
+    query = db.query(AdminAction)
+    if target_type:
+        query = query.filter(AdminAction.target_type == target_type)
+    total = query.with_entities(func.count(AdminAction.id)).scalar()
+    items = query.order_by(AdminAction.created_at.desc()).limit(limit).all()
+    return {"items": items, "total": total}
 
 
 def seed_super_admin() -> None:

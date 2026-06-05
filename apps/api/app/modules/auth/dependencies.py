@@ -56,6 +56,10 @@ def get_current_user(
     if profile.status.value == "suspended":
         raise ForbiddenError("Account suspended")
 
+    # Keep email in profiles in sync with the authoritative JWT value
+    if provider_user.email and profile.email != provider_user.email:
+        profile.email = provider_user.email
+
     role_rows = db.query(UserRoleAssignment).filter(
         UserRoleAssignment.user_id == provider_user.id
     ).all()
