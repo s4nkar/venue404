@@ -13,10 +13,66 @@ from app.modules.admin.models import AdminAction
 from app.modules.admin.schemas import VenueApprovalRequest
 from app.modules.profile.models import Profile, UserRoleAssignment, UserRole, ProfileStatus
 
+
+
 logger = logging.getLogger(__name__)
 
 def approve_venue(venue_id: str, body: VenueApprovalRequest) -> None:
     raise NotImplementedError
+
+
+def approve_owner(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    user_id: uuid.UUID,
+    reason: str = "",
+) -> None:
+    profile = db.query(Profile).filter(
+        Profile.id == user_id,
+        Profile.deleted_at.is_(None),
+    ).first()
+    if not profile:
+        raise NotFoundError("User not found")
+    if profile.status != ProfileStatus.pending:
+        raise ConflictError("User is not in pending status")
+
+    profile.status = ProfileStatus.active
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="venue_owner_approved",
+        target_type="user",
+        target_id=user_id,
+        reason=reason or None,
+    ))
+    db.commit()
+
+
+def reject_owner(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    user_id: uuid.UUID,
+    reason: str = "",
+) -> None:
+    profile = db.query(Profile).filter(
+        Profile.id == user_id,
+        Profile.deleted_at.is_(None),
+    ).first()
+    if not profile:
+        raise NotFoundError("User not found")
+    if profile.status != ProfileStatus.pending:
+        raise ConflictError("User is not in pending status")
+
+    profile.status = ProfileStatus.rejected
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="venue_owner_rejected",
+        target_type="user",
+        target_id=user_id,
+        reason=reason or None,
+    ))
+    db.commit()
 
 
 def _build_user_dict(
@@ -70,6 +126,8 @@ def list_users(
         func.count(Profile.id).label("total"),
         func.count(case((Profile.status == ProfileStatus.active, 1))).label("active"),
         func.count(case((Profile.status == ProfileStatus.suspended, 1))).label("suspended"),
+        func.count(case((Profile.status == ProfileStatus.pending, 1))).label("pending"),
+        func.count(case((Profile.status == ProfileStatus.rejected, 1))).label("rejected"),
     ).one()
 
     profiles = (
@@ -106,6 +164,8 @@ def list_users(
             "total": stats_row.total,
             "active": stats_row.active,
             "suspended": stats_row.suspended,
+            "pending": stats_row.pending,
+            "rejected": stats_row.rejected,
         },
     }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ShieldOff, ShieldCheck, Users as UsersIcon, Search, UserCheck, UserX } from 'lucide-react'
+import { ShieldOff, ShieldCheck, Users as UsersIcon, Search, UserCheck, UserX, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { createClient } from '@venue404/api-client'
 import { adminUserEndpoints } from '@venue404/api-client'
 import type { AdminUserSummary, AdminUserListResponse, AdminUserStatus, AdminUserRole } from '@venue404/api-client'
@@ -14,8 +14,11 @@ const api = adminUserEndpoints(createClient())
 
 const DEBOUNCE_MS = 350
 
-function statusVariant(s: AdminUserStatus): 'success' | 'danger' {
-  return s === 'active' ? 'success' : 'danger'
+function statusVariant(s: AdminUserStatus): 'success' | 'danger' | 'pending' | 'neutral' {
+  if (s === 'active') return 'success'
+  if (s === 'suspended') return 'danger'
+  if (s === 'pending') return 'pending'
+  return 'neutral'
 }
 
 function roleVariant(r: string): 'info' | 'pending' | 'neutral' {
@@ -75,6 +78,15 @@ export default function Users() {
   const [reactivateTarget, setReactivateTarget] = useState<AdminUserSummary | null>(null)
   const [reactivateLoading, setReactivateLoading] = useState(false)
   const [reactivateError, setReactivateError] = useState<string | null>(null)
+
+  const [approveTarget, setApproveTarget] = useState<AdminUserSummary | null>(null)
+  const [approveLoading, setApproveLoading] = useState(false)
+  const [approveError, setApproveError] = useState<string | null>(null)
+
+  const [rejectTarget, setRejectTarget] = useState<AdminUserSummary | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectLoading, setRejectLoading] = useState(false)
+  const [rejectError, setRejectError] = useState<string | null>(null)
 
   // Debounce the search input
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -156,6 +168,49 @@ export default function Users() {
     }
   }
 
+  function closeApproveModal() {
+    setApproveTarget(null)
+    setApproveError(null)
+    setApproveLoading(false)
+  }
+
+  function closeRejectModal() {
+    setRejectTarget(null)
+    setRejectReason('')
+    setRejectError(null)
+    setRejectLoading(false)
+  }
+
+  async function handleApprove() {
+    if (!approveTarget) return
+    setApproveLoading(true)
+    setApproveError(null)
+    try {
+      await api.approveOwner(approveTarget.id)
+      closeApproveModal()
+      fetchUsers()
+    } catch (e: unknown) {
+      setApproveError(e instanceof Error ? e.message : 'Failed to approve owner')
+    } finally {
+      setApproveLoading(false)
+    }
+  }
+
+  async function handleReject() {
+    if (!rejectTarget) return
+    setRejectLoading(true)
+    setRejectError(null)
+    try {
+      await api.rejectOwner(rejectTarget.id, { reason: rejectReason.trim() || undefined })
+      closeRejectModal()
+      fetchUsers()
+    } catch (e: unknown) {
+      setRejectError(e instanceof Error ? e.message : 'Failed to reject owner')
+    } finally {
+      setRejectLoading(false)
+    }
+  }
+
   const stats = response?.stats
   const pageSize = response?.page_size ?? 20
   const hasFilters = !!(searchInput || statusFilter || roleFilter)
@@ -164,7 +219,7 @@ export default function Users() {
     <AdminLayout pageTitle="Users" pageSubtitle="Manage customer and venue owner accounts">
 
       {/* Metric strip */}
-      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="card-enter" style={{ '--index': 0 } as React.CSSProperties}>
           <MetricCard
             label="Total Users"
@@ -184,6 +239,15 @@ export default function Users() {
           />
         </div>
         <div className="card-enter" style={{ '--index': 2 } as React.CSSProperties}>
+          <MetricCard
+            label="Pending Owners"
+            value={stats ? String(stats.pending) : '—'}
+            description="Awaiting admin approval"
+            icon={<Clock className="h-4 w-4" />}
+            accent="amber"
+          />
+        </div>
+        <div className="card-enter" style={{ '--index': 3 } as React.CSSProperties}>
           <MetricCard
             label="Suspended"
             value={stats ? String(stats.suspended) : '—'}
@@ -232,6 +296,8 @@ export default function Users() {
               >
                 <option value="">All statuses</option>
                 <option value="active">Active</option>
+                <option value="pending">Pending</option>
+                <option value="rejected">Rejected</option>
                 <option value="suspended">Suspended</option>
               </select>
             </div>
@@ -335,6 +401,25 @@ export default function Users() {
                       <td className="px-5 py-3.5 text-right">
                         {user.is_super_admin ? (
                           <StatusBadge label="Protected" variant="neutral" dot={false} />
+                        ) : user.status === 'pending' && user.roles.includes('venue_owner') ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setApproveTarget(user)}
+                              className="press inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRejectTarget(user)}
+                              className="press inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+                            >
+                              <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                              Reject
+                            </button>
+                          </div>
                         ) : user.status === 'active' ? (
                           <button
                             type="button"
@@ -344,7 +429,7 @@ export default function Users() {
                             <ShieldOff className="h-3.5 w-3.5" aria-hidden="true" />
                             Suspend
                           </button>
-                        ) : (
+                        ) : user.status === 'suspended' || user.status === 'rejected' ? (
                           <button
                             type="button"
                             onClick={() => setReactivateTarget(user)}
@@ -353,7 +438,7 @@ export default function Users() {
                             <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
                             Reactivate
                           </button>
-                        )}
+                        ) : null}
                       </td>
                     </tr>
                   ))}
@@ -469,6 +554,87 @@ export default function Users() {
                 className="press rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {reactivateLoading ? 'Reactivating…' : 'Reactivate account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Approve Modal */}
+      <Modal open={approveTarget !== null} onClose={closeApproveModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-zinc-900/5">
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+            </div>
+            <h3 className="mb-1 text-base font-semibold text-zinc-900">Approve venue owner</h3>
+            <p className="mb-5 text-sm text-zinc-500">
+              <span className="font-medium text-zinc-800">
+                {approveTarget?.full_name ?? approveTarget?.email ?? 'This user'}
+              </span>{' '}
+              will be granted full venue owner access immediately.
+            </p>
+            {approveError && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+                {approveError}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={closeApproveModal} disabled={approveLoading}>
+                Cancel
+              </Button>
+              <button
+                type="button"
+                onClick={handleApprove}
+                disabled={approveLoading}
+                className="press rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {approveLoading ? 'Approving…' : 'Approve owner'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Reject Modal */}
+      <Modal open={rejectTarget !== null} onClose={closeRejectModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-zinc-900/5">
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
+              <XCircle className="h-5 w-5 text-red-600" aria-hidden="true" />
+            </div>
+            <h3 className="mb-1 text-base font-semibold text-zinc-900">Reject venue owner</h3>
+            <p className="mb-5 text-sm text-zinc-500">
+              <span className="font-medium text-zinc-800">
+                {rejectTarget?.full_name ?? rejectTarget?.email ?? 'This user'}
+              </span>{' '}
+              will be notified their application was not approved. They can re-apply later.
+            </p>
+            <div>
+              <label htmlFor="reject-reason">Reason <span className="text-zinc-400 font-normal text-xs">(optional)</span></label>
+              <input
+                id="reject-reason"
+                type="text"
+                placeholder="e.g. Incomplete information"
+                value={rejectReason}
+                onChange={(e) => { setRejectReason(e.target.value); setRejectError(null) }}
+                autoFocus
+              />
+              {rejectError && (
+                <p className="mt-1.5 text-xs font-medium text-red-500">{rejectError}</p>
+              )}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="secondary" onClick={closeRejectModal} disabled={rejectLoading}>
+                Cancel
+              </Button>
+              <button
+                type="button"
+                onClick={handleReject}
+                disabled={rejectLoading}
+                className="press rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {rejectLoading ? 'Rejecting…' : 'Reject application'}
               </button>
             </div>
           </div>

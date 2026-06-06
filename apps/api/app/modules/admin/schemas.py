@@ -26,6 +26,8 @@ class UserStats(BaseModel):
     total: int
     active: int
     suspended: int
+    pending: int
+    rejected: int
 
 
 class UserListResponse(BaseModel):
@@ -60,3 +62,7 @@ class AdminActionResponse(BaseModel):
 class AdminActionListResponse(BaseModel):
     items: list[AdminActionResponse]
     total: int
+
+
+class OwnerApprovalRequest(BaseModel):
+    reason: str = ""

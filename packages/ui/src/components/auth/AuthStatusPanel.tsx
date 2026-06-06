@@ -9,10 +9,12 @@ type AuthStatusPanelProps = {
   title: string
   description: string
   features?: FeaturePill[]
+  tagline?: string
+  footnote?: string
   className?: string
 }
 
-export function AuthStatusPanel({ title, description, features, className }: AuthStatusPanelProps) {
+export function AuthStatusPanel({ title, description, features, tagline = 'Venue404 Admin', footnote = 'Restricted access. All sessions are logged.', className }: AuthStatusPanelProps) {
   return (
     <div className={cn('relative flex h-full flex-col justify-between p-12', className)}>
       {/* Subtle dot-grid pattern */}
@@ -29,7 +31,7 @@ export function AuthStatusPanel({ title, description, features, className }: Aut
       {/* Top: brand name */}
       <div className="relative">
         <span className="text-xs font-medium tracking-widest text-zinc-500 uppercase">
-          Venue404 Admin
+          {tagline}
         </span>
       </div>
 
@@ -59,9 +61,7 @@ export function AuthStatusPanel({ title, description, features, className }: Aut
 
       {/* Bottom: fine print */}
       <div className="relative">
-        <p className="text-xs text-zinc-600">
-          Restricted access. All sessions are logged.
-        </p>
+        <p className="text-xs text-zinc-600">{footnote}</p>
       </div>
     </div>
   )
