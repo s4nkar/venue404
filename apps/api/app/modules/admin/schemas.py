@@ -66,3 +66,11 @@ class AdminActionListResponse(BaseModel):
 
 class OwnerApprovalRequest(BaseModel):
     reason: str = ""
+
+
+class OwnerStatsResponse(BaseModel):
+    total: int
+    pending: int
+    active: int
+    rejected: int
+    suspended: int

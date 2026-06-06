@@ -26,6 +26,14 @@ export type OwnerApprovalBody = {
   reason?: string
 }
 
+export type OwnerStats = {
+  total: number
+  pending: number
+  active: number
+  rejected: number
+  suspended: number
+}
+
 export type AdminUserListResponse = {
   items: AdminUserSummary[]
   total: number
@@ -99,6 +107,9 @@ export const adminUserEndpoints = (client: ReturnType<typeof createClient>) => (
 
   reactivateUser: (userId: string, body: ReactivateUserBody = {}): Promise<void> =>
     client.patch<void>(`/api/admin/users/${userId}/reactivate`, body),
+
+  getOwnerStats: (): Promise<OwnerStats> =>
+    client.get<OwnerStats>('/api/admin/venue-owners/stats'),
 
   approveOwner: (userId: string, body: OwnerApprovalBody = {}): Promise<void> =>
     client.patch<void>(`/api/admin/venue-owners/${userId}/approve`, body),

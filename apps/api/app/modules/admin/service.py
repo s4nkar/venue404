@@ -92,6 +92,32 @@ def _build_user_dict(
     }
 
 
+def get_owner_stats(db: Session) -> dict:
+    owner_subq = (
+        db.query(UserRoleAssignment.user_id)
+        .filter(UserRoleAssignment.role == UserRole.venue_owner)
+        .subquery()
+    )
+    base = db.query(Profile).filter(
+        Profile.deleted_at.is_(None),
+        Profile.id.in_(owner_subq),
+    )
+    row = base.with_entities(
+        func.count(Profile.id).label("total"),
+        func.count(case((Profile.status == ProfileStatus.pending, 1))).label("pending"),
+        func.count(case((Profile.status == ProfileStatus.active, 1))).label("active"),
+        func.count(case((Profile.status == ProfileStatus.rejected, 1))).label("rejected"),
+        func.count(case((Profile.status == ProfileStatus.suspended, 1))).label("suspended"),
+    ).one()
+    return {
+        "total": row.total,
+        "pending": row.pending,
+        "active": row.active,
+        "rejected": row.rejected,
+        "suspended": row.suspended,
+    }
+
+
 def list_users(
     db: Session,
     *,
