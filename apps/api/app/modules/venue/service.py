@@ -14,6 +14,7 @@ from app.modules.venue.schemas import (
     PricingDisplay,
     VenueResponse,
     VenueAvailabilityUpdate,
+    CreateBlockedDateRequest,
     UpdateCancellationPolicyRequest,
     UpdateVenueAmenitiesRequest,
     BookingType,
