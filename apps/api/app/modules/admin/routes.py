@@ -10,6 +10,8 @@ from app.modules.admin.schemas import (
     SuspendUserRequest,
     ReactivateUserRequest,
     AdminActionListResponse,
+    OwnerApprovalRequest,
+    OwnerStatsResponse,
 )
 from app.modules.auth.dependencies import require_admin, AuthContext
 from app.modules.admin import service
@@ -27,7 +29,7 @@ def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: str | None = Query(None),
-    status: str | None = Query(None, pattern="^(active|suspended)$"),
+    status: str | None = Query(None, pattern="^(active|suspended|pending|rejected)$"),
     role: str | None = Query(None, pattern="^(customer|venue_owner|super_admin)$"),
     _: AuthContext = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -69,6 +71,34 @@ def reactivate_user(
     db: Session = Depends(get_db),
 ):
     service.reactivate_user(db, admin_id=auth.user_id, user_id=user_id, reason=body.reason)
+
+
+@router.get("/venue-owners/stats", response_model=OwnerStatsResponse)
+def get_owner_stats(
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.get_owner_stats(db)
+
+
+@router.patch("/venue-owners/{user_id}/approve", status_code=204)
+def approve_owner(
+    user_id: UUID,
+    body: OwnerApprovalRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    service.approve_owner(db, admin_id=auth.user_id, user_id=user_id, reason=body.reason)
+
+
+@router.patch("/venue-owners/{user_id}/reject", status_code=204)
+def reject_owner(
+    user_id: UUID,
+    body: OwnerApprovalRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    service.reject_owner(db, admin_id=auth.user_id, user_id=user_id, reason=body.reason)
 
 
 @router.get("/actions", response_model=AdminActionListResponse)

@@ -6,6 +6,7 @@ export type SignUpInput = {
   password: string
   fullName: string
   phone?: string
+  isOwner?: boolean
 }
 
 export type SignInInput = {
@@ -21,6 +22,7 @@ export async function signUpWithEmail(input: SignUpInput) {
       data: {
         full_name: input.fullName,
         phone: input.phone ?? null,
+        is_owner: input.isOwner ?? false,
       },
     },
   })

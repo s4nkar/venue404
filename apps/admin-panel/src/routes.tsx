@@ -7,6 +7,7 @@ import Forbidden from './pages/Forbidden'
 import NotFound from './pages/NotFound'
 import ComingSoon from './pages/ComingSoon'
 import Users from './pages/Users'
+import VenueOwners from './pages/VenueOwners'
 
 export const router = createBrowserRouter([
   // Auth
@@ -45,10 +46,7 @@ export const router = createBrowserRouter([
     path: '/owners',
     element: (
       <ProtectedRoute>
-        <ComingSoon
-          title="Venue Owners"
-          description="View and manage registered venue owners, verify identities, and monitor listings. Coming soon."
-        />
+        <VenueOwners />
       </ProtectedRoute>
     ),
   },
