@@ -1,16 +1,69 @@
-from fastapi import APIRouter, Depends
-from app.modules.availability.schemas import SlotResponse, BlockDateRequest
-from app.modules.auth.dependencies import get_current_user
+from datetime import date, datetime
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.modules.availability.schemas import (
+    AvailabilityResponse,
+)
+from app.modules.pricing.schemas import (
+    PricingQuote,
+)
 from app.modules.availability import service
+from app.modules.booking.models import BookingType
 
 router = APIRouter()
 
 
-@router.get("/{venue_id}/slots", response_model=list[SlotResponse])
-def get_slots(venue_id: str):
-    return service.get_slots(venue_id)
+@router.get(
+    "/venues/{venue_id}/date/{booking_date}",
+    response_model=AvailabilityResponse,
+)
+def availability_for_date(
+    venue_id: str,
+    booking_date: date,
+    db: Session = Depends(get_db),
+):
+    return service.get_availability_for_date(
+        db=db,
+        venue_id=venue_id,
+        booking_date=booking_date,
+    )
 
 
-@router.post("/{venue_id}/block", status_code=204)
-def block_date(venue_id: str, body: BlockDateRequest, user=Depends(get_current_user)):
-    service.block_date(venue_id, user["sub"], body)
+@router.get(
+    "/venues/{venue_id}/quote",
+    response_model=PricingQuote,
+)
+def pricing_quote(
+    venue_id: str,
+    starts_at: datetime = Query(...),
+    ends_at: datetime = Query(...),
+    db: Session = Depends(get_db),
+):
+    return service.get_pricing_quote(
+        db=db,
+        venue_id=venue_id,
+        starts_at=starts_at,
+        ends_at=ends_at,
+    )
+
+
+@router.post(
+    "/venues/{venue_id}/validate",
+)
+def validate_slot(
+    venue_id: str,
+    booking_type: str,
+    starts_at: datetime = Query(...),
+    ends_at: datetime = Query(...),
+    db: Session = Depends(get_db),
+):
+    return service.validate_slot(
+        db=db,
+        venue_id=venue_id,
+        booking_type=booking_type,
+        starts_at=starts_at,
+        ends_at=ends_at,
+    )
