@@ -10,6 +10,8 @@ from app.core.database import Base
 class ProfileStatus(str, enum.Enum):
     active = "active"
     suspended = "suspended"
+    pending = "pending"
+    rejected = "rejected"
 
 
 class UserRole(str, enum.Enum):

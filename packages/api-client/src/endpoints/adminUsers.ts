@@ -1,6 +1,6 @@
 import { createClient } from '../client'
 
-export type AdminUserStatus = 'active' | 'suspended'
+export type AdminUserStatus = 'active' | 'suspended' | 'pending' | 'rejected'
 export type AdminUserRole = 'customer' | 'venue_owner' | 'super_admin'
 
 export type AdminUserSummary = {
@@ -17,6 +17,20 @@ export type AdminUserSummary = {
 export type AdminUserStats = {
   total: number
   active: number
+  suspended: number
+  pending: number
+  rejected: number
+}
+
+export type OwnerApprovalBody = {
+  reason?: string
+}
+
+export type OwnerStats = {
+  total: number
+  pending: number
+  active: number
+  rejected: number
   suspended: number
 }
 
@@ -93,4 +107,13 @@ export const adminUserEndpoints = (client: ReturnType<typeof createClient>) => (
 
   reactivateUser: (userId: string, body: ReactivateUserBody = {}): Promise<void> =>
     client.patch<void>(`/api/admin/users/${userId}/reactivate`, body),
+
+  getOwnerStats: (): Promise<OwnerStats> =>
+    client.get<OwnerStats>('/api/admin/venue-owners/stats'),
+
+  approveOwner: (userId: string, body: OwnerApprovalBody = {}): Promise<void> =>
+    client.patch<void>(`/api/admin/venue-owners/${userId}/approve`, body),
+
+  rejectOwner: (userId: string, body: OwnerApprovalBody = {}): Promise<void> =>
+    client.patch<void>(`/api/admin/venue-owners/${userId}/reject`, body),
 })

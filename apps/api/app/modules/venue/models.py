@@ -93,7 +93,7 @@ class Venue(Base):
         CheckConstraint("min_booking_duration_minutes <= max_booking_duration_minutes", name="ck_venues_duration_range"),
         CheckConstraint("pre_buffer_minutes >= 0", name="ck_venues_pre_buffer"),
         CheckConstraint("post_buffer_minutes >= 0", name="ck_venues_post_buffer"),
-        CheckConstraint("pricing_mode IN ('flat', 'hourly')", name="ck_venues_pricing_mode"),
+        CheckConstraint("pricing_mode IN ('flat', 'hourly', 'mixed')", name="ck_venues_pricing_mode"),
         CheckConstraint("base_price_paise >= 0", name="ck_venues_base_price"),
         CheckConstraint("hourly_rate_paise >= 0", name="ck_venues_hourly_rate"),
         CheckConstraint("platform_commission_pct >= 0 AND platform_commission_pct <= 100", name="ck_venues_commission"),
