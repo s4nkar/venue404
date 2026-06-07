@@ -1,6 +1,6 @@
 from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,6 +23,7 @@ from app.modules.venue.schemas import (
     PublicVenueBlockedDateResponse,
 )
 from app.modules.venue import service
+from app.shared.utils import parse_timezone_datetime
 
 router = APIRouter()
 
@@ -150,13 +151,14 @@ def get_venue(
 @router.get("/{venue_id}/pricing", response_model=PricingPreviewResponse)
 def get_pricing_preview(
     venue_id: UUID,
-    starts_at: datetime = Query(..., description="ISO 8601 datetime with timezone offset"),
-    ends_at: datetime = Query(..., description="ISO 8601 datetime with timezone offset"),
+    starts_at: str = Query(..., description="ISO 8601 datetime with timezone offset"),
+    ends_at: str = Query(..., description="ISO 8601 datetime with timezone offset"),
     booking_type: BookingType = Query(..., description="full_day or time_slot"),
     db: Session = Depends(get_db),
 ):
-    
-    return service.get_pricing_preview(db, venue_id, starts_at, ends_at, booking_type)
+    starts_dt = parse_timezone_datetime(starts_at, "starts_at")
+    ends_dt = parse_timezone_datetime(ends_at, "ends_at")
+    return service.get_pricing_preview(db, venue_id, starts_dt, ends_dt, booking_type)
 
 
 @router.get("/{venue_id}/availability", response_model=list[VenueAvailabilityResponse])
