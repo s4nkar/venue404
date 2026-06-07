@@ -18,6 +18,8 @@ from app.modules.venue.schemas import (
     UpdateCancellationPolicyRequest,
     AmenityResponse,
     UpdateVenueAmenitiesRequest,
+    BookingType,
+    PublicVenueBlockedDateResponse,
 )
 from app.modules.venue import service
 
@@ -147,9 +149,9 @@ def get_venue(
 @router.get("/{venue_id}/pricing", response_model=PricingPreviewResponse)
 def get_pricing_preview(
     venue_id: UUID,
-    starts_at: str = Query(..., description="ISO 8601 datetime with timezone offset"),
-    ends_at: str = Query(..., description="ISO 8601 datetime with timezone offset"),
-    booking_type: str = Query(..., description="full_day or time_slot"),
+    starts_at: datetime = Query(..., description="ISO 8601 datetime with timezone offset"),
+    ends_at: datetime = Query(..., description="ISO 8601 datetime with timezone offset"),
+    booking_type: BookingType = Query(..., description="full_day or time_slot"),
     db: Session = Depends(get_db),
 ):
     
@@ -164,7 +166,7 @@ def get_venue_availability(
     return service.get_venue_availability(db, venue_id)
 
 
-@router.get("/{venue_id}/blocked-dates", response_model=list[VenueBlockedDateResponse])
+@router.get("/{venue_id}/blocked-dates", response_model=list[PublicVenueBlockedDateResponse])
 def get_venue_blocked_dates(
     venue_id: UUID,
     db: Session = Depends(get_db),

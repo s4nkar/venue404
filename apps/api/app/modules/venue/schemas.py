@@ -407,6 +407,23 @@ class VenueAvailabilityUpdate(BaseModel):
 class BulkUpdateAvailabilityRequest(BaseModel):
     availabilities: list[VenueAvailabilityUpdate]
 
+    @field_validator("availabilities")
+    @classmethod
+    def validate_unique_days(cls, v: list[VenueAvailabilityUpdate]) -> list[VenueAvailabilityUpdate]:
+        days = [item.day_of_week for item in v]
+        if len(days) != len(set(days)):
+            raise ValueError("Duplicate day_of_week entries are not allowed")
+        return v
+
+
+class PublicVenueBlockedDateResponse(BaseModel):
+    id: UUID
+    venue_id: UUID
+    starts_at: datetime
+    ends_at: datetime
+
+    model_config = {"from_attributes": True}
+
 
 class VenueBlockedDateResponse(BaseModel):
     id: UUID

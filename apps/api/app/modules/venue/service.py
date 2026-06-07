@@ -14,9 +14,9 @@ from app.modules.venue.schemas import (
     PricingDisplay,
     VenueResponse,
     VenueAvailabilityUpdate,
-    CreateBlockedDateRequest,
     UpdateCancellationPolicyRequest,
     UpdateVenueAmenitiesRequest,
+    BookingType,
 )
 
 
@@ -30,6 +30,18 @@ DEFAULT_PLATFORM_COMMISSION_PCT = Decimal("10.00")
 def _get_venue_or_404(db: Session, venue_id: UUID) -> Venue:
     venue = db.query(Venue).filter(
         Venue.id == venue_id,
+        Venue.deleted_at.is_(None),
+    ).first()
+    if not venue:
+        raise NotFoundError("Venue not found")
+    return venue
+
+
+def _get_active_venue_or_404(db: Session, venue_id: UUID) -> Venue:
+    venue = db.query(Venue).filter(
+        Venue.id == venue_id,
+        Venue.status == VenueStatus.approved,
+        Venue.is_active == True,
         Venue.deleted_at.is_(None),
     ).first()
     if not venue:
@@ -54,53 +66,27 @@ def _format_inr(paise: int) -> str:
 # Public service functions
 
 def get_venue(db: Session, venue_id: UUID) -> Venue:
-    
-    venue = db.query(Venue).filter(
-        Venue.id == venue_id,
-        Venue.status == VenueStatus.approved,
-        Venue.is_active == True,
-        Venue.deleted_at.is_(None),
-    ).first()
-
-    if not venue:
-        raise NotFoundError("Venue not found")
-
-    return venue
+    return _get_active_venue_or_404(db, venue_id)
 
 
 def get_pricing_preview(
     db: Session,
     venue_id: UUID,
-    starts_at: str,
-    ends_at: str,
-    booking_type: str,
+    starts_at: datetime,
+    ends_at: datetime,
+    booking_type: BookingType,
 ) -> PricingPreviewResponse:
     
-    
-    venue = db.query(Venue).filter(
-        Venue.id == venue_id,
-        Venue.status == VenueStatus.approved,
-        Venue.is_active == True,
-        Venue.deleted_at.is_(None),
-    ).first()
+    venue = _get_active_venue_or_404(db, venue_id)
 
-    if not venue:
-        raise NotFoundError("Venue not found")
-
-   
-    if venue.pricing_mode == "flat" or (venue.pricing_mode == "mixed" and booking_type == "full_day"):
-       
+    if venue.pricing_mode == "flat" or (venue.pricing_mode == "mixed" and booking_type == BookingType.full_day):
         quoted_price_paise = venue.base_price_paise
 
-    elif venue.pricing_mode == "hourly" or (venue.pricing_mode == "mixed" and booking_type == "time_slot"):
-        
-        start_dt = datetime.fromisoformat(starts_at)
-        end_dt = datetime.fromisoformat(ends_at)
-
-        if end_dt <= start_dt:
+    elif venue.pricing_mode == "hourly" or (venue.pricing_mode == "mixed" and booking_type == BookingType.time_slot):
+        if ends_at <= starts_at:
             raise ConflictError("ends_at must be after starts_at")
 
-        duration_seconds = (end_dt - start_dt).total_seconds()
+        duration_seconds = (ends_at - starts_at).total_seconds()
         duration_hours = Decimal(str(duration_seconds)) / Decimal("3600")
 
         quoted_price_paise = _banker_round(
@@ -117,23 +103,18 @@ def get_pricing_preview(
         / Decimal("100")
     )
 
-    
     owner_payout_paise = quoted_price_paise - platform_fee_paise
 
-    
     advance_due_paise = _banker_round(
         Decimal(str(quoted_price_paise))
         * Decimal(str(venue.advance_pct))
         / Decimal("100")
     )
 
-    
     balance_due_paise = quoted_price_paise - advance_due_paise
 
-    
-    assert advance_due_paise + balance_due_paise == quoted_price_paise, (
-        "Pricing invariant violated: advance_due + balance_due != quoted_price"
-    )
+    if advance_due_paise + balance_due_paise != quoted_price_paise:
+        raise ConflictError("Pricing invariant violated: advance_due + balance_due != quoted_price")
 
     return PricingPreviewResponse(
         pricing_mode=venue.pricing_mode,
@@ -256,6 +237,25 @@ def update_venue(
             value = [item.value for item in value]
         setattr(venue, field, value)
 
+    if venue.pricing_mode == "flat":
+        if venue.base_price_paise is None:
+            raise ConflictError("base_price_paise is required when pricing_mode is 'flat'")
+        if venue.hourly_rate_paise is not None:
+            raise ConflictError("hourly_rate_paise must be null when pricing_mode is 'flat'")
+    elif venue.pricing_mode == "hourly":
+        if venue.hourly_rate_paise is None:
+            raise ConflictError("hourly_rate_paise is required when pricing_mode is 'hourly'")
+        if venue.base_price_paise is not None:
+            raise ConflictError("base_price_paise must be null when pricing_mode is 'hourly'")
+    elif venue.pricing_mode == "mixed":
+        if venue.base_price_paise is None or venue.hourly_rate_paise is None:
+            raise ConflictError("Both base_price_paise and hourly_rate_paise are required when pricing_mode is 'mixed'")
+
+    if venue.min_capacity is not None and venue.min_capacity > venue.max_capacity:
+        raise ConflictError("min_capacity cannot exceed max_capacity")
+    if venue.min_booking_duration_minutes > venue.max_booking_duration_minutes:
+        raise ConflictError("min_booking_duration_minutes cannot exceed max_booking_duration_minutes")
+
     db.commit()
     db.refresh(venue)
     return venue
@@ -295,7 +295,7 @@ def submit_venue(db: Session, venue_id: UUID, owner_id: UUID) -> Venue:
 
 
 def get_venue_availability(db: Session, venue_id: UUID) -> list[VenueAvailability]:
-    _get_venue_or_404(db, venue_id)
+    _get_active_venue_or_404(db, venue_id)
     return (
         db.query(VenueAvailability)
         .filter(
@@ -344,7 +344,7 @@ def bulk_update_availability(
 
 
 def get_venue_blocked_dates(db: Session, venue_id: UUID) -> list[VenueBlockedDate]:
-    _get_venue_or_404(db, venue_id)
+    _get_active_venue_or_404(db, venue_id)
     now = datetime.now(timezone.utc)
     return (
         db.query(VenueBlockedDate)
@@ -399,7 +399,7 @@ def delete_blocked_date(db: Session, venue_id: UUID, blocked_id: UUID, owner_id:
 
 
 def get_venue_cancellation_policy(db: Session, venue_id: UUID) -> VenueCancellationPolicy:
-    _get_venue_or_404(db, venue_id)
+    _get_active_venue_or_404(db, venue_id)
     policy = db.query(VenueCancellationPolicy).filter(
         VenueCancellationPolicy.venue_id == venue_id
     ).first()
@@ -455,7 +455,10 @@ def update_venue_amenities(
     _assert_owner(venue, owner_id)
 
     if body.amenity_ids:
-        valid_amenities = db.query(Amenity).filter(Amenity.id.in_(body.amenity_ids)).all()
+        valid_amenities = db.query(Amenity).filter(
+            Amenity.id.in_(body.amenity_ids),
+            Amenity.deleted_at.is_(None),
+        ).all()
         if len(valid_amenities) != len(set(body.amenity_ids)):
             raise ConflictError("One or more amenity IDs provided do not exist in the platform.")
 
