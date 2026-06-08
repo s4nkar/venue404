@@ -104,6 +104,13 @@ class UpdateVenueAmenitiesRequest(BaseModel):
     amenity_ids: list[UUID]
 
 
+class UpdateVenuePhotoItem(BaseModel):
+    photo_id: UUID
+    sort_order: int
+    is_cover: bool
+
+class BulkUpdateVenuePhotosRequest(BaseModel):
+    photos: list[UpdateVenuePhotoItem]
 
 
 class VenueResponse(BaseModel):

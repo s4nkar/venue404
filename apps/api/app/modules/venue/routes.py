@@ -1,6 +1,6 @@
 from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -21,8 +21,11 @@ from app.modules.venue.schemas import (
     UpdateVenueAmenitiesRequest,
     BookingType,
     PublicVenueBlockedDateResponse,
+    VenuePhotoResponse,
+    BulkUpdateVenuePhotosRequest,
 )
 from app.modules.venue import service
+from app.shared.utils import parse_timezone_datetime
 
 router = APIRouter()
 
@@ -131,12 +134,52 @@ def update_venue_amenities(
     return service.update_venue_amenities(db, venue_id, auth.user_id, body)
 
 
+@router.post("/{venue_id}/photos", response_model=VenuePhotoResponse, status_code=201)
+async def add_venue_photo(
+    venue_id: UUID,
+    file: UploadFile = File(...),
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    file_bytes = await file.read()
+    return service.add_venue_photo(db, venue_id, auth.user_id, file_bytes)
+
+
+@router.put("/{venue_id}/photos/bulk-update", response_model=list[VenuePhotoResponse])
+def bulk_update_venue_photos(
+    venue_id: UUID,
+    body: BulkUpdateVenuePhotosRequest,
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    return service.bulk_update_venue_photos(db, venue_id, auth.user_id, body)
+
+
+@router.delete("/{venue_id}/photos/{photo_id}", response_model=DeleteResponse, status_code=200)
+def delete_venue_photo(
+    venue_id: UUID,
+    photo_id: UUID,
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    service.delete_venue_photo(db, venue_id, photo_id, auth.user_id)
+    return DeleteResponse(id=photo_id, message="Photo deleted successfully")
+
+
 
 
 
 
 
 # Public routes 
+
+@router.get("/amenities", response_model=list[AmenityResponse])
+def get_platform_amenities(db: Session = Depends(get_db)):
+    return service.get_platform_amenities(db)
+
 
 @router.get("/{venue_id}", response_model=VenueResponse)
 def get_venue(
@@ -150,13 +193,14 @@ def get_venue(
 @router.get("/{venue_id}/pricing", response_model=PricingPreviewResponse)
 def get_pricing_preview(
     venue_id: UUID,
-    starts_at: datetime = Query(..., description="ISO 8601 datetime with timezone offset"),
-    ends_at: datetime = Query(..., description="ISO 8601 datetime with timezone offset"),
+    starts_at: str = Query(..., description="ISO 8601 datetime with timezone offset"),
+    ends_at: str = Query(..., description="ISO 8601 datetime with timezone offset"),
     booking_type: BookingType = Query(..., description="full_day or time_slot"),
     db: Session = Depends(get_db),
 ):
-    
-    return service.get_pricing_preview(db, venue_id, starts_at, ends_at, booking_type)
+    starts_dt = parse_timezone_datetime(starts_at, "starts_at")
+    ends_dt = parse_timezone_datetime(ends_at, "ends_at")
+    return service.get_pricing_preview(db, venue_id, starts_dt, ends_dt, booking_type)
 
 
 @router.get("/{venue_id}/availability", response_model=list[VenueAvailabilityResponse])
