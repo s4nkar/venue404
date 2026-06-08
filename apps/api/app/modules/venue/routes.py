@@ -176,6 +176,11 @@ def delete_venue_photo(
 
 # Public routes 
 
+@router.get("/amenities", response_model=list[AmenityResponse])
+def get_platform_amenities(db: Session = Depends(get_db)):
+    return service.get_platform_amenities(db)
+
+
 @router.get("/{venue_id}", response_model=VenueResponse)
 def get_venue(
     venue_id: UUID,

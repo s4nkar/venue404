@@ -67,6 +67,9 @@ def _format_inr(paise: int) -> str:
 
 # Public service functions
 
+def get_platform_amenities(db: Session) -> list[Amenity]:
+    return db.query(Amenity).filter(Amenity.deleted_at.is_(None)).order_by(Amenity.name.asc()).all()
+
 def get_venue(db: Session, venue_id: UUID) -> Venue:
     return _get_active_venue_or_404(db, venue_id)
 
