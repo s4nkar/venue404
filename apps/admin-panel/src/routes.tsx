@@ -8,6 +8,7 @@ import NotFound from './pages/NotFound'
 import ComingSoon from './pages/ComingSoon'
 import Users from './pages/Users'
 import VenueOwners from './pages/VenueOwners'
+import Amenities from './pages/Amenities'
 
 export const router = createBrowserRouter([
   // Auth
@@ -47,6 +48,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <VenueOwners />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/amenities',
+    element: (
+      <ProtectedRoute>
+        <Amenities />
       </ProtectedRoute>
     ),
   },
