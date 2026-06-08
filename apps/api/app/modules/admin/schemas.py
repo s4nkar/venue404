@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel
-from typing import Literal
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
 
 
 class VenueApprovalRequest(BaseModel):
@@ -74,3 +74,34 @@ class OwnerStatsResponse(BaseModel):
     active: int
     rejected: int
     suspended: int
+
+
+class AmenityCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    icon: Optional[str] = None
+
+
+class AmenityUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    icon: Optional[str] = None
+
+
+class AdminAmenityResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    icon: Optional[str]
+    created_at: datetime
+    deleted_at: Optional[datetime]
+    active_venue_count: int
+
+    model_config = {"from_attributes": True}
+
+
+class AmenityListResponse(BaseModel):
+    items: list[AdminAmenityResponse]
+    total: int
+
+
+class AmenityDeleteResponse(BaseModel):
+    deleted: bool
+    active_venue_count: int

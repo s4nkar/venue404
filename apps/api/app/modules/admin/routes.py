@@ -12,6 +12,11 @@ from app.modules.admin.schemas import (
     AdminActionListResponse,
     OwnerApprovalRequest,
     OwnerStatsResponse,
+    AmenityCreateRequest,
+    AmenityUpdateRequest,
+    AdminAmenityResponse,
+    AmenityListResponse,
+    AmenityDeleteResponse,
 )
 from app.modules.auth.dependencies import require_admin, AuthContext
 from app.modules.admin import service
@@ -104,8 +109,45 @@ def reject_owner(
 @router.get("/actions", response_model=AdminActionListResponse)
 def list_actions(
     limit: int = Query(20, ge=1, le=100),
-    target_type: str | None = Query(None, pattern="^(user|venue|booking)$"),
+    target_type: str | None = Query(None, pattern="^(user|venue|booking|amenity)$"),
     _: AuthContext = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     return service.list_actions(db, limit=limit, target_type=target_type)
+
+
+@router.get("/amenities", response_model=AmenityListResponse)
+def list_amenities(
+    include_deleted: bool = Query(False),
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.list_amenities(db, include_deleted=include_deleted)
+
+
+@router.post("/amenities", response_model=AdminAmenityResponse, status_code=201)
+def create_amenity(
+    body: AmenityCreateRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.create_amenity(db, admin_id=auth.user_id, name=body.name, icon=body.icon)
+
+
+@router.patch("/amenities/{amenity_id}", response_model=AdminAmenityResponse)
+def update_amenity(
+    amenity_id: UUID,
+    body: AmenityUpdateRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.update_amenity(db, admin_id=auth.user_id, amenity_id=amenity_id, body=body)
+
+
+@router.delete("/amenities/{amenity_id}", response_model=AmenityDeleteResponse)
+def delete_amenity(
+    amenity_id: UUID,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.delete_amenity(db, admin_id=auth.user_id, amenity_id=amenity_id)

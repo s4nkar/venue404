@@ -3,15 +3,18 @@ import logging
 import math
 import urllib.request
 import uuid
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.exceptions import NotFoundError, ForbiddenError, ConflictError
 from app.modules.admin.models import AdminAction
-from app.modules.admin.schemas import VenueApprovalRequest
+from app.modules.admin.schemas import VenueApprovalRequest, AmenityUpdateRequest
 from app.modules.profile.models import Profile, UserRoleAssignment, UserRole, ProfileStatus
+from app.modules.venue.models import Amenity, VenueAmenity
 
 
 
@@ -275,6 +278,131 @@ def reactivate_user(
         reason=reason,
     ))
     db.commit()
+
+
+def _get_amenity_or_404(db: Session, amenity_id: uuid.UUID) -> Amenity:
+    amenity = db.query(Amenity).filter(Amenity.id == amenity_id).first()
+    if not amenity:
+        raise NotFoundError("Amenity not found")
+    return amenity
+
+
+def _count_active_venues(db: Session, amenity_id: uuid.UUID) -> int:
+    return db.query(VenueAmenity).filter(VenueAmenity.amenity_id == amenity_id).count()
+
+
+def _amenity_to_dict(amenity: Amenity, active_venue_count: int) -> dict:
+    return {
+        "id": amenity.id,
+        "name": amenity.name,
+        "icon": amenity.icon,
+        "created_at": amenity.created_at,
+        "deleted_at": amenity.deleted_at,
+        "active_venue_count": active_venue_count,
+    }
+
+
+def list_amenities(db: Session, *, include_deleted: bool = False) -> dict:
+    query = db.query(Amenity)
+    if not include_deleted:
+        query = query.filter(Amenity.deleted_at.is_(None))
+
+    amenities = query.order_by(Amenity.name.asc()).all()
+    amenity_ids = [a.id for a in amenities]
+
+    count_rows = (
+        db.query(VenueAmenity.amenity_id, func.count(VenueAmenity.venue_id).label("cnt"))
+        .filter(VenueAmenity.amenity_id.in_(amenity_ids))
+        .group_by(VenueAmenity.amenity_id)
+        .all()
+    ) if amenity_ids else []
+    counts = {row.amenity_id: row.cnt for row in count_rows}
+
+    items = [_amenity_to_dict(a, counts.get(a.id, 0)) for a in amenities]
+    return {"items": items, "total": len(items)}
+
+
+def create_amenity(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    name: str,
+    icon: str | None,
+) -> dict:
+    amenity = Amenity(name=name.strip(), icon=icon)
+    db.add(amenity)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise ConflictError("An amenity with this name already exists")
+
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="amenity_created",
+        target_type="amenity",
+        target_id=amenity.id,
+    ))
+    db.commit()
+    db.refresh(amenity)
+    return _amenity_to_dict(amenity, 0)
+
+
+def update_amenity(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    amenity_id: uuid.UUID,
+    body: AmenityUpdateRequest,
+) -> dict:
+    amenity = _get_amenity_or_404(db, amenity_id)
+    if amenity.deleted_at is not None:
+        raise ConflictError("Cannot update a deleted amenity")
+
+    if "name" in body.model_fields_set and body.name is not None:
+        amenity.name = body.name.strip()
+    if "icon" in body.model_fields_set:
+        amenity.icon = body.icon
+
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise ConflictError("An amenity with this name already exists")
+
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="amenity_updated",
+        target_type="amenity",
+        target_id=amenity.id,
+    ))
+    db.commit()
+    db.refresh(amenity)
+    active_count = _count_active_venues(db, amenity.id)
+    return _amenity_to_dict(amenity, active_count)
+
+
+def delete_amenity(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    amenity_id: uuid.UUID,
+) -> dict:
+    amenity = _get_amenity_or_404(db, amenity_id)
+    if amenity.deleted_at is not None:
+        raise ConflictError("Amenity is already deleted")
+
+    active_count = _count_active_venues(db, amenity.id)
+    amenity.deleted_at = datetime.now(timezone.utc)
+
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="amenity_deleted",
+        target_type="amenity",
+        target_id=amenity.id,
+    ))
+    db.commit()
+    return {"deleted": True, "active_venue_count": active_count}
 
 
 def list_actions(
