@@ -407,7 +407,7 @@ export default function Amenities() {
               <div>
                 <label htmlFor="create-icon">
                   Icon{' '}
-                  <span className="text-zinc-400 text-xs font-normal">(optional — emoji or short text)</span>
+                  <span className="text-zinc-400 text-xs font-normal">(optional: emoji or short text)</span>
                 </label>
                 <input
                   id="create-icon"
