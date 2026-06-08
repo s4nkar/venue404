@@ -18,10 +18,7 @@ from app.modules.availability.schemas import (
 
 from app.modules.venue.service import (
     _get_active_venue_or_404,
-)
-
-from app.modules.pricing.service import (
-    get_pricing_quote,
+    get_pricing_quote_for_slot,
 )
 
 
@@ -47,11 +44,7 @@ def resolve_operating_window(
         (
             a
             for a in venue.availability
-            if (
-                a.day_of_week == day
-                and a.is_available
-                and a.deleted_at is None
-            )
+            if (a.day_of_week == day and a.is_available and a.deleted_at is None)
         ),
         None,
     )
@@ -66,6 +59,7 @@ def resolve_operating_window(
         spans_next_day=availability.spans_next_day,
     )
 
+
 def is_date_blocked(
     venue,
     starts_at: datetime,
@@ -77,10 +71,7 @@ def is_date_blocked(
         if blocked.deleted_at:
             continue
 
-        overlap = (
-            starts_at < blocked.ends_at
-            and ends_at > blocked.starts_at
-        )
+        overlap = starts_at < blocked.ends_at and ends_at > blocked.starts_at
 
         if overlap:
             return True

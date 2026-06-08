@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.modules.availability.schemas import (
     AvailabilityResponse,
 )
-from app.modules.pricing.schemas import (
+from app.modules.venue.schemas import (
     PricingQuote,
 )
 from app.modules.availability import service

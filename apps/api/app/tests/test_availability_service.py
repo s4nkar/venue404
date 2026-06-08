@@ -6,7 +6,7 @@ from app.modules.availability.service import (
     expand_full_day_slot,
     compute_effective_range,
 )
-from app.modules.pricing import compute_pricing_quote
+from app.modules.venue.service import _compute_pricing_quote
 from app.modules.venue.models import Venue
 
 
@@ -50,10 +50,10 @@ def test_pricing_quote_hourly():
     tz = ZoneInfo(v.timezone)
     starts = datetime(2026, 6, 7, 10, 0, tzinfo=tz).astimezone(timezone.utc)
     ends = datetime(2026, 6, 7, 12, 30, tzinfo=tz).astimezone(timezone.utc)
-    q = compute_pricing_quote(v, starts, ends)
+    q = _compute_pricing_quote(v, starts, ends, booking_type="time_slot")
     # duration 2.5 hours * 10000 paise = 25000 paise
-    assert q["quoted_price_paise"] == 25000
-    assert q["advance_due_paise"] == int(25000 * 0.30)
+    assert q.quoted_price_paise == 25000
+    assert q.advance_due_paise == int(25000 * 0.30)
 
 
 def test_expand_full_day_handles_dst_forward():
