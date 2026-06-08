@@ -6,19 +6,20 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError, ForbiddenError, ConflictError
-from app.modules.venue.models import Venue, VenueStatus, VenueAvailability, VenueBlockedDate, VenueCancellationPolicy, VenueAmenity, Amenity
+from app.modules.venue.models import Venue, VenueStatus, VenueAvailability, VenueBlockedDate, VenueCancellationPolicy, VenueAmenity, Amenity, VenuePhoto
 from app.modules.venue.schemas import (
     CreateVenueRequest,
     UpdateVenueRequest,
     PricingPreviewResponse,
     PricingDisplay,
-    VenueResponse,
     VenueAvailabilityUpdate,
     CreateBlockedDateRequest,
     UpdateCancellationPolicyRequest,
     UpdateVenueAmenitiesRequest,
+    BulkUpdateVenuePhotosRequest,
     BookingType,
 )
+from app.core.storage import upload_image_to_cloudinary, delete_image_from_cloudinary
 
 
 # Default platform commission
@@ -475,3 +476,115 @@ def update_venue_amenities(
     db.commit()
     db.refresh(venue)
     return venue.amenities
+
+
+def add_venue_photo(
+    db: Session,
+    venue_id: UUID,
+    owner_id: UUID,
+    file_bytes: bytes,
+) -> VenuePhoto:
+    venue = _get_venue_or_404(db, venue_id)
+    _assert_owner(venue, owner_id)
+
+   
+    image_url = upload_image_to_cloudinary(file_bytes, folder=f"venues/{venue_id}")
+
+    
+    existing_photos = db.query(VenuePhoto).filter(
+        VenuePhoto.venue_id == venue_id,
+        VenuePhoto.deleted_at.is_(None)
+    ).all()
+
+    sort_order = len(existing_photos)
+    is_cover = True if sort_order == 0 else False
+
+    photo = VenuePhoto(
+        id=uuid.uuid4(),
+        venue_id=venue_id,
+        image_url=image_url,
+        sort_order=sort_order,
+        is_cover=is_cover
+    )
+    db.add(photo)
+    db.commit()
+    db.refresh(photo)
+    return photo
+
+
+def bulk_update_venue_photos(
+    db: Session,
+    venue_id: UUID,
+    owner_id: UUID,
+    body: BulkUpdateVenuePhotosRequest,
+) -> list[VenuePhoto]:
+    venue = _get_venue_or_404(db, venue_id)
+    _assert_owner(venue, owner_id)
+
+    cover_count = sum(1 for p in body.photos if p.is_cover)
+    if cover_count != 1:
+        raise ConflictError("Exactly one photo must be marked as the cover photo.")
+
+    photo_ids_in_request = {p.photo_id for p in body.photos}
+    
+    
+    existing_photos = db.query(VenuePhoto).filter(
+        VenuePhoto.venue_id == venue_id,
+        VenuePhoto.deleted_at.is_(None)
+    ).all()
+
+    existing_photo_map = {p.id: p for p in existing_photos}
+
+    if len(photo_ids_in_request) != len(existing_photos):
+        raise ConflictError("The request must include all active photos for this venue.")
+
+    for p_id in photo_ids_in_request:
+        if p_id not in existing_photo_map:
+            raise NotFoundError(f"Photo with ID {p_id} not found in this venue")
+
+    
+    
+    for photo in existing_photos:
+        photo.is_cover = False
+    db.flush()
+
+    
+    for item in body.photos:
+        photo = existing_photo_map[item.photo_id]
+        photo.sort_order = item.sort_order
+        photo.is_cover = item.is_cover
+
+    db.commit()
+
+    return sorted(existing_photos, key=lambda p: p.sort_order)
+
+
+def delete_venue_photo(db: Session, venue_id: UUID, photo_id: UUID, owner_id: UUID) -> None:
+    venue = _get_venue_or_404(db, venue_id)
+    _assert_owner(venue, owner_id)
+
+    photo = db.query(VenuePhoto).filter(
+        VenuePhoto.id == photo_id,
+        VenuePhoto.venue_id == venue_id,
+        VenuePhoto.deleted_at.is_(None)
+    ).first()
+
+    if not photo:
+        raise NotFoundError("Photo not found")
+
+    photo.deleted_at = datetime.now(timezone.utc)
+
+
+    if photo.is_cover:
+        photo.is_cover = False
+        next_photo = db.query(VenuePhoto).filter(
+            VenuePhoto.venue_id == venue_id,
+            VenuePhoto.id != photo_id,
+            VenuePhoto.deleted_at.is_(None)
+        ).order_by(VenuePhoto.sort_order.asc()).first()
+        
+        if next_photo:
+            next_photo.is_cover = True
+            db.add(next_photo)
+
+    db.commit()

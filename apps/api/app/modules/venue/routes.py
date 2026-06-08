@@ -1,6 +1,6 @@
 from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -21,6 +21,8 @@ from app.modules.venue.schemas import (
     UpdateVenueAmenitiesRequest,
     BookingType,
     PublicVenueBlockedDateResponse,
+    VenuePhotoResponse,
+    BulkUpdateVenuePhotosRequest,
 )
 from app.modules.venue import service
 from app.shared.utils import parse_timezone_datetime
@@ -130,6 +132,41 @@ def update_venue_amenities(
     db: Session = Depends(get_db),
 ):
     return service.update_venue_amenities(db, venue_id, auth.user_id, body)
+
+
+@router.post("/{venue_id}/photos", response_model=VenuePhotoResponse, status_code=201)
+async def add_venue_photo(
+    venue_id: UUID,
+    file: UploadFile = File(...),
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    file_bytes = await file.read()
+    return service.add_venue_photo(db, venue_id, auth.user_id, file_bytes)
+
+
+@router.put("/{venue_id}/photos/bulk-update", response_model=list[VenuePhotoResponse])
+def bulk_update_venue_photos(
+    venue_id: UUID,
+    body: BulkUpdateVenuePhotosRequest,
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    return service.bulk_update_venue_photos(db, venue_id, auth.user_id, body)
+
+
+@router.delete("/{venue_id}/photos/{photo_id}", response_model=DeleteResponse, status_code=200)
+def delete_venue_photo(
+    venue_id: UUID,
+    photo_id: UUID,
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    service.delete_venue_photo(db, venue_id, photo_id, auth.user_id)
+    return DeleteResponse(id=photo_id, message="Photo deleted successfully")
 
 
 
