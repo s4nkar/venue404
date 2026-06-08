@@ -77,6 +77,7 @@ export type AdminAction = {
   action_type: string
   target_type: string
   target_id: string
+  target_name: string | null
   reason: string | null
   created_at: string
 }

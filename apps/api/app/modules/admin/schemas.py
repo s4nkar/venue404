@@ -54,6 +54,7 @@ class AdminActionResponse(BaseModel):
     action_type: str
     target_type: str
     target_id: uuid.UUID
+    target_name: str | None
     reason: str | None
     created_at: datetime
 

@@ -630,19 +630,38 @@ def list_actions(
         .all()
     )
 
-    # Batch-enrich with admin names
+    # Batch-enrich admin names
     admin_ids = list({a.admin_id for a in items})
-    profiles = db.query(Profile).filter(Profile.id.in_(admin_ids)).all()
-    name_by_id = {p.id: p.full_name for p in profiles}
+    admin_profiles = db.query(Profile).filter(Profile.id.in_(admin_ids)).all()
+    admin_name_by_id = {p.id: p.full_name for p in admin_profiles}
+
+    # Batch-resolve target names grouped by target_type
+    target_name_by_id: dict[uuid.UUID, str] = {}
+
+    user_ids = [a.target_id for a in items if a.target_type == "user"]
+    if user_ids:
+        rows = db.query(Profile.id, Profile.full_name).filter(Profile.id.in_(user_ids)).all()
+        target_name_by_id.update({r.id: r.full_name for r in rows if r.full_name})
+
+    venue_ids = [a.target_id for a in items if a.target_type == "venue"]
+    if venue_ids:
+        rows = db.query(Venue.id, Venue.name).filter(Venue.id.in_(venue_ids)).all()
+        target_name_by_id.update({r.id: r.name for r in rows})
+
+    amenity_ids = [a.target_id for a in items if a.target_type == "amenity"]
+    if amenity_ids:
+        rows = db.query(Amenity.id, Amenity.name).filter(Amenity.id.in_(amenity_ids)).all()
+        target_name_by_id.update({r.id: r.name for r in rows})
 
     enriched = [
         {
             "id": a.id,
             "admin_id": a.admin_id,
-            "admin_name": name_by_id.get(a.admin_id),
+            "admin_name": admin_name_by_id.get(a.admin_id),
             "action_type": a.action_type,
             "target_type": a.target_type,
             "target_id": a.target_id,
+            "target_name": target_name_by_id.get(a.target_id),
             "reason": a.reason,
             "created_at": a.created_at,
         }

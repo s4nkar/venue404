@@ -239,8 +239,6 @@ export default function AuditLog() {
 
 function ActionRow({ action }: { action: AdminAction }) {
   const meta = getActionMeta(action.action_type)
-  const shortId = action.target_id.slice(0, 8)
-
   return (
     <tr className="transition-colors hover:bg-zinc-50/60">
 
@@ -254,12 +252,20 @@ function ActionRow({ action }: { action: AdminAction }) {
 
       {/* Target */}
       <td className="px-5 py-3.5">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-start gap-1.5">
           <TargetIcon type={action.target_type} />
-          <div>
-            <span className="text-xs font-medium text-zinc-500 capitalize">{action.target_type}</span>
-            <span className="ml-2 font-mono text-xs text-zinc-300" title={action.target_id}>
-              #{shortId}
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-medium text-zinc-500 capitalize">{action.target_type}</span>
+              {action.target_name && (
+                <span className="text-xs font-medium text-zinc-800">({action.target_name})</span>
+              )}
+            </div>
+            <span
+              className="font-mono text-xs text-zinc-400 select-all cursor-text"
+              title="Click to select — copy for DB lookup"
+            >
+              {action.target_id}
             </span>
           </div>
         </div>
