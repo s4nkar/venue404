@@ -60,10 +60,11 @@ function actionLabel(type: string): string {
 }
 
 function actionIcon(type: string) {
-  const ok = type.endsWith('approved') || type.endsWith('reactivated') || type.endsWith('completed')
-  return ok
-    ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-    : <XCircle className="h-3.5 w-3.5 text-red-400" />
+  if (type.endsWith('approved') || type.endsWith('reactivated') || type.endsWith('completed'))
+    return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+  if (type.endsWith('rejected') || type.endsWith('suspended') || type.endsWith('deleted'))
+    return <XCircle className="h-3.5 w-3.5 text-red-400" />
+  return <CheckCircle2 className="h-3.5 w-3.5 text-blue-400" />
 }
 
 function actionBadge(type: string) {
