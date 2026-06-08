@@ -37,6 +37,11 @@ class Profile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now(), onupdate=func.now())
 
+    bookings = relationship(
+        "Booking",
+        back_populates="user",
+    )
+
 
 class UserRoleAssignment(Base):
     __tablename__ = "user_roles"
@@ -49,8 +54,3 @@ class UserRoleAssignment(Base):
         nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
-
-    bookings = relationship(
-        "Booking",
-        back_populates="user",
-    )
