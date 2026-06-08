@@ -10,6 +10,7 @@ import Users from './pages/Users'
 import VenueOwners from './pages/VenueOwners'
 import VenueApprovals from './pages/VenueApprovals'
 import Amenities from './pages/Amenities'
+import AuditLog from './pages/AuditLog'
 
 export const router = createBrowserRouter([
   // Auth
@@ -66,14 +67,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/audit-log',
-    element: (
-      <ProtectedRoute>
-        <ComingSoon
-          title="Audit Log"
-          description="Full immutable history of all admin actions — approvals, rejections, suspensions, and more. Coming soon."
-        />
-      </ProtectedRoute>
-    ),
+    element: <ProtectedRoute><AuditLog /></ProtectedRoute>,
   },
   {
     path: '/settings',

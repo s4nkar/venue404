@@ -118,8 +118,8 @@ export default function Dashboard() {
 
   const metrics = METRIC_TEMPLATES.map((m) => {
     if (m.label === 'Pending Approvals') return { ...m, value: ownerStats ? String(ownerStats.pending) : '—' }
-    if (m.label === 'Venue Owners')      return { ...m, value: ownerStats ? String(ownerStats.total)   : '—' }
-    if (m.label === 'Open Actions')      return { ...m, value: actionsTotal !== null ? String(actionsTotal) : '—' }
+    if (m.label === 'Venue Owners') return { ...m, value: ownerStats ? String(ownerStats.total) : '—' }
+    if (m.label === 'Open Actions') return { ...m, value: actionsTotal !== null ? String(actionsTotal) : '—' }
     return m
   })
 
@@ -158,7 +158,7 @@ export default function Dashboard() {
               action={
                 <button
                   type="button"
-                  onClick={() => navigate('/venue-owners')}
+                  onClick={() => navigate('/venues/pending')}
                   className="press text-xs font-medium text-blue-600 transition-colors hover:text-blue-700"
                 >
                   View all
@@ -256,9 +256,9 @@ export default function Dashboard() {
         <div className="flex flex-wrap gap-2">
           {[
             { label: 'Review pending venues', href: '/venues/pending', icon: <Building2 className="h-3.5 w-3.5" /> },
-            { label: 'Manage users',           href: '/users',          icon: <UserCheck className="h-3.5 w-3.5" /> },
-            { label: 'Open audit log',         href: '/audit-log',      icon: <ClipboardList className="h-3.5 w-3.5" /> },
-            { label: 'Active bookings',        href: '/bookings',       icon: <Clock className="h-3.5 w-3.5" /> },
+            { label: 'Manage users', href: '/users', icon: <UserCheck className="h-3.5 w-3.5" /> },
+            { label: 'Open audit log', href: '/audit-log', icon: <ClipboardList className="h-3.5 w-3.5" /> },
+            { label: 'Active bookings', href: '/bookings', icon: <Clock className="h-3.5 w-3.5" /> },
           ].map((a) => (
             <button
               key={a.href}

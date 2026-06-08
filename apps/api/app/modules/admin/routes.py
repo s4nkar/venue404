@@ -156,12 +156,19 @@ def reject_owner(
 
 @router.get("/actions", response_model=AdminActionListResponse)
 def list_actions(
-    limit: int = Query(20, ge=1, le=100),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     target_type: str | None = Query(None, pattern="^(user|venue|booking|amenity)$"),
+    action_type: str | None = Query(None),
+    # Legacy convenience: limit=N returns N items on page 1 (used by dashboard)
+    limit: int | None = Query(None, ge=1, le=100),
     _: AuthContext = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    return service.list_actions(db, limit=limit, target_type=target_type)
+    return service.list_actions(
+        db, page=page, page_size=page_size,
+        target_type=target_type, action_type=action_type, limit=limit,
+    )
 
 
 @router.get("/amenities", response_model=AmenityListResponse)

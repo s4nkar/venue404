@@ -50,6 +50,7 @@ class ReactivateUserRequest(BaseModel):
 class AdminActionResponse(BaseModel):
     id: uuid.UUID
     admin_id: uuid.UUID
+    admin_name: str | None
     action_type: str
     target_type: str
     target_id: uuid.UUID
@@ -62,6 +63,9 @@ class AdminActionResponse(BaseModel):
 class AdminActionListResponse(BaseModel):
     items: list[AdminActionResponse]
     total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class OwnerApprovalRequest(BaseModel):

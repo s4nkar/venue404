@@ -604,15 +604,58 @@ def delete_amenity(
 def list_actions(
     db: Session,
     *,
-    limit: int = 20,
+    page: int = 1,
+    page_size: int = 20,
     target_type: str | None = None,
+    action_type: str | None = None,
+    # Legacy — used by dashboard summary (returns at most `limit` items, page 1)
+    limit: int | None = None,
 ) -> dict:
     query = db.query(AdminAction)
     if target_type:
         query = query.filter(AdminAction.target_type == target_type)
+    if action_type:
+        query = query.filter(AdminAction.action_type == action_type)
+
     total = query.with_entities(func.count(AdminAction.id)).scalar()
-    items = query.order_by(AdminAction.created_at.desc()).limit(limit).all()
-    return {"items": items, "total": total}
+
+    effective_page_size = limit if limit is not None else page_size
+    offset = 0 if limit is not None else (page - 1) * page_size
+
+    items = (
+        query
+        .order_by(AdminAction.created_at.desc())
+        .offset(offset)
+        .limit(effective_page_size)
+        .all()
+    )
+
+    # Batch-enrich with admin names
+    admin_ids = list({a.admin_id for a in items})
+    profiles = db.query(Profile).filter(Profile.id.in_(admin_ids)).all()
+    name_by_id = {p.id: p.full_name for p in profiles}
+
+    enriched = [
+        {
+            "id": a.id,
+            "admin_id": a.admin_id,
+            "admin_name": name_by_id.get(a.admin_id),
+            "action_type": a.action_type,
+            "target_type": a.target_type,
+            "target_id": a.target_id,
+            "reason": a.reason,
+            "created_at": a.created_at,
+        }
+        for a in items
+    ]
+
+    return {
+        "items": enriched,
+        "total": total,
+        "page": 1 if limit is not None else page,
+        "page_size": effective_page_size,
+        "total_pages": math.ceil(total / effective_page_size) if total else 1,
+    }
 
 
 def seed_super_admin() -> None:
