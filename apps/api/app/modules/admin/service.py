@@ -5,7 +5,8 @@ import urllib.request
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, case, text
+from sqlalchemy import func, case, text, cast
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
@@ -43,8 +44,8 @@ def list_admin_venues(
     if status:
         filtered = filtered.filter(Venue.status == VenueStatus(status))
     if search:
-        pattern = f"%{search.strip()}%"
-        filtered = filtered.filter(Venue.name.ilike(pattern))
+        safe = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        filtered = filtered.filter(Venue.name.ilike(f"%{safe}%"))
 
     total = filtered.with_entities(func.count(Venue.id)).scalar()
     venues = (
@@ -130,9 +131,12 @@ def _check_no_active_bookings(db: Session, venue_id: uuid.UUID) -> None:
         from app.modules.booking.models import Booking, BookingStatus  # noqa: PLC0415
         count = (
             db.query(func.count(Booking.id))
-            .filter(Booking.venue_id == str(venue_id), Booking.status.in_([
-                BookingStatus.requested, BookingStatus.accepted, BookingStatus.confirmed,
-            ]))
+            .filter(
+                cast(Booking.venue_id, PGUUID) == venue_id,
+                Booking.status.in_([
+                    BookingStatus.requested, BookingStatus.accepted, BookingStatus.confirmed,
+                ]),
+            )
             .scalar()
         )
         if count and count > 0:
@@ -330,7 +334,8 @@ def list_users(
 
     filtered = base
     if search:
-        pattern = f"%{search}%"
+        safe = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{safe}%"
         filtered = filtered.filter(
             Profile.full_name.ilike(pattern) | Profile.email.ilike(pattern)
         )
@@ -525,7 +530,11 @@ def create_amenity(
     name: str,
     icon: str | None,
 ) -> dict:
-    amenity = Amenity(name=name.strip(), icon=icon)
+    normalized = name.strip()
+    # Serialize concurrent creates for the same name — prevents two transactions
+    # from both reading "not found" and both inserting, which DB constraints alone can't stop.
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:n))"), {"n": normalized.lower()})
+    amenity = Amenity(name=normalized, icon=icon)
     db.add(amenity)
     try:
         db.flush()
@@ -556,7 +565,9 @@ def update_amenity(
         raise ConflictError("Cannot update a deleted amenity")
 
     if "name" in body.model_fields_set and body.name is not None:
-        amenity.name = body.name.strip()
+        normalized = body.name.strip()
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:n))"), {"n": normalized.lower()})
+        amenity.name = normalized
     if "icon" in body.model_fields_set:
         amenity.icon = body.icon
 

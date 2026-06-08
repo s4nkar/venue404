@@ -161,11 +161,13 @@ export default function VenueApprovals() {
   async function handleSuspend() {
     if (!suspendTarget) return
     if (!suspendReason.trim()) { setSuspendError('A reason is required'); return }
+    const savedReason = suspendReason
     setSuspendLoading(true); setSuspendError(null)
     try {
-      await api.suspendVenue(suspendTarget.id, { reason: suspendReason.trim() })
+      await api.suspendVenue(suspendTarget.id, { reason: savedReason.trim() })
       closeSuspend(); fetchVenues()
     } catch (e) {
+      setSuspendReason(savedReason)
       const msg = e instanceof ApiError
         ? (e.message ?? 'Failed to suspend venue')
         : e instanceof Error ? e.message : 'Failed to suspend venue'
@@ -507,6 +509,10 @@ type VenueCardProps = {
 function VenueCard({ venue, onApprove, onReject, onSuspend, onReactivate }: VenueCardProps) {
   const [imgError, setImgError] = useState(false)
 
+  useEffect(() => { setImgError(false) }, [venue.id])
+
+  const handleImgError = useCallback(() => setImgError(true), [])
+
   return (
     <div className="p-5">
       <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -518,7 +524,7 @@ function VenueCard({ venue, onApprove, onReject, onSuspend, onReactivate }: Venu
               src={venue.cover_photo_url}
               alt={venue.name}
               className="h-full w-full object-cover"
-              onError={() => setImgError(true)}
+              onError={handleImgError}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
