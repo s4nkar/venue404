@@ -8,6 +8,7 @@ import NotFound from './pages/NotFound'
 import ComingSoon from './pages/ComingSoon'
 import Users from './pages/Users'
 import VenueOwners from './pages/VenueOwners'
+import VenueApprovals from './pages/VenueApprovals'
 import Amenities from './pages/Amenities'
 
 export const router = createBrowserRouter([
@@ -26,14 +27,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/venues/pending',
-    element: (
-      <ProtectedRoute>
-        <ComingSoon
-          title="Venue Approvals"
-          description="Review, approve, and reject venue submissions from owners. Filtering and detail review coming soon."
-        />
-      </ProtectedRoute>
-    ),
+    element: <ProtectedRoute><VenueApprovals /></ProtectedRoute>,
   },
   {
     path: '/users',

@@ -4,7 +4,7 @@ import math
 import urllib.request
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, case
 from sqlalchemy.exc import IntegrityError
 
@@ -12,16 +12,202 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.exceptions import NotFoundError, ForbiddenError, ConflictError
 from app.modules.admin.models import AdminAction
-from app.modules.admin.schemas import VenueApprovalRequest, AmenityUpdateRequest
+from app.modules.admin.schemas import AmenityUpdateRequest
 from app.modules.profile.models import Profile, UserRoleAssignment, UserRole, ProfileStatus
-from app.modules.venue.models import Amenity, VenueAmenity
+from app.modules.venue.models import Amenity, VenueAmenity, Venue, VenueStatus
 
 
 
 logger = logging.getLogger(__name__)
 
-def approve_venue(venue_id: str, body: VenueApprovalRequest) -> None:
-    raise NotImplementedError
+def list_admin_venues(
+    db: Session,
+    *,
+    status: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    base = db.query(Venue).filter(Venue.deleted_at.is_(None))
+
+    stats_row = base.with_entities(
+        func.count(Venue.id).label("total"),
+        func.count(case((Venue.status == VenueStatus.pending_approval, 1))).label("pending_approval"),
+        func.count(case((Venue.status == VenueStatus.approved, 1))).label("approved"),
+        func.count(case((Venue.status == VenueStatus.rejected, 1))).label("rejected"),
+        func.count(case((Venue.status == VenueStatus.suspended, 1))).label("suspended"),
+        func.count(case((Venue.status == VenueStatus.draft, 1))).label("draft"),
+    ).one()
+
+    filtered = base
+    if status:
+        filtered = filtered.filter(Venue.status == VenueStatus(status))
+
+    total = filtered.with_entities(func.count(Venue.id)).scalar()
+    venues = (
+        filtered
+        .options(joinedload(Venue.photos), joinedload(Venue.amenities))
+        .order_by(Venue.updated_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    owner_ids = [v.owner_id for v in venues]
+    profiles = db.query(Profile).filter(Profile.id.in_(owner_ids)).all()
+    profile_by_id = {p.id: p for p in profiles}
+
+    items = []
+    for v in venues:
+        cover = next((p.image_url for p in v.photos if p.is_cover and p.deleted_at is None), None)
+        owner = profile_by_id.get(v.owner_id)
+        items.append({
+            "id": v.id,
+            "name": v.name,
+            "slug": v.slug,
+            "description": v.description,
+            "venue_type": v.venue_type,
+            "address_line1": v.address_line1,
+            "city": v.city,
+            "state": v.state,
+            "country": v.country,
+            "min_capacity": v.min_capacity,
+            "max_capacity": v.max_capacity,
+            "open_time": str(v.open_time),
+            "close_time": str(v.close_time),
+            "pricing_mode": v.pricing_mode,
+            "base_price_paise": v.base_price_paise,
+            "hourly_rate_paise": v.hourly_rate_paise,
+            "advance_pct": float(v.advance_pct),
+            "platform_commission_pct": float(v.platform_commission_pct),
+            "status": v.status.value,
+            "is_active": v.is_active,
+            "cover_photo_url": cover,
+            "amenities": [a.name for a in v.amenities],
+            "owner": {
+                "id": owner.id if owner else v.owner_id,
+                "full_name": owner.full_name if owner else None,
+                "email": owner.email if owner else None,
+            },
+            "created_at": v.created_at,
+            "updated_at": v.updated_at,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": math.ceil(total / page_size) if total else 1,
+        "stats": {
+            "total": stats_row.total,
+            "pending_approval": stats_row.pending_approval,
+            "approved": stats_row.approved,
+            "rejected": stats_row.rejected,
+            "suspended": stats_row.suspended,
+            "draft": stats_row.draft,
+        },
+    }
+
+
+def _get_venue_or_404(db: Session, venue_id: uuid.UUID) -> Venue:
+    venue = db.query(Venue).filter(Venue.id == venue_id, Venue.deleted_at.is_(None)).first()
+    if not venue:
+        raise NotFoundError("Venue not found")
+    return venue
+
+
+def _check_no_active_bookings(db: Session, venue_id: uuid.UUID) -> None:
+    try:
+        from app.modules.booking.models import Booking, BookingStatus  # noqa: PLC0415
+        active_statuses = [BookingStatus.requested, BookingStatus.accepted, BookingStatus.confirmed]
+        active_count = (
+            db.query(func.count(Booking.id))
+            .filter(Booking.venue_id == str(venue_id), Booking.status.in_(active_statuses))
+            .scalar()
+        )
+        if active_count and active_count > 0:
+            raise ConflictError(f"Cannot suspend: venue has {active_count} active booking(s)")
+    except ConflictError:
+        raise
+    except Exception:
+        logger.warning("Could not verify active bookings for venue %s; proceeding.", venue_id)
+
+
+def approve_venue(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    venue_id: uuid.UUID,
+    reason: str = "",
+) -> None:
+    venue = _get_venue_or_404(db, venue_id)
+    if venue.status != VenueStatus.pending_approval:
+        raise ConflictError("Venue is not pending approval")
+    venue.status = VenueStatus.approved
+    db.add(AdminAction(
+        admin_id=admin_id, action_type="venue_approved",
+        target_type="venue", target_id=venue_id, reason=reason or None,
+    ))
+    db.commit()
+
+
+def reject_venue(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    venue_id: uuid.UUID,
+    reason: str = "",
+) -> None:
+    venue = _get_venue_or_404(db, venue_id)
+    if venue.status not in (VenueStatus.pending_approval, VenueStatus.approved):
+        raise ConflictError("Venue cannot be rejected in its current state")
+    venue.status = VenueStatus.rejected
+    db.add(AdminAction(
+        admin_id=admin_id, action_type="venue_rejected",
+        target_type="venue", target_id=venue_id, reason=reason or None,
+    ))
+    db.commit()
+
+
+def suspend_venue(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    venue_id: uuid.UUID,
+    reason: str,
+) -> None:
+    if not reason.strip():
+        raise ConflictError("Reason is required to suspend a venue")
+    venue = _get_venue_or_404(db, venue_id)
+    if venue.status == VenueStatus.suspended:
+        raise ConflictError("Venue is already suspended")
+    if venue.status != VenueStatus.approved:
+        raise ConflictError("Only approved venues can be suspended")
+    _check_no_active_bookings(db, venue_id)
+    venue.status = VenueStatus.suspended
+    db.add(AdminAction(
+        admin_id=admin_id, action_type="venue_suspended",
+        target_type="venue", target_id=venue_id, reason=reason,
+    ))
+    db.commit()
+
+
+def reactivate_venue(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    venue_id: uuid.UUID,
+    reason: str = "",
+) -> None:
+    venue = _get_venue_or_404(db, venue_id)
+    if venue.status not in (VenueStatus.suspended, VenueStatus.rejected):
+        raise ConflictError("Only suspended or rejected venues can be reactivated")
+    venue.status = VenueStatus.approved
+    db.add(AdminAction(
+        admin_id=admin_id, action_type="venue_reactivated",
+        target_type="venue", target_id=venue_id, reason=reason or None,
+    ))
+    db.commit()
 
 
 def approve_owner(

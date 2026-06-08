@@ -105,3 +105,63 @@ class AmenityListResponse(BaseModel):
 class AmenityDeleteResponse(BaseModel):
     deleted: bool
     active_venue_count: int
+
+
+# ─── Venue admin schemas ───────────────────────────────────────────────────────
+
+class VenueActionRequest(BaseModel):
+    reason: str = ""
+
+
+class AdminVenueOwner(BaseModel):
+    id: uuid.UUID
+    full_name: str | None
+    email: str | None
+
+
+class AdminVenueItem(BaseModel):
+    id: uuid.UUID
+    name: str
+    slug: str | None
+    description: str | None
+    venue_type: str
+    address_line1: str
+    city: str
+    state: str
+    country: str
+    min_capacity: int | None
+    max_capacity: int
+    open_time: str
+    close_time: str
+    pricing_mode: str
+    base_price_paise: int | None
+    hourly_rate_paise: int | None
+    advance_pct: float
+    platform_commission_pct: float
+    status: str
+    is_active: bool
+    cover_photo_url: str | None
+    amenities: list[str]
+    owner: AdminVenueOwner
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminVenueStats(BaseModel):
+    total: int
+    pending_approval: int
+    approved: int
+    rejected: int
+    suspended: int
+    draft: int
+
+
+class AdminVenueListResponse(BaseModel):
+    items: list[AdminVenueItem]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    stats: AdminVenueStats

@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.modules.admin.schemas import (
-    VenueApprovalRequest,
+    VenueActionRequest,
+    AdminVenueListResponse,
     UserListResponse,
     UserSummary,
     SuspendUserRequest,
@@ -24,9 +25,55 @@ from app.modules.admin import service
 router = APIRouter()
 
 
+@router.get("/venues", response_model=AdminVenueListResponse)
+def list_venues(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: str | None = Query(None, pattern="^(draft|pending_approval|approved|rejected|suspended)$"),
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.list_admin_venues(db, status=status, page=page, page_size=page_size)
+
+
 @router.patch("/venues/{venue_id}/approve", status_code=204)
-def approve_venue(venue_id: str, body: VenueApprovalRequest, _=Depends(require_admin)):
-    service.approve_venue(venue_id, body)
+def approve_venue(
+    venue_id: UUID,
+    body: VenueActionRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    service.approve_venue(db, admin_id=auth.user_id, venue_id=venue_id, reason=body.reason)
+
+
+@router.patch("/venues/{venue_id}/reject", status_code=204)
+def reject_venue(
+    venue_id: UUID,
+    body: VenueActionRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    service.reject_venue(db, admin_id=auth.user_id, venue_id=venue_id, reason=body.reason)
+
+
+@router.patch("/venues/{venue_id}/suspend", status_code=204)
+def suspend_venue(
+    venue_id: UUID,
+    body: VenueActionRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    service.suspend_venue(db, admin_id=auth.user_id, venue_id=venue_id, reason=body.reason)
+
+
+@router.patch("/venues/{venue_id}/reactivate", status_code=204)
+def reactivate_venue(
+    venue_id: UUID,
+    body: VenueActionRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    service.reactivate_venue(db, admin_id=auth.user_id, venue_id=venue_id, reason=body.reason)
 
 
 @router.get("/users", response_model=UserListResponse)
