@@ -30,10 +30,11 @@ def list_venues(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: str | None = Query(None, pattern="^(draft|pending_approval|approved|rejected|suspended)$"),
+    search: str | None = Query(None),
     _: AuthContext = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    return service.list_admin_venues(db, status=status, page=page, page_size=page_size)
+    return service.list_admin_venues(db, status=status, search=search, page=page, page_size=page_size)
 
 
 @router.patch("/venues/{venue_id}/approve", status_code=204)

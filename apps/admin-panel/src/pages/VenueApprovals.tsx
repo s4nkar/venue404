@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Building2, MapPin, Users, Clock, IndianRupee,
   CheckCircle2, XCircle, ShieldOff, ShieldCheck,
-  ImageOff, RefreshCw,
+  ImageOff, Search,
 } from 'lucide-react'
 import { createClient, adminVenueEndpoints, ApiError } from '@venue404/api-client'
 import type { AdminVenueItem, AdminVenueStats } from '@venue404/api-client'
@@ -74,6 +74,17 @@ export default function VenueApprovals() {
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabStatus>('pending_approval')
 
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleSearchChange(value: string) {
+    setSearchInput(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => { setSearch(value); setPage(1) }, 350)
+  }
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
+
   // Approve
   const [approveTarget, setApproveTarget] = useState<AdminVenueItem | null>(null)
   const [approveLoading, setApproveLoading] = useState(false)
@@ -104,6 +115,7 @@ export default function VenueApprovals() {
         page,
         page_size: PAGE_SIZE,
         status: activeTab || undefined,
+        search: search.trim() || undefined,
       })
       setItems(res.items)
       setTotal(res.total)
@@ -114,7 +126,7 @@ export default function VenueApprovals() {
     } finally {
       setLoading(false)
     }
-  }, [page, activeTab])
+  }, [page, activeTab, search])
 
   useEffect(() => { fetchVenues() }, [fetchVenues])
 
@@ -232,6 +244,23 @@ export default function VenueApprovals() {
                 </button>
               )
             })}
+          </div>
+
+          {/* Search */}
+          <div className="mt-3 mb-4">
+            <div className="relative max-w-xs">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400"
+                aria-hidden="true"
+              />
+              <input
+                type="search"
+                placeholder="Search by venue name…"
+                value={searchInput}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                style={{ paddingLeft: '2.25rem' }}
+              />
+            </div>
           </div>
         </div>
 

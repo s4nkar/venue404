@@ -60,6 +60,7 @@ export type ListVenuesParams = {
   page?: number
   page_size?: number
   status?: AdminVenueItem['status']
+  search?: string
 }
 
 function buildQS(params: ListVenuesParams = {}): string {
@@ -67,6 +68,7 @@ function buildQS(params: ListVenuesParams = {}): string {
   if (params.page)      qs.set('page',      String(params.page))
   if (params.page_size) qs.set('page_size', String(params.page_size))
   if (params.status)    qs.set('status',    params.status)
+  if (params.search)    qs.set('search',    params.search)
   const str = qs.toString()
   return str ? `?${str}` : ''
 }

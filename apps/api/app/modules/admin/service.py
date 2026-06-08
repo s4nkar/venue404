@@ -5,7 +5,7 @@ import urllib.request
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, case
+from sqlalchemy import func, case, text
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
@@ -24,6 +24,7 @@ def list_admin_venues(
     db: Session,
     *,
     status: str | None = None,
+    search: str | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> dict:
@@ -41,6 +42,9 @@ def list_admin_venues(
     filtered = base
     if status:
         filtered = filtered.filter(Venue.status == VenueStatus(status))
+    if search:
+        pattern = f"%{search.strip()}%"
+        filtered = filtered.filter(Venue.name.ilike(pattern))
 
     total = filtered.with_entities(func.count(Venue.id)).scalar()
     venues = (
@@ -117,20 +121,26 @@ def _get_venue_or_404(db: Session, venue_id: uuid.UUID) -> Venue:
 
 
 def _check_no_active_bookings(db: Session, venue_id: uuid.UUID) -> None:
+    # to_regclass returns NULL (not an error) when the table doesn't exist, so this query
+    # never fails and never poisons the current transaction.
+    table_exists = db.execute(text("SELECT to_regclass('public.bookings') IS NOT NULL")).scalar()
+    if not table_exists:
+        return  # Bookings not yet migrated — skip check
     try:
         from app.modules.booking.models import Booking, BookingStatus  # noqa: PLC0415
-        active_statuses = [BookingStatus.requested, BookingStatus.accepted, BookingStatus.confirmed]
-        active_count = (
+        count = (
             db.query(func.count(Booking.id))
-            .filter(Booking.venue_id == str(venue_id), Booking.status.in_(active_statuses))
+            .filter(Booking.venue_id == str(venue_id), Booking.status.in_([
+                BookingStatus.requested, BookingStatus.accepted, BookingStatus.confirmed,
+            ]))
             .scalar()
         )
-        if active_count and active_count > 0:
-            raise ConflictError(f"Cannot suspend: venue has {active_count} active booking(s)")
+        if count and count > 0:
+            raise ConflictError(f"Cannot suspend: venue has {count} active booking(s)")
     except ConflictError:
         raise
-    except Exception:
-        logger.warning("Could not verify active bookings for venue %s; proceeding.", venue_id)
+    except Exception as e:
+        logger.warning("Booking check error for venue %s: %s", venue_id, e)
 
 
 def approve_venue(
