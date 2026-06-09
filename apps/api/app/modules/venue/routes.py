@@ -25,6 +25,8 @@ from app.modules.venue.schemas import (
     BulkUpdateVenuePhotosRequest,
 )
 from app.modules.venue import service
+from app.modules.booking import service as booking_service
+from app.modules.booking.schemas import BookingOut
 from app.shared.utils import parse_timezone_datetime
 
 router = APIRouter()
@@ -167,6 +169,29 @@ def delete_venue_photo(
 ):
     service.delete_venue_photo(db, venue_id, photo_id, auth.user_id)
     return DeleteResponse(id=photo_id, message="Photo deleted successfully")
+
+
+@router.get("/{venue_id}/bookings", response_model=list[BookingOut])
+def list_venue_bookings(
+    venue_id: UUID,
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    return booking_service.list_venue_bookings(db, venue_id, auth.user_id)
+
+
+@router.get("/{venue_id}/bookings/pending", response_model=list[BookingOut])
+def list_pending_venue_bookings(
+    venue_id: UUID,
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    return booking_service.list_venue_bookings(
+        db,
+        venue_id,
+        auth.user_id,
+        pending_only=True,
+    )
 
 
 

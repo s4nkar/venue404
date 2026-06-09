@@ -104,6 +104,11 @@ class Venue(Base):
         Index("idx_venues_search", "city", "venue_type", "status", "is_active", postgresql_where=text("deleted_at IS NULL")),
     )
 
+    bookings = relationship(
+        "Booking",
+        back_populates="venue",
+    )
+
 
 class VenuePhoto(Base):
     __tablename__ = "venue_photos"
