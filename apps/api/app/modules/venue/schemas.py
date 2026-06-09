@@ -6,7 +6,6 @@ from decimal import Decimal
 from enum import Enum
 
 
-
 class VenueType(str, Enum):
     banquet_hall = "banquet_hall"
     wedding_hall = "wedding_hall"
@@ -37,8 +36,6 @@ class VenueStatus(str, Enum):
     approved = "approved"
     rejected = "rejected"
     suspended = "suspended"
-
-
 
 
 class VenuePhotoResponse(BaseModel):
@@ -277,8 +274,6 @@ class CreateVenueRequest(BaseModel):
             )
 
 
-
-
 class UpdateVenueRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
@@ -349,8 +344,6 @@ class UpdateVenueRequest(BaseModel):
             raise ValueError(
                 "min_booking_duration_minutes cannot exceed max_booking_duration_minutes"
             )
-
-
 
 
 class PricingDisplay(BaseModel):
@@ -451,3 +444,18 @@ class CreateBlockedDateRequest(BaseModel):
     def model_post_init(self, __context) -> None:
         if self.ends_at <= self.starts_at:
             raise ValueError("ends_at must be strictly after starts_at")
+
+
+class PricingQuote(BaseModel):
+    quoted_price_paise: int
+
+    platform_commission_pct: float
+    platform_fee_paise: int
+
+    owner_payout_paise: int
+
+    advance_pct: float
+    advance_due_paise: int
+    balance_due_paise: int
+
+    pricing_mode: str

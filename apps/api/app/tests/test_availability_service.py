@@ -1,0 +1,80 @@
+from datetime import date, datetime, time, timezone, timedelta
+from zoneinfo import ZoneInfo
+
+from app.modules.availability.service import (
+    resolve_operating_window,
+    expand_full_day_slot,
+    compute_effective_range,
+)
+from app.modules.venue.service import _compute_pricing_quote
+from app.modules.venue.models import Venue
+
+
+def make_venue(tz="Asia/Kolkata"):
+    v = Venue()
+    v.timezone = tz
+    v.open_time = time(9, 0)
+    v.close_time = time(18, 0)
+    v.spans_next_day = False
+    v.pricing_mode = "hourly"
+    v.hourly_rate_paise = 10000
+    v.platform_commission_pct = 10.00
+    v.advance_pct = 30.00
+    return v
+
+
+def test_resolve_and_expand_basic():
+    v = make_venue()
+    op = resolve_operating_window(v, date(2026, 6, 7))
+    assert op.is_available is True
+    assert op.opens_at == time(9, 0)
+
+    starts_utc, ends_utc = expand_full_day_slot(v, date(2026, 6, 7))
+    # Asia/Kolkata is UTC+5:30
+    assert starts_utc.tzinfo is not None
+    assert ends_utc.tzinfo is not None
+    assert (ends_utc - starts_utc).seconds == (18 - 9) * 3600
+
+
+def test_compute_effective_range():
+    tz = ZoneInfo("Asia/Kolkata")
+    starts = datetime(2026, 6, 7, 9, 0, tzinfo=tz)
+    ends = datetime(2026, 6, 7, 18, 0, tzinfo=tz)
+    es, ee = compute_effective_range(starts, ends, 15, 20)
+    assert es == starts - timedelta(minutes=15)
+    assert ee == ends + timedelta(minutes=20)
+
+
+def test_pricing_quote_hourly():
+    v = make_venue()
+    tz = ZoneInfo(v.timezone)
+    starts = datetime(2026, 6, 7, 10, 0, tzinfo=tz).astimezone(timezone.utc)
+    ends = datetime(2026, 6, 7, 12, 30, tzinfo=tz).astimezone(timezone.utc)
+    q = _compute_pricing_quote(v, starts, ends, booking_type="time_slot")
+    # duration 2.5 hours * 10000 paise = 25000 paise
+    assert q.quoted_price_paise == 25000
+    assert q.advance_due_paise == int(25000 * 0.30)
+
+
+def test_expand_full_day_handles_dst_forward():
+    # London DST starts 2026-03-29 (clocks forward 1 hour) -> day length 23 hours
+    v = make_venue(tz="Europe/London")
+    v.open_time = time(0, 0)
+    v.close_time = time(0, 0)
+    v.spans_next_day = True
+
+    starts_utc, ends_utc = expand_full_day_slot(v, date(2026, 3, 29))
+    delta = ends_utc - starts_utc
+    assert delta.total_seconds() == 23 * 3600
+
+
+def test_expand_full_day_handles_dst_backward():
+    # London DST ends 2026-10-25 (clocks back 1 hour) -> day length 25 hours
+    v = make_venue(tz="Europe/London")
+    v.open_time = time(0, 0)
+    v.close_time = time(0, 0)
+    v.spans_next_day = True
+
+    starts_utc, ends_utc = expand_full_day_slot(v, date(2026, 10, 25))
+    delta = ends_utc - starts_utc
+    assert delta.total_seconds() == 25 * 3600

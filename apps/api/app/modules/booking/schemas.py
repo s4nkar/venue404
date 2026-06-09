@@ -1,18 +1,93 @@
-from pydantic import BaseModel
-from datetime import date
+from datetime import date, datetime
+from typing import Literal
+from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
-class CreateBookingRequest(BaseModel):
-    venue_id: str
-    start_date: date
-    end_date: date
-    notes: str = ""
+BookingTypeValue = Literal["full_day", "time_slot"]
 
 
-class BookingResponse(BaseModel):
-    id: str
-    venue_id: str
-    user_id: str
-    start_date: date
-    end_date: date
+class BookingRequestIn(BaseModel):
+    venue_id: UUID
+    booking_type: BookingTypeValue
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    booking_date: date | None = None
+    guest_count: int = Field(gt=0)
+    event_type: str | None = None
+    user_notes: str | None = None
+
+
+class BookingDisplay(BaseModel):
+    quoted_price: str
+    advance_due: str
+    balance_due: str
+    platform_fee: str
+    owner_payout: str
+
+
+class BookingOut(BaseModel):
+    id: UUID
+    venue_id: UUID
+    user_id: UUID
+    booking_type: str
     status: str
+    payment_status: str
+    starts_at: datetime
+    ends_at: datetime
+    effective_starts_at: datetime
+    effective_ends_at: datetime
+    guest_count: int
+    event_type: str | None = None
+    user_notes: str | None = None
+    owner_notes: str | None = None
+    quoted_price_paise: int
+    platform_commission_pct: float
+    platform_fee_paise: int
+    owner_payout_paise: int
+    advance_pct: float
+    advance_due_paise: int
+    balance_due_paise: int
+    balance_due_date: date | None = None
+    hold_expires_at: datetime | None = None
+    confirmed_at: datetime | None = None
+    cancelled_at: datetime | None = None
+    expired_at: datetime | None = None
+    amount_paid_paise: int
+    refund_amount_paise: int
+    stripe_advance_payment_intent_id: str | None = None
+    stripe_balance_payment_intent_id: str | None = None
+    deadline_extension_count: int
+    balance_overdue_at: datetime | None = None
+    owner_action_deadline: datetime | None = None
+    display: BookingDisplay
+
+
+class CancellationDisplay(BaseModel):
+    refund_amount: str
+    penalty_amount: str
+
+
+class CancellationPreviewOut(BaseModel):
+    refund_amount_paise: int
+    penalty_amount_paise: int
+    refund_pct_applied: float
+    tier_matched: str | None
+    display: CancellationDisplay
+
+
+class OwnerAcceptIn(BaseModel):
+    pass
+
+
+class OwnerRejectIn(BaseModel):
+    reason: str = Field(min_length=1)
+
+
+class ExtendDeadlineIn(BaseModel):
+    new_due_date: date
+
+
+BookingResponse = BookingOut
+CreateBookingRequest = BookingRequestIn
