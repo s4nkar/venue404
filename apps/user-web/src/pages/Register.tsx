@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { AuthLayout, AuthCard, AuthStatusPanel, Logo } from '@venue404/ui'
@@ -48,7 +48,7 @@ export default function Register() {
           footer={
             <>
               Already have an account?{' '}
-              <Link to="/login" className="font-medium text-blue-600 hover:text-blue-700">
+              <Link to="/login" className="font-medium text-brand hover:text-brand-hover">
                 Sign in
               </Link>
             </>
@@ -140,7 +140,7 @@ export default function Register() {
             <button
               type="submit"
               disabled={submitting || !fullName || !email || !password}
-              className="press flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm outline-none transition-[background-color,box-shadow] duration-150 hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-55"
+              className="press flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm outline-none transition-[background-color,box-shadow] duration-150 hover:bg-brand-hover focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-55"
             >
               {submitting ? (
                 <>

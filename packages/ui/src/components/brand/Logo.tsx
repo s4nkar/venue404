@@ -4,7 +4,7 @@ export function BrandMark({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600',
+        'flex h-7 w-7 items-center justify-center rounded-lg bg-brand',
         className,
       )}
     >
@@ -47,7 +47,7 @@ export function Logo({ className, textClassName, showText = true, variant = 'lig
             textClassName,
           )}
         >
-          Venue<span className="text-blue-500">404</span>
+          Venue<span className="text-brand-secondary">404</span>
         </span>
       )}
     </div>

@@ -6,14 +6,26 @@
  *   2. @import "@venue404/ui/theme.css";
  *   3. @source "<path-to-packages/ui/src>";
  *
- * Palette  : zinc neutrals  +  blue-600 accent  (no AI-purple, no gradients)
+ * Palette  : zinc neutrals  +  #285A48 primary  +  #408A71 secondary  +  #091413 black
  * Font     : Geist Variable (variable font, weights 100–900)
- * Sidebar  : zinc-950 background, zinc-800 borders
+ * Sidebar  : brand-black background, zinc-800 borders
  * Content  : zinc-50 background, white cards, zinc-200 borders
  * Motion   : Emil-style press feedback (scale 0.97), expo easing, stagger entry
  */
 
 @import "@fontsource-variable/geist";
+
+/* ─── Brand color utilities (Tailwind v4 @theme) ────────────────────────── */
+@theme {
+  --color-brand:                 #285A48;  /* primary */
+  --color-brand-hover:           #1e4335;  /* primary dark */
+  --color-brand-secondary:       #408A71;  /* secondary */
+  --color-brand-secondary-hover: #327060;  /* secondary dark */
+  --color-brand-black:           #091413;  /* custom black */
+  --color-brand-light:           #e8f2ee;  /* primary tint — backgrounds */
+  --color-brand-light-strong:    #d1e6dc;  /* primary tint — stronger */
+  --color-brand-muted:           #9ec5b4;  /* primary tint — rings/borders */
+}
 
 /* ─── Design tokens ─────────────────────────────────────────────────────── */
 @layer base {
@@ -26,12 +38,9 @@
     --ease-out-expo:    cubic-bezier(0.23, 1, 0.32, 1);
     --ease-in-out-expo: cubic-bezier(0.77, 0, 0.175, 1);
 
-    /* Brand */
-    --color-brand:       #2563eb;  /* blue-600  */
-    --color-brand-hover: #1d4ed8;  /* blue-700  */
-    --color-sidebar:     #09090b;  /* zinc-950  */
-    --color-surface:     #ffffff;  /* white     */
-    --color-bg:          #fafafa;  /* zinc-50   */
+    /* Non-Tailwind surface tokens */
+    --color-surface: #ffffff;
+    --color-bg:      #fafafa;  /* zinc-50 */
   }
 
   *, *::before, *::after {
@@ -134,7 +143,7 @@
   select:focus {
     outline: none;
     border-color: var(--color-brand);
-    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
+    box-shadow: 0 0 0 3px rgb(40 90 72 / 0.15);
   }
 
   input::placeholder,

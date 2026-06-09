@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import {
   CheckCircle2, XCircle, ShieldOff, ShieldCheck,
   Sparkles, User, Building2, CalendarDays, ClipboardList,
@@ -40,7 +40,7 @@ function getActionMeta(type: string): ActionMeta {
   if (type.endsWith('reactivated'))
     return { label: fmtType(type), icon: <ShieldCheck className="h-3.5 w-3.5" />, color: 'text-emerald-700', bg: 'bg-emerald-50' }
   if (type.includes('created') || type.includes('updated'))
-    return { label: fmtType(type), icon: <Sparkles className="h-3.5 w-3.5" />, color: 'text-blue-600', bg: 'bg-blue-50' }
+    return { label: fmtType(type), icon: <Sparkles className="h-3.5 w-3.5" />, color: 'text-brand', bg: 'bg-brand-light' }
   return { label: fmtType(type), icon: <ClipboardList className="h-3.5 w-3.5" />, color: 'text-zinc-600', bg: 'bg-zinc-100' }
 }
 
@@ -137,7 +137,7 @@ export default function AuditLog() {
                   className={[
                     'relative flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium transition-colors focus:outline-none',
                     isActive
-                      ? 'text-zinc-900 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-blue-600'
+                      ? 'text-zinc-900 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-brand'
                       : 'text-zinc-400 hover:text-zinc-600',
                   ].join(' ')}
                 >

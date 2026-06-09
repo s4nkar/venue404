@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Sparkles, Plus, Pencil, Trash2, Search,
   AlertTriangle, CheckCircle2,
@@ -187,7 +187,7 @@ export default function Amenities() {
             value={loading ? '—' : String(stats.total)}
             description="Available for venue owners to select"
             icon={<Sparkles className="h-4 w-4" />}
-            accent="blue"
+            accent="brand"
           />
         </div>
         <div className="card-enter" style={{ '--index': 1 } as React.CSSProperties}>
@@ -329,7 +329,7 @@ export default function Amenities() {
                     </td>
                     <td className="px-5 py-3.5">
                       {amenity.active_venue_count > 0 ? (
-                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                        <span className="inline-flex items-center rounded-full bg-brand-light px-2 py-0.5 text-xs font-medium text-brand">
                           {amenity.active_venue_count} {amenity.active_venue_count === 1 ? 'venue' : 'venues'}
                         </span>
                       ) : (

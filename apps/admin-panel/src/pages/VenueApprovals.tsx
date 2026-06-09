@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Building2, MapPin, Users, Clock, IndianRupee,
   CheckCircle2, XCircle, ShieldOff, ShieldCheck,
@@ -195,7 +195,7 @@ export default function VenueApprovals() {
           { label: 'Pending Approval', value: stats?.pending_approval, accent: 'amber' as const, icon: <Clock className="h-4 w-4" /> },
           { label: 'Approved',         value: stats?.approved,         accent: 'emerald' as const, icon: <CheckCircle2 className="h-4 w-4" /> },
           { label: 'Suspended',        value: stats?.suspended,        accent: 'rose' as const,    icon: <ShieldOff className="h-4 w-4" /> },
-          { label: 'Total Venues',     value: stats?.total,            accent: 'blue' as const,    icon: <Building2 className="h-4 w-4" /> },
+          { label: 'Total Venues',     value: stats?.total,            accent: 'brand' as const,    icon: <Building2 className="h-4 w-4" /> },
         ].map((m, i) => (
           <div key={m.label} className="card-enter" style={{ '--index': i } as React.CSSProperties}>
             <MetricCard
@@ -230,7 +230,7 @@ export default function VenueApprovals() {
                   className={[
                     'relative px-3.5 py-2.5 text-sm font-medium transition-colors focus:outline-none',
                     isActive
-                      ? 'text-zinc-900 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-blue-600'
+                      ? 'text-zinc-900 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-brand'
                       : 'text-zinc-400 hover:text-zinc-600',
                   ].join(' ')}
                 >
@@ -238,7 +238,7 @@ export default function VenueApprovals() {
                   {count !== undefined && count > 0 && (
                     <span className={[
                       'ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums',
-                      isActive ? 'bg-blue-100 text-blue-700' : 'bg-zinc-100 text-zinc-500',
+                      isActive ? 'bg-brand-light-strong text-brand' : 'bg-zinc-100 text-zinc-500',
                     ].join(' ')}>
                       {count}
                     </span>

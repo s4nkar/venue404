@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+﻿import { Link } from 'react-router-dom'
 import { Logo } from '@venue404/ui'
 import { useAuth } from '../lib/AuthContext'
 
@@ -94,7 +94,7 @@ export default function Home() {
                 </Link>
                 <Link
                   to="/register"
-                  className="press ml-2 rounded-lg bg-pink-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-pink-800"
+                  className="press ml-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-hover"
                 >
                   Get started
                 </Link>
@@ -107,7 +107,7 @@ export default function Home() {
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-6 pb-16 pt-16">
         <div className="max-w-2xl">
-          <p className="text-xs font-medium uppercase tracking-widest text-pink-700">
+          <p className="text-xs font-medium uppercase tracking-widest text-brand">
             Venue discovery & booking
           </p>
           <h1 className="mt-3 text-[2.75rem] font-semibold leading-[1.15] tracking-tight text-zinc-900 sm:text-5xl">
@@ -120,7 +120,7 @@ export default function Home() {
           </p>
 
           {/* Search */}
-          <div className="mt-8 flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 shadow-sm transition-shadow focus-within:border-pink-400 focus-within:shadow-md">
+          <div className="mt-8 flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 shadow-sm transition-shadow focus-within:border-brand-secondary focus-within:shadow-md">
             <svg className="h-4 w-4 shrink-0 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -129,7 +129,7 @@ export default function Home() {
               placeholder="City, venue name, or type…"
               className="flex-1 border-none bg-transparent text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-0"
             />
-            <button className="press shrink-0 rounded-lg bg-pink-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-pink-800">
+            <button className="press shrink-0 rounded-lg bg-brand px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-hover">
               Search
             </button>
           </div>
@@ -139,7 +139,7 @@ export default function Home() {
             {CATEGORIES.map((c) => (
               <button
                 key={c.label}
-                className="press flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-medium text-zinc-600 transition-all hover:border-pink-700 hover:bg-pink-700 hover:text-white"
+                className="press flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-medium text-zinc-600 transition-all hover:border-brand hover:bg-brand hover:text-white"
               >
                 <span>{c.icon}</span>
                 {c.label}
@@ -154,7 +154,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-7 flex items-baseline justify-between">
             <h2 className="text-base font-semibold text-zinc-900">Popular venues</h2>
-            <Link to="/login" className="text-xs font-medium text-pink-700 hover:text-pink-800 transition-colors">
+            <Link to="/login" className="text-xs font-medium text-brand hover:text-brand-hover transition-colors">
               Browse all →
             </Link>
           </div>
