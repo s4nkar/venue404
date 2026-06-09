@@ -3,23 +3,12 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { AuthLayout, AuthCard, AuthStatusPanel, Logo } from '@venue404/ui'
 
-const OWNER_PORTAL_URL = import.meta.env.VITE_OWNER_PORTAL_URL ?? 'http://localhost:5398'
-const ADMIN_PANEL_URL = import.meta.env.VITE_ADMIN_PANEL_URL ?? 'http://localhost:5399'
-
 const FEATURES = [
   { label: 'Discover unique venues near you' },
   { label: 'Book instantly or on request' },
   { label: 'Track your bookings in one place' },
   { label: 'Secure payments & easy refunds' },
 ]
-
-function redirectByRole(roles: string[]) {
-  if (roles.includes('super_admin')) {
-    window.location.href = ADMIN_PANEL_URL
-  } else if (roles.includes('venue_owner')) {
-    window.location.href = OWNER_PORTAL_URL
-  }
-}
 
 export default function Login() {
   const { user, loading, signIn } = useAuth()
@@ -30,13 +19,7 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    if (!loading && user) {
-      if (user.roles.includes('super_admin') || user.roles.includes('venue_owner')) {
-        redirectByRole(user.roles)
-      } else {
-        navigate('/', { replace: true })
-      }
-    }
+    if (!loading && user) navigate('/login/success', { replace: true })
   }, [user, loading, navigate])
 
   async function handleSubmit(e: React.FormEvent) {

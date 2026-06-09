@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createClient, authEndpoints } from '@venue404/api-client'
 import { LoadingScreen, ErrorState } from '@venue404/ui'
@@ -10,32 +10,13 @@ export default function LoginSuccess() {
   useEffect(() => {
     async function verify() {
       try {
-        const client = createClient()
-        const user = await authEndpoints(client).me()
+        const user = await authEndpoints(createClient()).me()
 
-        if (!user.roles.includes('venue_owner') && !user.roles.includes('super_admin')) {
-          navigate('/403', { replace: true })
+        if (user.roles.includes('customer')) {
+          navigate('/', { replace: true })
           return
         }
 
-        // if (user.roles.includes('super_admin')) {
-        //   navigate('/', { replace: true })
-        //   return
-        // }
-
-        switch (user.profile.status) {
-          case 'active':
-            navigate('/', { replace: true })
-            break
-          case 'pending':
-            navigate('/pending-approval', { replace: true })
-            break
-          case 'rejected':
-            navigate('/rejected', { replace: true })
-            break
-          default:
-            navigate('/403', { replace: true })
-        }
       } catch {
         setError('Session verification failed. Please sign in again.')
       }
@@ -61,5 +42,5 @@ export default function LoginSuccess() {
     )
   }
 
-  return <LoadingScreen message="Verifying your account…" />
+  return <LoadingScreen message="Signing you in…" />
 }

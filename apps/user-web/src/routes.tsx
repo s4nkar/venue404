@@ -4,6 +4,7 @@ import Home from './pages/Home'
 import VenueDetails from './pages/VenueDetails'
 import MyBookings from './pages/MyBookings'
 import Login from './pages/Login'
+import LoginSuccess from './pages/LoginSuccess'
 import Register from './pages/Register'
 import RegisterSuccess from './pages/RegisterSuccess'
 
@@ -12,6 +13,7 @@ export const router = createBrowserRouter([
   { path: '/', element: <Home /> },
   { path: '/venues/:id', element: <VenueDetails /> },
   { path: '/login', element: <Login /> },
+  { path: '/login/success', element: <LoginSuccess /> },
   { path: '/register', element: <Register /> },
   { path: '/register/success', element: <RegisterSuccess /> },
 
