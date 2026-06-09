@@ -1,10 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { AuthLayout, AuthCard, AuthStatusPanel, Logo } from '@venue404/ui'
-
-const OWNER_PORTAL_URL = import.meta.env.VITE_OWNER_PORTAL_URL ?? 'http://localhost:5398'
-const ADMIN_PANEL_URL = import.meta.env.VITE_ADMIN_PANEL_URL ?? 'http://localhost:5399'
 
 const FEATURES = [
   { label: 'Discover unique venues near you' },
@@ -13,58 +10,46 @@ const FEATURES = [
   { label: 'Secure payments & easy refunds' },
 ]
 
-function redirectByRole(roles: string[]) {
-  if (roles.includes('super_admin')) {
-    window.location.href = ADMIN_PANEL_URL
-  } else if (roles.includes('venue_owner')) {
-    window.location.href = OWNER_PORTAL_URL
-  }
-}
-
-export default function Login() {
-  const { user, loading, signIn } = useAuth()
+export default function Register() {
+  const { signUp } = useAuth()
   const navigate = useNavigate()
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-
-  useEffect(() => {
-    if (!loading && user) {
-      if (user.roles.includes('super_admin') || user.roles.includes('venue_owner')) {
-        redirectByRole(user.roles)
-      } else {
-        navigate('/', { replace: true })
-      }
-    }
-  }, [user, loading, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setSubmitting(true)
     try {
-      await signIn({ email, password })
+      await signUp({
+        email: email.trim(),
+        password,
+        fullName: fullName.trim(),
+        phone: phone.trim() || undefined,
+      })
+      navigate('/register/success', { replace: true })
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Sign in failed. Check your credentials.')
+      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.')
     } finally {
       setSubmitting(false)
     }
   }
 
-  if (loading) return null
-
   return (
     <AuthLayout
       left={
         <AuthCard
-          title="Welcome back"
-          subtitle="Sign in to discover and book amazing venues."
+          title="Create your account"
+          subtitle="Sign up to start discovering and booking venues."
           footer={
             <>
-              New here?{' '}
-              <Link to="/register" className="font-medium text-blue-600 hover:text-blue-700">
-                Create an account
+              Already have an account?{' '}
+              <Link to="/login" className="font-medium text-blue-600 hover:text-blue-700">
+                Sign in
               </Link>
             </>
           }
@@ -75,7 +60,25 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
-              <label htmlFor="email">Email address</label>
+              <label htmlFor="full-name">
+                Full name <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="full-name"
+                type="text"
+                autoComplete="name"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Your full name"
+                disabled={submitting}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="email">
+                Email address <span className="text-red-500">*</span>
+              </label>
               <input
                 id="email"
                 type="email"
@@ -89,15 +92,34 @@ export default function Login() {
             </div>
 
             <div>
-              <label htmlFor="password">Password</label>
+              <label htmlFor="phone">
+                Phone{' '}
+                <span className="font-normal text-zinc-400">(optional)</span>
+              </label>
+              <input
+                id="phone"
+                type="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+                disabled={submitting}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password">
+                Password <span className="text-red-500">*</span>
+              </label>
               <input
                 id="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 required
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••"
+                placeholder="At least 8 characters"
                 disabled={submitting}
               />
             </div>
@@ -117,16 +139,16 @@ export default function Login() {
 
             <button
               type="submit"
-              disabled={submitting || !email || !password}
+              disabled={submitting || !fullName || !email || !password}
               className="press flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm outline-none transition-[background-color,box-shadow] duration-150 hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-55"
             >
               {submitting ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true" />
-                  Signing in…
+                  Creating account…
                 </>
               ) : (
-                'Sign in'
+                'Create account'
               )}
             </button>
           </form>
