@@ -1,4 +1,4 @@
-"""merge booking and venue branches
+"""Merge booking and venue branches - no schema changes needed
 
 Revision ID: feaba28f7d2b
 Revises: 1679aa81b5b3, 014af2456033

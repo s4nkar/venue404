@@ -23,9 +23,13 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from typing import TYPE_CHECKING
+
 from app.core.database import Base
-from app.modules.profile.models import Profile
-from app.modules.venue.models import Venue
+
+if TYPE_CHECKING:
+    from app.modules.profile.models import Profile
+    from app.modules.venue.models import Venue
 
 
 
@@ -420,4 +424,6 @@ class BookingStatusHistory(Base):
     
     changed_by_user: Mapped["Profile"] = relationship(
         "Profile",
+        foreign_keys=[changed_by],
+        primaryjoin="BookingStatusHistory.changed_by == Profile.id",
     )

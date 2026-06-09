@@ -18,8 +18,8 @@ from app.modules.venue.schemas import (
     UpdateCancellationPolicyRequest,
     UpdateVenueAmenitiesRequest,
     BulkUpdateVenuePhotosRequest,
-    BookingType,
 )
+from app.modules.booking.models import BookingType
 from app.core.storage import upload_image_to_cloudinary, delete_image_from_cloudinary
 
 
@@ -58,7 +58,8 @@ def _assert_owner(venue: Venue, owner_id: UUID) -> None:
 
 
 def _banker_round(value: Decimal) -> int:
-    return int(value.to_integral_value(rounding=ROUND_HALF_EVEN))
+    """Banker's rounding to nearest integer for financial precision."""
+    return int(value.quantize(Decimal('1'), rounding=ROUND_HALF_EVEN))
 
 
 def _format_inr(paise: int) -> str:
