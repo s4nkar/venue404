@@ -1,14 +1,8 @@
 ﻿import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { AuthLayout, AuthCard, AuthStatusPanel, Logo } from '@venue404/ui'
-
-const FEATURES = [
-  { label: 'Discover unique venues near you' },
-  { label: 'Book instantly or on request' },
-  { label: 'Track your bookings in one place' },
-  { label: 'Secure payments & easy refunds' },
-]
+import { AuthLayout, AuthCard, Logo } from '@venue404/ui'
+import { VenueFlowPanel } from '../components/VenueFlowPanel'
 
 export default function Login() {
   const { user, loading, signIn } = useAuth()
@@ -115,14 +109,7 @@ export default function Login() {
           </form>
         </AuthCard>
       }
-      right={
-        <AuthStatusPanel
-          tagline="Venue404"
-          title="Find and book the perfect venue"
-          description="Discover unique spaces for events, parties, shoots, and more — and book them with just a few clicks."
-          features={FEATURES}
-        />
-      }
+      right={<VenueFlowPanel />}
     />
   )
 }

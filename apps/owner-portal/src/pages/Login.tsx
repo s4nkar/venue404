@@ -1,14 +1,8 @@
 ﻿import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { AuthLayout, AuthCard, AuthStatusPanel, Logo } from '@venue404/ui'
-
-const FEATURES = [
-  { label: 'Publish & manage venues' },
-  { label: 'Accept booking requests' },
-  { label: 'Track payments & revenue' },
-  { label: 'Read customer reviews' },
-]
+import { AuthLayout, AuthCard, Logo } from '@venue404/ui'
+import { OwnerFlowPanel } from '../components/OwnerFlowPanel'
 
 export default function Login() {
   const { user, loading, signIn } = useAuth()
@@ -124,15 +118,7 @@ export default function Login() {
           </div>
         </AuthCard>
       }
-      right={
-        <AuthStatusPanel
-          tagline="Venue404 Owner Portal"
-          title="Run your venue business from one place"
-          description="List your space, manage availability, confirm bookings, and track revenue — all without leaving the portal."
-          features={FEATURES}
-          footnote="Access is granted after admin review of your application."
-        />
-      }
+      right={<OwnerFlowPanel />}
     />
   )
 }
