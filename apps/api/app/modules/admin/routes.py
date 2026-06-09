@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.modules.admin.schemas import (
-    VenueApprovalRequest,
+    VenueActionRequest,
+    AdminVenueListResponse,
     UserListResponse,
     UserSummary,
     SuspendUserRequest,
@@ -12,6 +13,11 @@ from app.modules.admin.schemas import (
     AdminActionListResponse,
     OwnerApprovalRequest,
     OwnerStatsResponse,
+    AmenityCreateRequest,
+    AmenityUpdateRequest,
+    AdminAmenityResponse,
+    AmenityListResponse,
+    AmenityDeleteResponse,
 )
 from app.modules.auth.dependencies import require_admin, AuthContext
 from app.modules.admin import service
@@ -19,9 +25,56 @@ from app.modules.admin import service
 router = APIRouter()
 
 
+@router.get("/venues", response_model=AdminVenueListResponse)
+def list_venues(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: str | None = Query(None, pattern="^(draft|pending_approval|approved|rejected|suspended)$"),
+    search: str | None = Query(None),
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.list_admin_venues(db, status=status, search=search, page=page, page_size=page_size)
+
+
 @router.patch("/venues/{venue_id}/approve", status_code=204)
-def approve_venue(venue_id: str, body: VenueApprovalRequest, _=Depends(require_admin)):
-    service.approve_venue(venue_id, body)
+def approve_venue(
+    venue_id: UUID,
+    body: VenueActionRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    service.approve_venue(db, admin_id=auth.user_id, venue_id=venue_id, reason=body.reason)
+
+
+@router.patch("/venues/{venue_id}/reject", status_code=204)
+def reject_venue(
+    venue_id: UUID,
+    body: VenueActionRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    service.reject_venue(db, admin_id=auth.user_id, venue_id=venue_id, reason=body.reason)
+
+
+@router.patch("/venues/{venue_id}/suspend", status_code=204)
+def suspend_venue(
+    venue_id: UUID,
+    body: VenueActionRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    service.suspend_venue(db, admin_id=auth.user_id, venue_id=venue_id, reason=body.reason)
+
+
+@router.patch("/venues/{venue_id}/reactivate", status_code=204)
+def reactivate_venue(
+    venue_id: UUID,
+    body: VenueActionRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    service.reactivate_venue(db, admin_id=auth.user_id, venue_id=venue_id, reason=body.reason)
 
 
 @router.get("/users", response_model=UserListResponse)
@@ -103,9 +156,53 @@ def reject_owner(
 
 @router.get("/actions", response_model=AdminActionListResponse)
 def list_actions(
-    limit: int = Query(20, ge=1, le=100),
-    target_type: str | None = Query(None, pattern="^(user|venue|booking)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    target_type: str | None = Query(None, pattern="^(user|venue|booking|amenity)$"),
+    action_type: str | None = Query(None),
+    # Legacy convenience: limit=N returns N items on page 1 (used by dashboard)
+    limit: int | None = Query(None, ge=1, le=100),
     _: AuthContext = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    return service.list_actions(db, limit=limit, target_type=target_type)
+    return service.list_actions(
+        db, page=page, page_size=page_size,
+        target_type=target_type, action_type=action_type, limit=limit,
+    )
+
+
+@router.get("/amenities", response_model=AmenityListResponse)
+def list_amenities(
+    include_deleted: bool = Query(False),
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.list_amenities(db, include_deleted=include_deleted)
+
+
+@router.post("/amenities", response_model=AdminAmenityResponse, status_code=201)
+def create_amenity(
+    body: AmenityCreateRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.create_amenity(db, admin_id=auth.user_id, name=body.name, icon=body.icon)
+
+
+@router.patch("/amenities/{amenity_id}", response_model=AdminAmenityResponse)
+def update_amenity(
+    amenity_id: UUID,
+    body: AmenityUpdateRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.update_amenity(db, admin_id=auth.user_id, amenity_id=amenity_id, body=body)
+
+
+@router.delete("/amenities/{amenity_id}", response_model=AmenityDeleteResponse)
+def delete_amenity(
+    amenity_id: UUID,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.delete_amenity(db, admin_id=auth.user_id, amenity_id=amenity_id)

@@ -73,9 +73,11 @@ function buildQS(params: ListUsersParams = {}): string {
 export type AdminAction = {
   id: string
   admin_id: string
+  admin_name: string | null
   action_type: string
   target_type: string
   target_id: string
+  target_name: string | null
   reason: string | null
   created_at: string
 }
@@ -83,13 +85,28 @@ export type AdminAction = {
 export type AdminActionListResponse = {
   items: AdminAction[]
   total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export type ListActionsParams = {
+  page?: number
+  page_size?: number
+  target_type?: string
+  action_type?: string
+  /** Legacy — returns at most N items on page 1 (used by dashboard) */
+  limit?: number
 }
 
 export const adminActionEndpoints = (client: ReturnType<typeof createClient>) => ({
-  listActions: (params: { limit?: number; target_type?: string } = {}): Promise<AdminActionListResponse> => {
+  listActions: (params: ListActionsParams = {}): Promise<AdminActionListResponse> => {
     const qs = new URLSearchParams()
+    if (params.page)        qs.set('page',        String(params.page))
+    if (params.page_size)   qs.set('page_size',   String(params.page_size))
     if (params.limit)       qs.set('limit',       String(params.limit))
     if (params.target_type) qs.set('target_type', params.target_type)
+    if (params.action_type) qs.set('action_type', params.action_type)
     const q = qs.toString()
     return client.get<AdminActionListResponse>(`/api/admin/actions${q ? `?${q}` : ''}`)
   },

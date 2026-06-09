@@ -8,6 +8,9 @@ import NotFound from './pages/NotFound'
 import ComingSoon from './pages/ComingSoon'
 import Users from './pages/Users'
 import VenueOwners from './pages/VenueOwners'
+import VenueApprovals from './pages/VenueApprovals'
+import Amenities from './pages/Amenities'
+import AuditLog from './pages/AuditLog'
 
 export const router = createBrowserRouter([
   // Auth
@@ -25,14 +28,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/venues/pending',
-    element: (
-      <ProtectedRoute>
-        <ComingSoon
-          title="Venue Approvals"
-          description="Review, approve, and reject venue submissions from owners. Filtering and detail review coming soon."
-        />
-      </ProtectedRoute>
-    ),
+    element: <ProtectedRoute><VenueApprovals /></ProtectedRoute>,
   },
   {
     path: '/users',
@@ -51,6 +47,14 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/amenities',
+    element: (
+      <ProtectedRoute>
+        <Amenities />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: '/bookings',
     element: (
       <ProtectedRoute>
@@ -63,14 +67,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/audit-log',
-    element: (
-      <ProtectedRoute>
-        <ComingSoon
-          title="Audit Log"
-          description="Full immutable history of all admin actions — approvals, rejections, suspensions, and more. Coming soon."
-        />
-      </ProtectedRoute>
-    ),
+    element: <ProtectedRoute><AuditLog /></ProtectedRoute>,
   },
   {
     path: '/settings',
