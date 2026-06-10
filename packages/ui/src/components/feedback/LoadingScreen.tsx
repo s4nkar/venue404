@@ -18,7 +18,7 @@ export function LoadingScreen({ message = 'Loading', fullScreen = true, classNam
       aria-label={message}
     >
       {/* Fast spinner = perceived performance improvement */}
-      <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-200 border-t-blue-600" />
+      <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-200 border-t-brand" />
       <p className="text-xs font-medium text-zinc-400">{message}</p>
     </div>
   )

@@ -33,7 +33,7 @@ export function NavItem({ label, href, icon, active, onClick }: NavItemProps) {
       {active && (
         <span
           aria-hidden="true"
-          className="absolute inset-y-1 left-0 w-0.5 rounded-r-full bg-blue-500"
+          className="absolute inset-y-1 left-0 w-0.5 rounded-r-full bg-brand-secondary"
         />
       )}
 
@@ -41,7 +41,7 @@ export function NavItem({ label, href, icon, active, onClick }: NavItemProps) {
         <span
           className={cn(
             'flex h-[18px] w-[18px] shrink-0 items-center justify-center',
-            active ? 'text-blue-400' : 'text-zinc-500 group-hover:text-zinc-300',
+            active ? 'text-brand-secondary' : 'text-zinc-500 group-hover:text-zinc-300',
           )}
         >
           {icon}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { AuthLayout, AuthCard, AuthStatusPanel, Logo } from '@venue404/ui'
@@ -66,7 +66,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@venue404.com"
                 disabled={submitting}
-                className="block w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm outline-none transition-[border-color,box-shadow] duration-150 focus:border-blue-500 focus:ring-3 focus:ring-blue-500/15 disabled:opacity-50"
+                className="block w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm outline-none transition-[border-color,box-shadow] duration-150 focus:border-brand focus:ring-3 focus:ring-brand-secondary/15 disabled:opacity-50"
               />
             </div>
 
@@ -83,7 +83,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••"
                 disabled={submitting}
-                className="block w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm outline-none transition-[border-color,box-shadow] duration-150 focus:border-blue-500 focus:ring-3 focus:ring-blue-500/15 disabled:opacity-50"
+                className="block w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm outline-none transition-[border-color,box-shadow] duration-150 focus:border-brand focus:ring-3 focus:ring-brand-secondary/15 disabled:opacity-50"
               />
             </div>
 
@@ -103,7 +103,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={submitting || !email || !password}
-              className="press flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm outline-none transition-[background-color,box-shadow] duration-150 hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-55"
+              className="press flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm outline-none transition-[background-color,box-shadow] duration-150 hover:bg-brand-hover focus-visible:ring-2 focus-visible:ring-brand-secondary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-55"
             >
               {submitting ? (
                 <>

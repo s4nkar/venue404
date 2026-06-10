@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   ShieldOff, ShieldCheck, UserCheck, Search,
   Clock, CheckCircle2, XCircle, Users as UsersIcon,
@@ -44,7 +44,7 @@ function initials(u: AdminUserSummary): string {
 }
 
 const AVATAR_COLORS = [
-  'bg-blue-100 text-blue-700',
+  'bg-brand-light-strong text-brand',
   'bg-violet-100 text-violet-700',
   'bg-amber-100 text-amber-700',
   'bg-emerald-100 text-emerald-700',
@@ -199,7 +199,7 @@ export default function VenueOwners() {
             value={stats ? String(stats.total) : '—'}
             description="All registered venue owners"
             icon={<UserCheck className="h-4 w-4" />}
-            accent="blue"
+            accent="brand"
           />
         </div>
         <div className="card-enter" style={{ '--index': 1 } as React.CSSProperties}>
@@ -258,7 +258,7 @@ export default function VenueOwners() {
                   className={[
                     'relative px-3.5 py-2.5 text-sm font-medium transition-colors focus:outline-none',
                     isActive
-                      ? 'text-zinc-900 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-blue-600'
+                      ? 'text-zinc-900 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-brand'
                       : 'text-zinc-400 hover:text-zinc-600',
                   ].join(' ')}
                 >

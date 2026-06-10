@@ -50,7 +50,7 @@ export function AuthStatusPanel({ title, description, features, tagline = 'Venue
                 className="flex items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3.5 py-2.5"
               >
                 {f.icon && (
-                  <span className="shrink-0 text-blue-400">{f.icon}</span>
+                  <span className="shrink-0 text-brand-secondary">{f.icon}</span>
                 )}
                 <span className="text-sm font-medium text-zinc-300">{f.label}</span>
               </div>

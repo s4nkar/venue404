@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import { ShieldOff, ShieldCheck, Users as UsersIcon, Search, UserCheck, UserX, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { createClient } from '@venue404/api-client'
 import { adminUserEndpoints } from '@venue404/api-client'
@@ -42,7 +42,7 @@ function initials(u: AdminUserSummary): string {
 }
 
 const AVATAR_COLORS = [
-  'bg-blue-100 text-blue-700',
+  'bg-brand-light-strong text-brand',
   'bg-violet-100 text-violet-700',
   'bg-amber-100 text-amber-700',
   'bg-emerald-100 text-emerald-700',
@@ -226,7 +226,7 @@ export default function Users() {
             value={stats ? String(stats.total) : '—'}
             description="Non-deleted accounts"
             icon={<UsersIcon className="h-4 w-4" />}
-            accent="blue"
+            accent="brand"
           />
         </div>
         <div className="card-enter" style={{ '--index': 1 } as React.CSSProperties}>

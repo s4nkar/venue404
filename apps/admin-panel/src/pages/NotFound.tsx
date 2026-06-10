@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+﻿import { useNavigate } from 'react-router-dom'
 import { NotFoundState } from '@venue404/ui'
 
 export default function NotFound() {
@@ -18,7 +18,7 @@ export default function NotFound() {
           <button
             type="button"
             onClick={() => navigate('/dashboard', { replace: true })}
-            className="press rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+            className="press rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-hover"
           >
             Dashboard
           </button>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import {
   MetricCard, ActivityItem,
@@ -33,7 +33,7 @@ const METRIC_TEMPLATES: DashboardMetric[] = [
     value: '—',
     description: 'Confirmed this month',
     icon: <CalendarDays className="h-4 w-4" />,
-    accent: 'blue',
+    accent: 'brand',
   },
   {
     label: 'Venue Owners',
@@ -64,7 +64,7 @@ function actionIcon(type: string) {
     return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
   if (type.endsWith('rejected') || type.endsWith('suspended') || type.endsWith('deleted'))
     return <XCircle className="h-3.5 w-3.5 text-red-400" />
-  return <CheckCircle2 className="h-3.5 w-3.5 text-blue-400" />
+  return <CheckCircle2 className="h-3.5 w-3.5 text-brand-secondary" />
 }
 
 function actionBadge(type: string) {
@@ -160,7 +160,7 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => navigate('/venues/pending')}
-                  className="press text-xs font-medium text-blue-600 transition-colors hover:text-blue-700"
+                  className="press text-xs font-medium text-brand transition-colors hover:text-brand"
                 >
                   View all
                 </button>
@@ -209,7 +209,7 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => navigate('/audit-log')}
-                  className="press text-xs font-medium text-blue-600 transition-colors hover:text-blue-700"
+                  className="press text-xs font-medium text-brand transition-colors hover:text-brand"
                 >
                   Full log
                 </button>

@@ -28,7 +28,7 @@ export function UserMenu({ name, email, role, onSignOut, className }: UserMenuPr
         aria-expanded={open}
         aria-label="User menu"
       >
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[11px] font-semibold text-white">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-[11px] font-semibold text-white">
           {initials}
         </div>
         <div className="min-w-0 flex-1">
