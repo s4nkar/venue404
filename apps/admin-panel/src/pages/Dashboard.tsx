@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../lib/AuthContext'
 import {
   MetricCard, ActivityItem,
@@ -15,7 +15,6 @@ import { useNavigate } from 'react-router-dom'
 import { AdminLayout } from '../components/AdminLayout'
 import { createClient, ApiError } from '@venue404/api-client'
 import { adminActionEndpoints, adminUserEndpoints } from '@venue404/api-client'
-import type { AdminAction, AdminUserSummary, OwnerStats } from '@venue404/api-client'
 
 const actionsApi = adminActionEndpoints(createClient())
 const usersApi = adminUserEndpoints(createClient())
@@ -85,37 +84,34 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
+function suppressAuthErrors(e: unknown) {
+  if (e instanceof ApiError && (e.status === 401 || e.status === 403)) throw e
+  return null
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  const [recentActions, setRecentActions] = useState<AdminAction[]>([])
-  const [actionsTotal, setActionsTotal] = useState<number | null>(null)
-  const [actionsLoading, setActionsLoading] = useState(true)
+  const { data: actionsData, isLoading: actionsLoading } = useQuery({
+    queryKey: ['admin', 'dashboard', 'actions'],
+    queryFn: () => actionsApi.listActions({ limit: 4 }).catch(suppressAuthErrors),
+  })
 
-  const [ownerStats, setOwnerStats] = useState<OwnerStats | null>(null)
-  const [pendingOwners, setPendingOwners] = useState<AdminUserSummary[]>([])
-  const [pendingLoading, setPendingLoading] = useState(true)
+  const { data: ownerStats } = useQuery({
+    queryKey: ['admin', 'dashboard', 'owner-stats'],
+    queryFn: () => usersApi.getOwnerStats().catch(suppressAuthErrors),
+  })
 
-  useEffect(() => {
-    const suppress = (e: unknown) => {
-      if (e instanceof ApiError && (e.status === 401 || e.status === 403)) throw e
-    }
+  const { data: pendingOwnersData, isLoading: pendingLoading } = useQuery({
+    queryKey: ['admin', 'dashboard', 'pending-owners'],
+    queryFn: () =>
+      usersApi.listUsers({ role: 'venue_owner', status: 'pending', page_size: 4 }).catch(suppressAuthErrors),
+  })
 
-    actionsApi.listActions({ limit: 4 })
-      .then((res) => { setRecentActions(res.items); setActionsTotal(res.total) })
-      .catch(suppress)
-      .finally(() => setActionsLoading(false))
-
-    usersApi.getOwnerStats()
-      .then(setOwnerStats)
-      .catch(suppress)
-
-    usersApi.listUsers({ role: 'venue_owner', status: 'pending', page_size: 4 })
-      .then((res) => setPendingOwners(res.items))
-      .catch(suppress)
-      .finally(() => setPendingLoading(false))
-  }, [])
+  const recentActions = actionsData?.items ?? []
+  const actionsTotal = actionsData?.total ?? null
+  const pendingOwners = pendingOwnersData?.items ?? []
 
   const metrics = METRIC_TEMPLATES.map((m) => {
     if (m.label === 'Pending Approvals') return { ...m, value: ownerStats ? String(ownerStats.pending) : '—' }
@@ -200,7 +196,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Recent audit actions — real data */}
+        {/* Recent audit actions */}
         <div className="card-enter rounded-xl border border-zinc-200 bg-white shadow-sm">
           <div className="border-b border-zinc-100 px-5 py-4">
             <SectionHeader
