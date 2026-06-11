@@ -1,21 +1,461 @@
-from pydantic import BaseModel
-from typing import Optional, List
+from pydantic import BaseModel, field_validator, Field
+from uuid import UUID
+from datetime import datetime, time
+from typing import Optional
+from decimal import Decimal
+from enum import Enum
 
 
-class CreateVenueRequest(BaseModel):
+class VenueType(str, Enum):
+    banquet_hall = "banquet_hall"
+    wedding_hall = "wedding_hall"
+    auditorium = "auditorium"
+    conference_room = "conference_room"
+    club = "club"
+    rooftop = "rooftop"
+    resort = "resort"
+    lawn = "lawn"
+    event_space = "event_space"
+    meeting_room = "meeting_room"
+
+
+class BookingType(str, Enum):
+    full_day = "full_day"
+    time_slot = "time_slot"
+
+
+class PricingMode(str, Enum):
+    flat = "flat"
+    hourly = "hourly"
+    mixed = "mixed"
+
+
+class VenueStatus(str, Enum):
+    draft = "draft"
+    pending_approval = "pending_approval"
+    approved = "approved"
+    rejected = "rejected"
+    suspended = "suspended"
+
+
+class VenuePhotoResponse(BaseModel):
+    id: UUID
+    venue_id: UUID
+    image_url: str
+    sort_order: int
+    is_cover: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AmenityResponse(BaseModel):
+    id: UUID
     name: str
-    description: str
-    address: str
-    capacity: int
-    price_per_day: float
+    icon: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class CancellationPolicyResponse(BaseModel):
+    tier_1_hours: Optional[int] = None
+    tier_1_refund_pct: Optional[Decimal] = None
+    tier_2_hours: Optional[int] = None
+    tier_2_refund_pct: Optional[Decimal] = None
+    tier_3_hours: Optional[int] = None
+    tier_3_refund_pct: Optional[Decimal] = None
+    no_show_refund_pct: Decimal
+    platform_fee_refundable: bool
+    notes: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+class UpdateCancellationPolicyRequest(BaseModel):
+    tier_1_hours: Optional[int] = Field(default=None, gt=0)
+    tier_1_refund_pct: Optional[Decimal] = Field(default=None, ge=0, le=100)
+    tier_2_hours: Optional[int] = Field(default=None, gt=0)
+    tier_2_refund_pct: Optional[Decimal] = Field(default=None, ge=0, le=100)
+    tier_3_hours: Optional[int] = Field(default=None, gt=0)
+    tier_3_refund_pct: Optional[Decimal] = Field(default=None, ge=0, le=100)
+    no_show_refund_pct: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
+    platform_fee_refundable: bool = False
+    notes: Optional[str] = None
+
+    def model_post_init(self, __context) -> None:
+        if (self.tier_1_hours is None) != (self.tier_1_refund_pct is None):
+            raise ValueError("tier_1_hours and tier_1_refund_pct must be both set or both null")
+        if (self.tier_2_hours is None) != (self.tier_2_refund_pct is None):
+            raise ValueError("tier_2_hours and tier_2_refund_pct must be both set or both null")
+        if (self.tier_3_hours is None) != (self.tier_3_refund_pct is None):
+            raise ValueError("tier_3_hours and tier_3_refund_pct must be both set or both null")
+
+        if self.tier_1_hours is not None and self.tier_2_hours is not None:
+            if self.tier_1_hours <= self.tier_2_hours:
+                raise ValueError("tier_1_hours must be strictly greater than tier_2_hours")
+        if self.tier_2_hours is not None and self.tier_3_hours is not None:
+            if self.tier_2_hours <= self.tier_3_hours:
+                raise ValueError("tier_2_hours must be strictly greater than tier_3_hours")
+
+
+class UpdateVenueAmenitiesRequest(BaseModel):
+    amenity_ids: list[UUID]
+
+
+class UpdateVenuePhotoItem(BaseModel):
+    photo_id: UUID
+    sort_order: int
+    is_cover: bool
+
+class BulkUpdateVenuePhotosRequest(BaseModel):
+    photos: list[UpdateVenuePhotoItem]
 
 
 class VenueResponse(BaseModel):
-    id: str
+    id: UUID
+    owner_id: UUID
+
+    
     name: str
-    description: str
-    address: str
-    capacity: int
-    price_per_day: float
-    approval_status: str
-    owner_id: str
+    slug: Optional[str] = None
+    description: Optional[str] = None
+    venue_type: VenueType
+
+    
+    address_line1: str
+    address_line2: Optional[str] = None
+    city: str
+    state: str
+    country: str
+    postal_code: Optional[str] = None
+    latitude: Optional[Decimal] = None
+    longitude: Optional[Decimal] = None
+    timezone: str
+
+    
+    min_capacity: Optional[int] = None
+    max_capacity: int
+
+    
+    open_time: time
+    close_time: time
+    spans_next_day: bool
+
+    
+    allowed_booking_types: list[BookingType]
+    min_booking_duration_minutes: int
+    max_booking_duration_minutes: int
+    slot_interval_minutes: int
+
+    
+    pre_buffer_minutes: int
+    post_buffer_minutes: int
+
+    
+    pricing_mode: PricingMode
+    base_price_paise: Optional[int] = None     
+    hourly_rate_paise: Optional[int] = None   
+
+    
+    platform_commission_pct: Decimal
+
+    
+    advance_pct: Decimal
+    balance_due_days_before_event: int
+    owner_action_window_hours: int
+    overdue_advance_refund_pct: Decimal
+
+    
+    status: VenueStatus
+    is_active: bool
+
+    
+    created_at: datetime
+    updated_at: datetime
+
+    
+    photos: list[VenuePhotoResponse] = Field(default_factory=list)
+    amenities: list[AmenityResponse] = Field(default_factory=list)
+    cancellation_policy: Optional[CancellationPolicyResponse] = None
+
+    model_config = {"from_attributes": True}
+
+
+class DeleteResponse(BaseModel):
+    id: UUID
+    deleted: bool = True
+    message: str = "Venue deleted successfully"
+
+
+class CreateVenueRequest(BaseModel):
+   
+    name: str
+    description: Optional[str] = None
+    venue_type: VenueType
+
+    
+    address_line1: str
+    address_line2: Optional[str] = None
+    city: str
+    state: str
+    country: str = "India"
+    postal_code: Optional[str] = None
+    latitude: Optional[Decimal] = None
+    longitude: Optional[Decimal] = None
+    timezone: str = "Asia/Kolkata"
+
+    
+    min_capacity: Optional[int] = Field(default=None, gt=0)
+    max_capacity: int = Field(gt=0)
+
+    
+    open_time: time
+    close_time: time
+    spans_next_day: bool = False
+
+    
+    allowed_booking_types: list[BookingType] = Field(default_factory=lambda: [BookingType.full_day, BookingType.time_slot])
+    min_booking_duration_minutes: int = Field(default=60, gt=0)
+    max_booking_duration_minutes: int = Field(default=1440, gt=0)
+    slot_interval_minutes: int = Field(default=30, gt=0)
+
+    
+    pre_buffer_minutes: int = Field(default=0, ge=0)
+    post_buffer_minutes: int = Field(default=0, ge=0)
+
+    
+    pricing_mode: PricingMode = PricingMode.flat
+    base_price_paise: Optional[int] = Field(default=None, ge=0)
+    hourly_rate_paise: Optional[int] = Field(default=None, ge=0)
+
+    
+    advance_pct: Decimal = Field(default=Decimal("30.00"), gt=0, le=100)
+    balance_due_days_before_event: int = Field(default=7, gt=0)
+    owner_action_window_hours: int = Field(default=48, ge=24, le=72)
+    overdue_advance_refund_pct: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
+
+    
+
+    @field_validator("allowed_booking_types")
+    @classmethod
+    def validate_booking_types(cls, v: list[BookingType]) -> list[BookingType]:
+        if not v:
+            raise ValueError("allowed_booking_types cannot be empty")
+        if len(v) != len(set(v)):
+            raise ValueError("Duplicate booking types are not allowed")
+        return v
+
+    def model_post_init(self, __context) -> None:
+       
+        if self.pricing_mode == PricingMode.flat:
+            if self.base_price_paise is None:
+                raise ValueError("base_price_paise is required when pricing_mode is 'flat'")
+            if self.hourly_rate_paise is not None:
+                raise ValueError("hourly_rate_paise must be null when pricing_mode is 'flat'")
+        elif self.pricing_mode == PricingMode.hourly:
+            if self.hourly_rate_paise is None:
+                raise ValueError("hourly_rate_paise is required when pricing_mode is 'hourly'")
+            if self.base_price_paise is not None:
+                raise ValueError("base_price_paise must be null when pricing_mode is 'hourly'")
+        elif self.pricing_mode == PricingMode.mixed:
+            if self.base_price_paise is None or self.hourly_rate_paise is None:
+                raise ValueError("Both base_price_paise and hourly_rate_paise are required when pricing_mode is 'mixed'")
+
+        
+        if (
+            self.min_capacity is not None
+            and self.min_capacity > self.max_capacity
+        ):
+            raise ValueError("min_capacity cannot exceed max_capacity")
+
+        
+        if self.min_booking_duration_minutes > self.max_booking_duration_minutes:
+            raise ValueError(
+                "min_booking_duration_minutes cannot exceed max_booking_duration_minutes"
+            )
+
+
+class UpdateVenueRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    venue_type: Optional[VenueType] = None
+
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+    postal_code: Optional[str] = None
+    latitude: Optional[Decimal] = None
+    longitude: Optional[Decimal] = None
+    timezone: Optional[str] = None
+
+    min_capacity: Optional[int] = Field(default=None, gt=0)
+    max_capacity: Optional[int] = Field(default=None, gt=0)
+
+    open_time: Optional[time] = None
+    close_time: Optional[time] = None
+    spans_next_day: Optional[bool] = None
+
+    allowed_booking_types: Optional[list[BookingType]] = None
+    min_booking_duration_minutes: Optional[int] = Field(default=None, gt=0)
+    max_booking_duration_minutes: Optional[int] = Field(default=None, gt=0)
+    slot_interval_minutes: Optional[int] = Field(default=None, gt=0)
+
+    pre_buffer_minutes: Optional[int] = Field(default=None, ge=0)
+    post_buffer_minutes: Optional[int] = Field(default=None, ge=0)
+
+    pricing_mode: Optional[PricingMode] = None
+    base_price_paise: Optional[int] = Field(default=None, ge=0)
+    hourly_rate_paise: Optional[int] = Field(default=None, ge=0)
+
+    advance_pct: Optional[Decimal] = Field(default=None, gt=0, le=100)
+    balance_due_days_before_event: Optional[int] = Field(default=None, gt=0)
+    owner_action_window_hours: Optional[int] = Field(default=None, ge=24, le=72)
+    overdue_advance_refund_pct: Optional[Decimal] = Field(default=None, ge=0, le=100)
+
+    @field_validator("allowed_booking_types")
+    @classmethod
+    def validate_booking_types(cls, v: Optional[list[BookingType]]) -> Optional[list[BookingType]]:
+        if v is not None:
+            if not v:
+                raise ValueError("allowed_booking_types cannot be empty if provided")
+            if len(v) != len(set(v)):
+                raise ValueError("Duplicate booking types are not allowed")
+        return v
+
+    def model_post_init(self, __context) -> None:
+        if self.pricing_mode == PricingMode.flat and self.hourly_rate_paise is not None:
+             raise ValueError("hourly_rate_paise must be null when pricing_mode is 'flat'")
+        if self.pricing_mode == PricingMode.hourly and self.base_price_paise is not None:
+             raise ValueError("base_price_paise must be null when pricing_mode is 'hourly'")
+
+        if (
+            self.min_capacity is not None
+            and self.max_capacity is not None
+            and self.min_capacity > self.max_capacity
+        ):
+            raise ValueError("min_capacity cannot exceed max_capacity")
+
+        if (
+            self.min_booking_duration_minutes is not None
+            and self.max_booking_duration_minutes is not None
+            and self.min_booking_duration_minutes > self.max_booking_duration_minutes
+        ):
+            raise ValueError(
+                "min_booking_duration_minutes cannot exceed max_booking_duration_minutes"
+            )
+
+
+class PricingDisplay(BaseModel):
+    quoted_price: str
+    advance_due: str
+    balance_due: str
+    platform_fee: str
+    owner_payout: str
+
+
+class PricingPreviewResponse(BaseModel):
+    pricing_mode: PricingMode
+    quoted_price_paise: int
+    platform_fee_paise: int
+    owner_payout_paise: int
+    advance_due_paise: int
+    balance_due_paise: int
+    display: PricingDisplay
+
+
+# ─── Search Result (used by search module) ────────────────────────────────────
+
+class VenueSearchResult(BaseModel):
+    id: UUID
+    name: str
+    slug: Optional[str] = None
+    venue_type: VenueType
+    city: str
+    state: str
+    max_capacity: int
+    pricing_mode: PricingMode
+    base_price_paise: Optional[int] = None
+    hourly_rate_paise: Optional[int] = None
+    cover_photo_url: Optional[str] = None
+    status: VenueStatus
+
+    model_config = {"from_attributes": True}
+
+
+class VenueAvailabilityResponse(BaseModel):
+    day_of_week: int = Field(ge=0, le=6)
+    is_available: bool
+    opens_at: Optional[time] = None
+    closes_at: Optional[time] = None
+    spans_next_day: bool
+
+    model_config = {"from_attributes": True}
+
+class VenueAvailabilityUpdate(BaseModel):
+    day_of_week: int = Field(ge=0, le=6)
+    is_available: bool
+    opens_at: Optional[time] = None
+    closes_at: Optional[time] = None
+    spans_next_day: bool = False
+
+    def model_post_init(self, __context) -> None:
+        if self.is_available:
+            if self.opens_at is None or self.closes_at is None:
+                raise ValueError("opens_at and closes_at are required when is_available is true")
+
+class BulkUpdateAvailabilityRequest(BaseModel):
+    availabilities: list[VenueAvailabilityUpdate]
+
+    @field_validator("availabilities")
+    @classmethod
+    def validate_unique_days(cls, v: list[VenueAvailabilityUpdate]) -> list[VenueAvailabilityUpdate]:
+        days = [item.day_of_week for item in v]
+        if len(days) != len(set(days)):
+            raise ValueError("Duplicate day_of_week entries are not allowed")
+        return v
+
+
+class PublicVenueBlockedDateResponse(BaseModel):
+    id: UUID
+    venue_id: UUID
+    starts_at: datetime
+    ends_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class VenueBlockedDateResponse(BaseModel):
+    id: UUID
+    venue_id: UUID
+    starts_at: datetime
+    ends_at: datetime
+    reason: Optional[str] = None
+    blocked_by: UUID
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+class CreateBlockedDateRequest(BaseModel):
+    starts_at: datetime
+    ends_at: datetime
+    reason: Optional[str] = None
+
+    def model_post_init(self, __context) -> None:
+        if self.ends_at <= self.starts_at:
+            raise ValueError("ends_at must be strictly after starts_at")
+
+
+class PricingQuote(BaseModel):
+    quoted_price_paise: int
+
+    platform_commission_pct: float
+    platform_fee_paise: int
+
+    owner_payout_paise: int
+
+    advance_pct: float
+    advance_due_paise: int
+    balance_due_paise: int
+
+    pricing_mode: str

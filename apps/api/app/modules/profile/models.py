@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 from sqlalchemy import String, Enum, DateTime, UniqueConstraint, func, ForeignKey
-from sqlalchemy.orm import mapped_column, Mapped
+from sqlalchemy.orm import mapped_column, Mapped, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
 
@@ -10,6 +10,8 @@ from app.core.database import Base
 class ProfileStatus(str, enum.Enum):
     active = "active"
     suspended = "suspended"
+    pending = "pending"
+    rejected = "rejected"
 
 
 class UserRole(str, enum.Enum):
@@ -22,6 +24,7 @@ class Profile(Base):
     __tablename__ = "profiles"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    email: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     full_name: Mapped[str | None] = mapped_column(String, nullable=True)
     phone: Mapped[str | None] = mapped_column(String, nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -33,6 +36,11 @@ class Profile(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now(), onupdate=func.now())
+
+    bookings = relationship(
+        "Booking",
+        back_populates="user",
+    )
 
 
 class UserRoleAssignment(Base):

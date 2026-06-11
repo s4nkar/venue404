@@ -6,14 +6,26 @@
  *   2. @import "@venue404/ui/theme.css";
  *   3. @source "<path-to-packages/ui/src>";
  *
- * Palette  : zinc neutrals  +  blue-600 accent  (no AI-purple, no gradients)
+ * Palette  : zinc neutrals  +  #285A48 primary  +  #408A71 secondary  +  #091413 black
  * Font     : Geist Variable (variable font, weights 100–900)
- * Sidebar  : zinc-950 background, zinc-800 borders
+ * Sidebar  : brand-black background, zinc-800 borders
  * Content  : zinc-50 background, white cards, zinc-200 borders
  * Motion   : Emil-style press feedback (scale 0.97), expo easing, stagger entry
  */
 
 @import "@fontsource-variable/geist";
+
+/* ─── Brand color utilities (Tailwind v4 @theme) ────────────────────────── */
+@theme {
+  --color-brand:                 #285A48;  /* primary */
+  --color-brand-hover:           #1e4335;  /* primary dark */
+  --color-brand-secondary:       #408A71;  /* secondary */
+  --color-brand-secondary-hover: #327060;  /* secondary dark */
+  --color-brand-black:           #091413;  /* custom black */
+  --color-brand-light:           #e8f2ee;  /* primary tint — backgrounds */
+  --color-brand-light-strong:    #d1e6dc;  /* primary tint — stronger */
+  --color-brand-muted:           #9ec5b4;  /* primary tint — rings/borders */
+}
 
 /* ─── Design tokens ─────────────────────────────────────────────────────── */
 @layer base {
@@ -26,12 +38,9 @@
     --ease-out-expo:    cubic-bezier(0.23, 1, 0.32, 1);
     --ease-in-out-expo: cubic-bezier(0.77, 0, 0.175, 1);
 
-    /* Brand */
-    --color-brand:       #2563eb;  /* blue-600  */
-    --color-brand-hover: #1d4ed8;  /* blue-700  */
-    --color-sidebar:     #09090b;  /* zinc-950  */
-    --color-surface:     #ffffff;  /* white     */
-    --color-bg:          #fafafa;  /* zinc-50   */
+    /* Non-Tailwind surface tokens */
+    --color-surface: #ffffff;
+    --color-bg:      #fafafa;  /* zinc-50 */
   }
 
   *, *::before, *::after {
@@ -93,5 +102,132 @@
   .card-enter,
   .page-enter {
     animation: none;
+  }
+}
+
+/* ─── Form elements ──────────────────────────────────────────────────────── */
+@layer components {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="number"],
+  input:not([type]),
+  textarea,
+  select {
+    appearance: none;
+    display: block;
+    width: 100%;
+    border-radius: 0.5rem;             /* rounded-lg */
+    border: 1px solid #e4e4e7;         /* zinc-200   */
+    background-color: #ffffff;
+    padding: 0.5rem 0.75rem;           /* py-2 px-3  */
+    font-size: 0.875rem;               /* text-sm    */
+    line-height: 1.5rem;
+    color: #18181b;                    /* zinc-900   */
+    font-family: inherit;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  input:not([type]):focus,
+  input[type="text"]:focus,
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  input[type="search"]:focus,
+  input[type="tel"]:focus,
+  input[type="url"]:focus,
+  input[type="number"]:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px rgb(40 90 72 / 0.15);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #a1a1aa; /* zinc-400 */
+  }
+
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    background-color: #f4f4f5; /* zinc-100 */
+    color: #a1a1aa;
+    cursor: not-allowed;
+  }
+
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2.25rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.8125rem;  /* 13px */
+    font-weight: 500;
+    color: #52525b;        /* zinc-600 */
+    margin-bottom: 0.375rem;
+  }
+}
+
+/* ─── Button variants ────────────────────────────────────────────────────── */
+@layer components {
+  button[data-variant] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    line-height: 1;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+  }
+
+  button[data-variant]:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  button[data-variant="primary"] {
+    background-color: var(--color-brand);
+    color: #ffffff;
+    border: 1px solid transparent;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  }
+
+  button[data-variant="primary"]:hover:not(:disabled) {
+    background-color: var(--color-brand-hover);
+  }
+
+  button[data-variant="secondary"] {
+    background-color: #ffffff;
+    color: #3f3f46;        /* zinc-700 */
+    border: 1px solid #e4e4e7; /* zinc-200 */
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  }
+
+  button[data-variant="secondary"]:hover:not(:disabled) {
+    background-color: #f4f4f5; /* zinc-100 */
+    border-color: #d4d4d8;     /* zinc-300 */
+  }
+
+  button[data-variant="ghost"] {
+    background-color: transparent;
+    color: #52525b; /* zinc-600 */
+    border: 1px solid transparent;
+  }
+
+  button[data-variant="ghost"]:hover:not(:disabled) {
+    background-color: #f4f4f5; /* zinc-100 */
+    color: #18181b;
   }
 }

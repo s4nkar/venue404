@@ -6,6 +6,11 @@ import LoginSuccess from './pages/LoginSuccess'
 import Forbidden from './pages/Forbidden'
 import NotFound from './pages/NotFound'
 import ComingSoon from './pages/ComingSoon'
+import Users from './pages/Users'
+import VenueOwners from './pages/VenueOwners'
+import VenueApprovals from './pages/VenueApprovals'
+import Amenities from './pages/Amenities'
+import AuditLog from './pages/AuditLog'
 
 export const router = createBrowserRouter([
   // Auth
@@ -23,23 +28,13 @@ export const router = createBrowserRouter([
   },
   {
     path: '/venues/pending',
-    element: (
-      <ProtectedRoute>
-        <ComingSoon
-          title="Venue Approvals"
-          description="Review, approve, and reject venue submissions from owners. Filtering and detail review coming soon."
-        />
-      </ProtectedRoute>
-    ),
+    element: <ProtectedRoute><VenueApprovals /></ProtectedRoute>,
   },
   {
     path: '/users',
     element: (
       <ProtectedRoute>
-        <ComingSoon
-          title="User Management"
-          description="View and manage customer accounts, suspend users, and review activity. Coming soon."
-        />
+        <Users />
       </ProtectedRoute>
     ),
   },
@@ -47,10 +42,15 @@ export const router = createBrowserRouter([
     path: '/owners',
     element: (
       <ProtectedRoute>
-        <ComingSoon
-          title="Venue Owners"
-          description="View and manage registered venue owners, verify identities, and monitor listings. Coming soon."
-        />
+        <VenueOwners />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/amenities',
+    element: (
+      <ProtectedRoute>
+        <Amenities />
       </ProtectedRoute>
     ),
   },
@@ -67,14 +67,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/audit-log',
-    element: (
-      <ProtectedRoute>
-        <ComingSoon
-          title="Audit Log"
-          description="Full immutable history of all admin actions — approvals, rejections, suspensions, and more. Coming soon."
-        />
-      </ProtectedRoute>
-    ),
+    element: <ProtectedRoute><AuditLog /></ProtectedRoute>,
   },
   {
     path: '/settings',

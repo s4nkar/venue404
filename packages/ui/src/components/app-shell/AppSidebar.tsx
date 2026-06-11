@@ -28,7 +28,7 @@ export function AppSidebar({
   const sidebar = (
     <aside
       className={cn(
-        'flex h-full w-[var(--sidebar-width,248px)] flex-col bg-zinc-950',
+        'flex h-full w-[var(--sidebar-width,248px)] flex-col bg-brand-black',
         className,
       )}
     >

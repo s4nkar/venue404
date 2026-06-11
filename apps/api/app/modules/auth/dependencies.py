@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.exceptions import UnauthorizedError, ForbiddenError
 from app.modules.auth.providers.supabase import SupabaseAuthProvider
-from app.modules.profile.models import Profile, UserRoleAssignment
+from app.modules.profile.models import Profile, UserRoleAssignment, ProfileStatus
 
 _auth_provider = SupabaseAuthProvider()
 
@@ -53,8 +53,12 @@ def get_current_user(
     if not profile:
         raise ForbiddenError("Account not found")
 
-    if profile.status.value == "suspended":
+    if profile.status == ProfileStatus.suspended:
         raise ForbiddenError("Account suspended")
+
+    # Keep email in profiles in sync with the authoritative JWT value
+    if provider_user.email and profile.email != provider_user.email:
+        profile.email = provider_user.email
 
     role_rows = db.query(UserRoleAssignment).filter(
         UserRoleAssignment.user_id == provider_user.id
@@ -110,4 +114,9 @@ def require_owner(
 ) -> AuthContext:
     if not current_user.is_owner():
         raise ForbiddenError("Venue owner access required")
+    if not current_user.is_admin():
+        if current_user.status == "pending":
+            raise ForbiddenError("account_pending")
+        if current_user.status == "rejected":
+            raise ForbiddenError("account_rejected")
     return current_user

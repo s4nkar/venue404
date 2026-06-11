@@ -65,12 +65,11 @@ That's it. After `pnpm dev:all` runs you should have:
  
 | Service       | URL                          |
 |---------------|------------------------------|
-| User app      | http://localhost:5173        |
-| Owner portal  | http://localhost:5174        |
-| Admin panel   | http://localhost:5175        |
+| User app      | http://localhost:5397        |
+| Owner portal  | http://localhost:5398        |
+| Admin panel   | http://localhost:5399        |
 | FastAPI       | http://localhost:8000        |
 | FastAPI docs  | http://localhost:8000/docs   |
-| PostgreSQL    | localhost:5432               |
  
 Apply initial database migrations (first time only):
  

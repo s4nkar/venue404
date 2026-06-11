@@ -14,5 +14,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/403" replace />
   }
 
+  if (!user.roles.includes('super_admin')) {
+    if (user.profile.status === 'pending') return <Navigate to="/pending-approval" replace />
+    if (user.profile.status === 'rejected') return <Navigate to="/rejected" replace />
+  }
+
   return <>{children}</>
 }
