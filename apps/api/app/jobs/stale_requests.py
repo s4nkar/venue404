@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 from app.core.database import with_session
-from app.modules.booking.models import Booking, BookingStatus, StatusHistory
+from app.modules.booking.models import Booking, BookingStatus, BookingStatusHistory
 from app.modules.venue.models import Venue
 from app.modules.notification import service as notifications
 
@@ -26,7 +26,7 @@ def run():
         )
         for b in rows:
             b.status = BookingStatus.request_expired
-            db.add(StatusHistory(
+            db.add(BookingStatusHistory(
                 booking_id=b.id, old_status="requested", new_status="request_expired",
                 reason="stale_requests_job",
             ))
