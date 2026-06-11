@@ -5,6 +5,9 @@ from datetime import datetime
 class NotificationResponse(BaseModel):
     id: str
     user_id: str
-    message: str
-    is_read: bool
+    booking_id: str | None
+    type: str
+    title: str
+    body: str
+    read_at: datetime | None
     created_at: datetime
