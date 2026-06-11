@@ -245,7 +245,19 @@ class CreateVenueRequest(BaseModel):
         return v
 
     def model_post_init(self, __context) -> None:
-       
+        has_full_day = BookingType.full_day in self.allowed_booking_types
+        has_time_slot = BookingType.time_slot in self.allowed_booking_types
+
+        if has_full_day and has_time_slot:
+            if self.pricing_mode != PricingMode.mixed:
+                raise ValueError("pricing_mode must be 'mixed' when both full_day and time_slot are allowed")
+        elif has_full_day:
+            if self.pricing_mode != PricingMode.flat:
+                raise ValueError("pricing_mode must be 'flat' when only full_day is allowed")
+        elif has_time_slot:
+            if self.pricing_mode != PricingMode.hourly:
+                raise ValueError("pricing_mode must be 'hourly' when only time_slot is allowed")
+
         if self.pricing_mode == PricingMode.flat:
             if self.base_price_paise is None:
                 raise ValueError("base_price_paise is required when pricing_mode is 'flat'")
@@ -324,6 +336,20 @@ class UpdateVenueRequest(BaseModel):
         return v
 
     def model_post_init(self, __context) -> None:
+        if self.allowed_booking_types is not None and self.pricing_mode is not None:
+            has_full_day = BookingType.full_day in self.allowed_booking_types
+            has_time_slot = BookingType.time_slot in self.allowed_booking_types
+
+            if has_full_day and has_time_slot:
+                if self.pricing_mode != PricingMode.mixed:
+                    raise ValueError("pricing_mode must be 'mixed' when both full_day and time_slot are allowed")
+            elif has_full_day:
+                if self.pricing_mode != PricingMode.flat:
+                    raise ValueError("pricing_mode must be 'flat' when only full_day is allowed")
+            elif has_time_slot:
+                if self.pricing_mode != PricingMode.hourly:
+                    raise ValueError("pricing_mode must be 'hourly' when only time_slot is allowed")
+
         if self.pricing_mode == PricingMode.flat and self.hourly_rate_paise is not None:
              raise ValueError("hourly_rate_paise must be null when pricing_mode is 'flat'")
         if self.pricing_mode == PricingMode.hourly and self.base_price_paise is not None:

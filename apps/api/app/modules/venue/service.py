@@ -155,6 +155,12 @@ def list_owner_venues(db: Session, owner_id: UUID) -> list[Venue]:
     )
 
 
+def get_owner_venue(db: Session, venue_id: UUID, owner_id: UUID) -> Venue:
+    venue = _get_venue_or_404(db, venue_id)
+    _assert_owner(venue, owner_id)
+    return venue
+
+
 def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue:
     
     venue = Venue(

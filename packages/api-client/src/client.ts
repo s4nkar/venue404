@@ -10,16 +10,20 @@ export class ApiError extends Error {
 }
 
 export function createClient() {
-  async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async function request<T>(method: string, path: string, body?: any): Promise<T> {
     const token = await getAccessToken()
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const isFormData = body && (body instanceof FormData || body.constructor?.name === 'FormData' || body.append !== undefined)
+    const headers: Record<string, string> = {}
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json'
+    }
     if (token) headers['Authorization'] = `Bearer ${token}`
 
     const res = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
-      body: body != null ? JSON.stringify(body) : undefined,
+      body: body != null ? (isFormData ? body : JSON.stringify(body)) : undefined,
     })
 
     if (res.status === 401) {
