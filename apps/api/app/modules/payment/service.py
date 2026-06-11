@@ -22,7 +22,7 @@ from app.core.stripe_client import get_stripe
 from app.core.exceptions import NotFoundError, ForbiddenError, BadRequestError
 from app.modules.auth.dependencies import AuthContext
 from app.modules.booking.models import (
-    Booking, BookingStatus, BookingPaymentStatus, BookingSlot, StatusHistory,
+    Booking, BookingStatus, PaymentStatus, BookingSlot, BookingStatusHistory,
 )
 from app.modules.booking.state_machine import can_transition
 from app.modules.venue.models import Venue
@@ -79,7 +79,7 @@ def create_payment_intent(db: Session, current_user_id, booking_id: str) -> Paym
     )
     db.add(payment)
     booking.stripe_payment_intent_id = intent.id
-    booking.payment_status = BookingPaymentStatus.pending
+    booking.payment_status = PaymentStatus.pending
     db.commit()
     db.refresh(payment)
 
@@ -144,7 +144,7 @@ def confirm_payment(db: Session, payment_intent_id: str) -> None:
 
     payment.status = PaymentAttemptStatus.succeeded
     booking.status = BookingStatus.confirmed
-    booking.payment_status = BookingPaymentStatus.paid
+    booking.payment_status = PaymentStatus.paid
 
     owner_id = venue.owner_id if venue else booking.user_id
     db.add(LedgerEntry(
@@ -163,7 +163,7 @@ def confirm_payment(db: Session, payment_intent_id: str) -> None:
             direction="debit", stripe_pi_ref=payment_intent_id,
         ))
 
-    db.add(StatusHistory(
+    db.add(BookingStatusHistory(
         booking_id=booking.id, old_status="accepted", new_status="confirmed",
         reason="token_payment_succeeded",
     ))
@@ -191,8 +191,8 @@ def fail_payment(db: Session, payment_intent_id: str) -> None:
         return
     payment.status = PaymentAttemptStatus.failed
     booking = db.get(Booking, payment.booking_id)
-    if booking and booking.payment_status == BookingPaymentStatus.pending:
-        booking.payment_status = BookingPaymentStatus.unpaid
+    if booking and booking.payment_status == PaymentStatus.pending:
+        booking.payment_status = PaymentStatus.unpaid
 
 
 # --------------------------------------------------------------------------- #
@@ -216,7 +216,7 @@ def refund_booking(db: Session, booking_id: str, current_user: AuthContext, reas
 
     if booking.status == BookingStatus.confirmed:
         booking.status = BookingStatus.canceled
-        db.add(StatusHistory(
+        db.add(BookingStatusHistory(
             booking_id=booking.id, old_status="confirmed", new_status="canceled",
             reason=reason or "owner_cancellation",
         ))
@@ -273,7 +273,7 @@ def _record_refund(db: Session, payment: Payment, booking: Booking, amount_paise
     ))
     payment.status = PaymentAttemptStatus.refunded
     booking.refund_paise = (booking.refund_paise or 0) + amount_paise
-    booking.payment_status = BookingPaymentStatus.refunded
+    booking.payment_status = PaymentStatus.refunded
 
     venue = db.get(Venue, booking.venue_id)
     owner_id = venue.owner_id if venue else booking.user_id
@@ -309,7 +309,7 @@ def _find_competing_bookings(db: Session, booking: Booking) -> list[Booking]:
 def _conflict_cancel(db: Session, competitor: Booking, venue: Venue | None) -> None:
     old = competitor.status.value
     competitor.status = BookingStatus.conflict_canceled
-    db.add(StatusHistory(
+    db.add(BookingStatusHistory(
         booking_id=competitor.id, old_status=old, new_status="conflict_canceled",
         reason="slot_confirmed_by_another",
     ))
@@ -337,7 +337,7 @@ def _conflict_cancel_self_and_refund(db: Session, payment_intent_id: str) -> Non
     venue = db.get(Venue, booking.venue_id)
     old = booking.status.value
     booking.status = BookingStatus.conflict_canceled
-    db.add(StatusHistory(
+    db.add(BookingStatusHistory(
         booking_id=booking.id, old_status=old, new_status="conflict_canceled",
         reason="lost_slot_race",
     ))

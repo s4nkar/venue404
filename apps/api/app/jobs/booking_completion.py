@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 
 from app.core.database import with_session
-from app.modules.booking.models import Booking, BookingStatus, BookingPaymentStatus, StatusHistory
+from app.modules.booking.models import Booking, BookingStatus, PaymentStatus, BookingStatusHistory
 from app.modules.venue.models import Venue
 from app.modules.notification import service as notifications
 
@@ -20,7 +20,7 @@ def run():
             db.query(Booking)
             .filter(
                 Booking.status == BookingStatus.confirmed,
-                Booking.payment_status == BookingPaymentStatus.paid,
+                Booking.payment_status == PaymentStatus.paid,
                 Booking.event_date.isnot(None),
                 Booking.event_date < today,
             )
@@ -28,7 +28,7 @@ def run():
         )
         for b in rows:
             b.status = BookingStatus.completed
-            db.add(StatusHistory(
+            db.add(BookingStatusHistory(
                 booking_id=b.id, old_status="confirmed", new_status="completed",
                 reason="booking_completion_job",
             ))

@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 
 from app.core.database import with_session
-from app.modules.booking.models import Booking, BookingStatus, BookingPaymentStatus, StatusHistory
+from app.modules.booking.models import Booking, BookingStatus, PaymentStatus, BookingStatusHistory
 from app.modules.venue.models import Venue
 from app.modules.notification import service as notifications
 
@@ -24,8 +24,8 @@ def run():
         )
         for b in rows:
             b.status = BookingStatus.hold_expired
-            b.payment_status = BookingPaymentStatus.unpaid
-            db.add(StatusHistory(
+            b.payment_status = PaymentStatus.unpaid
+            db.add(BookingStatusHistory(
                 booking_id=b.id, old_status="accepted", new_status="hold_expired",
                 reason="hold_expiry_job",
             ))
