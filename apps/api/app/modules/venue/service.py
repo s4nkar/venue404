@@ -39,16 +39,28 @@ def _get_venue_or_404(db: Session, venue_id: UUID) -> Venue:
         raise NotFoundError("Venue not found")
     return venue
 
-
-def _get_active_venue_or_404(db: Session, venue_id: UUID) -> Venue:
-    venue = db.query(Venue).filter(
+# Acquire exclusive write lock on Venue to serialize slot check and creation
+def _get_active_venue_or_404(
+    db: Session,
+    venue_id: UUID,
+    *,
+    for_update: bool = False,
+) -> Venue:
+    query = db.query(Venue).filter(
         Venue.id == venue_id,
         Venue.status == VenueStatus.approved,
-        Venue.is_active == True,
+        Venue.is_active.is_(True),
         Venue.deleted_at.is_(None),
-    ).first()
+    )
+
+    if for_update:
+        query = query.with_for_update()
+
+    venue = query.first()
+
     if not venue:
         raise NotFoundError("Venue not found")
+
     return venue
 
 

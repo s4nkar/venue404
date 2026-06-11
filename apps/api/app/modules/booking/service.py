@@ -35,7 +35,7 @@ from app.modules.booking.schemas import (
     ExtendDeadlineIn,
 )
 from app.modules.venue.models import Venue, VenueStatus
-from app.modules.venue.service import get_pricing_quote_for_slot
+from app.modules.venue.service import ( get_pricing_quote_for_slot,  _get_active_venue_or_404 )
 
 # Re-expose functions from cancellation module
 from app.modules.booking.cancellation import (
@@ -62,23 +62,12 @@ def create_booking_request(
     payload: BookingRequestIn,
 ) -> BookingOut:
     # Acquire exclusive write lock on Venue to serialize slot check and creation
-    venue = (
-        db.query(Venue)
-        .filter(
-            Venue.id == payload.venue_id,
-            Venue.status == VenueStatus.approved,
-            Venue.is_active.is_(True),
-            Venue.deleted_at.is_(None),
-        )
-        .with_for_update()
-        .first()
+    venue = _get_active_venue_or_404(
+        db,
+        payload.venue_id,
+        for_update=True,
     )
-    if not venue:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Venue not found or inactive",
-        )
-
+    
     validation = validate_booking_request(
         db=db,
         venue=venue,
@@ -97,8 +86,7 @@ def create_booking_request(
         starts_at=starts_at,
         ends_at=ends_at,
         booking_type=payload.booking_type,
-    )
-
+    ) 
     booking = Booking(
         id=uuid.uuid4(),
         venue_id=venue.id,
