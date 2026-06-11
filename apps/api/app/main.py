@@ -1,6 +1,9 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from app.core.config import settings
 from app.core.middleware import register_middleware
+from app.jobs import scheduler as job_scheduler
 from app.modules.auth.routes import router as auth_router
 from app.modules.profile.routes import router as profile_router
 from app.modules.venue.routes import router as venue_router
@@ -13,10 +16,20 @@ from app.modules.payment.routes import router as payment_router
 from app.modules.admin.service import seed_super_admin
 
 
+logger = logging.getLogger(__name__)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     seed_super_admin()
+    if settings.enable_jobs:
+        logger.info("ENABLE_JOBS=true — starting background scheduler")
+        job_scheduler.start()
+    else:
+        logger.info("ENABLE_JOBS=false — background scheduler not started")
     yield
+    if settings.enable_jobs:
+        job_scheduler.shutdown()
 
 
 app = FastAPI(title="Venue404 API", lifespan=lifespan)

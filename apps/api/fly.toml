@@ -1,0 +1,32 @@
+# Fly.io config for the Venue404 API.
+# Change `app` to your Fly app name (create with: fly apps create venue404-api).
+app = "venue404-api"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Run the background scheduler on exactly ONE machine to avoid duplicate jobs.
+  # Set to "true" only where you run a single instance (or a dedicated worker).
+  ENABLE_JOBS = "false"
+
+[processes]
+  # Production command — no --reload (the Dockerfile CMD is dev-only).
+  app = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+# NOTE: migrations are intentionally NOT auto-run. Apply them deliberately with
+#   fly ssh console -C "alembic upgrade head"
+# (Or, once you're ready to automate, add:  release_command = "alembic upgrade head")
