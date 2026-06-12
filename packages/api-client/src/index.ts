@@ -10,3 +10,6 @@ export * from './endpoints/notifications'
 export * from './endpoints/adminUsers'
 export * from './endpoints/adminAmenities'
 export * from './endpoints/adminVenues'
+export * from './endpoints/profile'
+export * from './endpoints/notifications'
+
