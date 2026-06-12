@@ -1,15 +1,15 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ShieldOff, ShieldCheck, Users as UsersIcon, Search, UserCheck, UserX, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { createClient } from '@venue404/api-client'
 import { adminUserEndpoints } from '@venue404/api-client'
-import type { AdminUserSummary, AdminUserListResponse, AdminUserStatus, AdminUserRole } from '@venue404/api-client'
+import type { AdminUserSummary, AdminUserStatus, AdminUserRole } from '@venue404/api-client'
 import { AdminLayout } from '../components/AdminLayout'
 import {
   MetricCard, StatusBadge, SectionHeader, EmptyState,
   LoadingScreen, ErrorState, Button, Modal,
 } from '@venue404/ui'
 
-// Module-level singleton — never recreated on re-render
 const api = adminUserEndpoints(createClient())
 
 const DEBOUNCE_MS = 350
@@ -57,158 +57,113 @@ function avatarColor(id: string): string {
 }
 
 export default function Users() {
-  const [response, setResponse] = useState<AdminUserListResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const qc = useQueryClient()
 
-  // Immediate input value (shown while typing)
   const [searchInput, setSearchInput] = useState('')
-  // Debounced value that actually triggers the API call
   const [search, setSearch] = useState('')
-
   const [statusFilter, setStatusFilter] = useState<AdminUserStatus | ''>('')
   const [roleFilter, setRoleFilter] = useState<AdminUserRole | ''>('')
   const [page, setPage] = useState(1)
 
   const [suspendTarget, setSuspendTarget] = useState<AdminUserSummary | null>(null)
   const [suspendReason, setSuspendReason] = useState('')
-  const [suspendLoading, setSuspendLoading] = useState(false)
-  const [suspendError, setSuspendError] = useState<string | null>(null)
 
   const [reactivateTarget, setReactivateTarget] = useState<AdminUserSummary | null>(null)
-  const [reactivateLoading, setReactivateLoading] = useState(false)
-  const [reactivateError, setReactivateError] = useState<string | null>(null)
-
   const [approveTarget, setApproveTarget] = useState<AdminUserSummary | null>(null)
-  const [approveLoading, setApproveLoading] = useState(false)
-  const [approveError, setApproveError] = useState<string | null>(null)
-
   const [rejectTarget, setRejectTarget] = useState<AdminUserSummary | null>(null)
   const [rejectReason, setRejectReason] = useState('')
-  const [rejectLoading, setRejectLoading] = useState(false)
-  const [rejectError, setRejectError] = useState<string | null>(null)
 
-  // Debounce the search input
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   function handleSearchChange(value: string) {
     setSearchInput(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      setSearch(value)
-      setPage(1)
-    }, DEBOUNCE_MS)
+    debounceRef.current = setTimeout(() => { setSearch(value); setPage(1) }, DEBOUNCE_MS)
   }
   useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await api.listUsers({
-        page,
-        page_size: 20,
-        search: search.trim() || undefined,
-        status: statusFilter || undefined,
-        role: roleFilter || undefined,
-      })
-      setResponse(data)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to load users')
-    } finally {
-      setLoading(false)
-    }
-  }, [page, search, statusFilter, roleFilter])
+  // ── Query ───────────────────────────────────────────────────────────────────
 
-  useEffect(() => { fetchUsers() }, [fetchUsers])
+  const { data: response, isLoading, error } = useQuery({
+    queryKey: ['admin', 'users', { page, search, status: statusFilter, role: roleFilter }],
+    queryFn: () => api.listUsers({
+      page,
+      page_size: 20,
+      search: search.trim() || undefined,
+      status: statusFilter || undefined,
+      role: roleFilter || undefined,
+    }),
+  })
+
+  const invalidateUsers = () => qc.invalidateQueries({ queryKey: ['admin', 'users'] })
+
+  // ── Mutations ───────────────────────────────────────────────────────────────
+
+  const suspendMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.suspendUser(id, { reason }),
+    onSuccess: () => { invalidateUsers(); closeSuspendModal() },
+  })
+
+  const reactivateMutation = useMutation({
+    mutationFn: (id: string) => api.reactivateUser(id),
+    onSuccess: () => { invalidateUsers(); closeReactivateModal() },
+  })
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => api.approveOwner(id),
+    onSuccess: () => { invalidateUsers(); closeApproveModal() },
+  })
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      api.rejectOwner(id, { reason }),
+    onSuccess: () => { invalidateUsers(); closeRejectModal() },
+  })
+
+  // ── Modal helpers ───────────────────────────────────────────────────────────
 
   function closeSuspendModal() {
     setSuspendTarget(null)
     setSuspendReason('')
-    setSuspendError(null)
-    setSuspendLoading(false)
+    suspendMutation.reset()
   }
 
   function closeReactivateModal() {
     setReactivateTarget(null)
-    setReactivateError(null)
-    setReactivateLoading(false)
-  }
-
-  async function handleSuspend() {
-    if (!suspendTarget) return
-    if (!suspendReason.trim()) {
-      setSuspendError('A reason is required')
-      return
-    }
-    setSuspendLoading(true)
-    setSuspendError(null)
-    try {
-      await api.suspendUser(suspendTarget.id, { reason: suspendReason.trim() })
-      closeSuspendModal()
-      fetchUsers()
-    } catch (e: unknown) {
-      setSuspendError(e instanceof Error ? e.message : 'Failed to suspend user')
-    } finally {
-      setSuspendLoading(false)
-    }
-  }
-
-  async function handleReactivate() {
-    if (!reactivateTarget) return
-    setReactivateLoading(true)
-    setReactivateError(null)
-    try {
-      await api.reactivateUser(reactivateTarget.id)
-      closeReactivateModal()
-      fetchUsers()
-    } catch (e: unknown) {
-      setReactivateError(e instanceof Error ? e.message : 'Failed to reactivate user')
-    } finally {
-      setReactivateLoading(false)
-    }
+    reactivateMutation.reset()
   }
 
   function closeApproveModal() {
     setApproveTarget(null)
-    setApproveError(null)
-    setApproveLoading(false)
+    approveMutation.reset()
   }
 
   function closeRejectModal() {
     setRejectTarget(null)
     setRejectReason('')
-    setRejectError(null)
-    setRejectLoading(false)
+    rejectMutation.reset()
   }
 
-  async function handleApprove() {
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
+  function handleSuspend() {
+    if (!suspendTarget || !suspendReason.trim()) return
+    suspendMutation.mutate({ id: suspendTarget.id, reason: suspendReason.trim() })
+  }
+
+  function handleReactivate() {
+    if (!reactivateTarget) return
+    reactivateMutation.mutate(reactivateTarget.id)
+  }
+
+  function handleApprove() {
     if (!approveTarget) return
-    setApproveLoading(true)
-    setApproveError(null)
-    try {
-      await api.approveOwner(approveTarget.id)
-      closeApproveModal()
-      fetchUsers()
-    } catch (e: unknown) {
-      setApproveError(e instanceof Error ? e.message : 'Failed to approve owner')
-    } finally {
-      setApproveLoading(false)
-    }
+    approveMutation.mutate(approveTarget.id)
   }
 
-  async function handleReject() {
+  function handleReject() {
     if (!rejectTarget) return
-    setRejectLoading(true)
-    setRejectError(null)
-    try {
-      await api.rejectOwner(rejectTarget.id, { reason: rejectReason.trim() || undefined })
-      closeRejectModal()
-      fetchUsers()
-    } catch (e: unknown) {
-      setRejectError(e instanceof Error ? e.message : 'Failed to reject owner')
-    } finally {
-      setRejectLoading(false)
-    }
+    rejectMutation.mutate({ id: rejectTarget.id, reason: rejectReason.trim() || undefined })
   }
 
   const stats = response?.stats
@@ -266,7 +221,7 @@ export default function Users() {
           <SectionHeader
             title="All users"
             description={
-              !loading && response
+              !isLoading && response
                 ? `${response.total} ${response.total === 1 ? 'user' : 'users'}${hasFilters ? ' matching filters' : ''}`
                 : undefined
             }
@@ -318,24 +273,24 @@ export default function Users() {
         </div>
 
         {/* Content states */}
-        {loading && (
+        {isLoading && (
           <div className="px-5 py-10">
             <LoadingScreen message="Loading users…" fullScreen={false} />
           </div>
         )}
 
-        {!loading && error && (
+        {!isLoading && error && (
           <div className="px-5 py-10">
             <ErrorState
               title="Could not load users"
-              message={error}
+              message={error instanceof Error ? error.message : 'Failed to load users'}
               fullScreen={false}
-              action={<Button variant="secondary" onClick={fetchUsers}>Retry</Button>}
+              action={<Button variant="secondary" onClick={invalidateUsers}>Retry</Button>}
             />
           </div>
         )}
 
-        {!loading && !error && response && response.items.length === 0 && (
+        {!isLoading && !error && response && response.items.length === 0 && (
           <div className="px-5 py-10">
             <EmptyState
               icon={<UsersIcon className="h-4 w-4" />}
@@ -349,7 +304,7 @@ export default function Users() {
           </div>
         )}
 
-        {!loading && !error && response && response.items.length > 0 && (
+        {!isLoading && !error && response && response.items.length > 0 && (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -499,25 +454,27 @@ export default function Users() {
                 type="text"
                 placeholder="e.g. Violation of terms of service"
                 value={suspendReason}
-                onChange={(e) => { setSuspendReason(e.target.value); setSuspendError(null) }}
+                onChange={(e) => { setSuspendReason(e.target.value); suspendMutation.reset() }}
                 autoFocus
               />
-              {suspendError && (
-                <p className="mt-1.5 text-xs font-medium text-red-500">{suspendError}</p>
+              {suspendMutation.error && (
+                <p className="mt-1.5 text-xs font-medium text-red-500">
+                  {suspendMutation.error instanceof Error ? suspendMutation.error.message : 'Failed to suspend user'}
+                </p>
               )}
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeSuspendModal} disabled={suspendLoading}>
+              <Button variant="secondary" onClick={closeSuspendModal} disabled={suspendMutation.isPending}>
                 Cancel
               </Button>
               <button
                 type="button"
                 onClick={handleSuspend}
-                disabled={suspendLoading || !suspendReason.trim()}
+                disabled={suspendMutation.isPending || !suspendReason.trim()}
                 className="press rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {suspendLoading ? 'Suspending…' : 'Suspend account'}
+                {suspendMutation.isPending ? 'Suspending…' : 'Suspend account'}
               </button>
             </div>
           </div>
@@ -538,22 +495,22 @@ export default function Users() {
               </span>{' '}
               will immediately regain full platform access.
             </p>
-            {reactivateError && (
+            {reactivateMutation.error && (
               <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
-                {reactivateError}
+                {reactivateMutation.error instanceof Error ? reactivateMutation.error.message : 'Failed to reactivate user'}
               </div>
             )}
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeReactivateModal} disabled={reactivateLoading}>
+              <Button variant="secondary" onClick={closeReactivateModal} disabled={reactivateMutation.isPending}>
                 Cancel
               </Button>
               <button
                 type="button"
                 onClick={handleReactivate}
-                disabled={reactivateLoading}
+                disabled={reactivateMutation.isPending}
                 className="press rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {reactivateLoading ? 'Reactivating…' : 'Reactivate account'}
+                {reactivateMutation.isPending ? 'Reactivating…' : 'Reactivate account'}
               </button>
             </div>
           </div>
@@ -574,22 +531,22 @@ export default function Users() {
               </span>{' '}
               will be granted full venue owner access immediately.
             </p>
-            {approveError && (
+            {approveMutation.error && (
               <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
-                {approveError}
+                {approveMutation.error instanceof Error ? approveMutation.error.message : 'Failed to approve owner'}
               </div>
             )}
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeApproveModal} disabled={approveLoading}>
+              <Button variant="secondary" onClick={closeApproveModal} disabled={approveMutation.isPending}>
                 Cancel
               </Button>
               <button
                 type="button"
                 onClick={handleApprove}
-                disabled={approveLoading}
+                disabled={approveMutation.isPending}
                 className="press rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {approveLoading ? 'Approving…' : 'Approve owner'}
+                {approveMutation.isPending ? 'Approving…' : 'Approve owner'}
               </button>
             </div>
           </div>
@@ -617,24 +574,26 @@ export default function Users() {
                 type="text"
                 placeholder="e.g. Incomplete information"
                 value={rejectReason}
-                onChange={(e) => { setRejectReason(e.target.value); setRejectError(null) }}
+                onChange={(e) => { setRejectReason(e.target.value); rejectMutation.reset() }}
                 autoFocus
               />
-              {rejectError && (
-                <p className="mt-1.5 text-xs font-medium text-red-500">{rejectError}</p>
+              {rejectMutation.error && (
+                <p className="mt-1.5 text-xs font-medium text-red-500">
+                  {rejectMutation.error instanceof Error ? rejectMutation.error.message : 'Failed to reject owner'}
+                </p>
               )}
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeRejectModal} disabled={rejectLoading}>
+              <Button variant="secondary" onClick={closeRejectModal} disabled={rejectMutation.isPending}>
                 Cancel
               </Button>
               <button
                 type="button"
                 onClick={handleReject}
-                disabled={rejectLoading}
+                disabled={rejectMutation.isPending}
                 className="press rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {rejectLoading ? 'Rejecting…' : 'Reject application'}
+                {rejectMutation.isPending ? 'Rejecting…' : 'Reject application'}
               </button>
             </div>
           </div>
