@@ -10,3 +10,8 @@ def start():
     scheduler.add_job(payment_reminders.run, "cron", hour=8, id="payment_reminders")
     scheduler.add_job(booking_completion.run, "cron", hour=0, id="booking_completion")
     scheduler.start()
+
+
+def shutdown():
+    if scheduler.running:
+        scheduler.shutdown(wait=False)

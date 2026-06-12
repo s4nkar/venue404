@@ -1,9 +1,9 @@
 import { cn } from '../../lib/utils'
 
-export type MetricCardAccent = 'blue' | 'amber' | 'emerald' | 'violet' | 'rose'
+export type MetricCardAccent = 'brand' | 'amber' | 'emerald' | 'violet' | 'rose'
 
 const accentMap: Record<MetricCardAccent, { icon: string; value: string; badge: string }> = {
-  blue:    { icon: 'bg-blue-50 text-blue-600',    value: 'text-zinc-900', badge: 'bg-blue-50 text-blue-600' },
+  brand:   { icon: 'bg-brand-light text-brand',   value: 'text-zinc-900', badge: 'bg-brand-light text-brand' },
   amber:   { icon: 'bg-amber-50 text-amber-600',  value: 'text-zinc-900', badge: 'bg-amber-50 text-amber-600' },
   emerald: { icon: 'bg-emerald-50 text-emerald-600', value: 'text-zinc-900', badge: 'bg-emerald-50 text-emerald-600' },
   violet:  { icon: 'bg-violet-50 text-violet-600', value: 'text-zinc-900', badge: 'bg-violet-50 text-violet-600' },
@@ -32,7 +32,7 @@ export function MetricCard({
   trend,
   trendUp,
   icon,
-  accent = 'blue',
+  accent = 'brand',
   className,
   onClick,
 }: MetricCardProps) {

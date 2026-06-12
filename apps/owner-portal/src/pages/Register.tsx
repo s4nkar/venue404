@@ -1,15 +1,9 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { createClient, authEndpoints } from '@venue404/api-client'
-import { AuthLayout, AuthCard, AuthStatusPanel, Logo } from '@venue404/ui'
-
-const FEATURES = [
-  { label: 'Publish & manage venues' },
-  { label: 'Accept booking requests' },
-  { label: 'Track payments & revenue' },
-  { label: 'Read customer reviews' },
-]
+import { AuthLayout, AuthCard, Logo } from '@venue404/ui'
+import { OwnerFlowPanel } from '../components/OwnerFlowPanel'
 
 export default function Register() {
   const { signUp } = useAuth()
@@ -46,7 +40,7 @@ export default function Register() {
           footer={
             <>
               Already have an account?{' '}
-              <Link to="/login" className="font-medium text-blue-600 hover:text-blue-700">
+              <Link to="/login" className="font-medium text-brand hover:text-brand-hover">
                 Sign in
               </Link>
             </>
@@ -138,7 +132,7 @@ export default function Register() {
             <button
               type="submit"
               disabled={submitting || !fullName || !email || !password}
-              className="press flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm outline-none transition-[background-color,box-shadow] duration-150 hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-55"
+              className="press flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm outline-none transition-[background-color,box-shadow] duration-150 hover:bg-brand-hover focus-visible:ring-2 focus-visible:ring-brand-secondary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-55"
             >
               {submitting ? (
                 <>
@@ -161,15 +155,7 @@ export default function Register() {
           </div>
         </AuthCard>
       }
-      right={
-        <AuthStatusPanel
-          tagline="Venue404 Owner Portal"
-          title="Grow your venue business with Venue404"
-          description="Join venue owners who use Venue404 to get discovered, manage bookings, and get paid — all in one place."
-          features={FEATURES}
-          footnote="Access is granted after admin review of your application."
-        />
-      }
+      right={<OwnerFlowPanel />}
     />
   )
 }

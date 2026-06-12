@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createClient, authEndpoints } from '@venue404/api-client'
 import { LoadingScreen, ErrorState } from '@venue404/ui'
@@ -34,7 +34,7 @@ export default function LoginSuccess() {
         action={
           <button
             onClick={() => navigate('/login', { replace: true })}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover"
           >
             Back to Login
           </button>

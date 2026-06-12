@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../lib/AuthContext'
 import {
   MetricCard, ActivityItem,
@@ -14,16 +14,16 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout } from '../components/AdminLayout'
 import { createClient, ApiError } from '@venue404/api-client'
-import { adminActionEndpoints } from '@venue404/api-client'
-import type { AdminAction } from '@venue404/api-client'
+import { adminActionEndpoints, adminUserEndpoints } from '@venue404/api-client'
 
 const actionsApi = adminActionEndpoints(createClient())
+const usersApi = adminUserEndpoints(createClient())
 
-const METRICS: DashboardMetric[] = [
+const METRIC_TEMPLATES: DashboardMetric[] = [
   {
     label: 'Pending Approvals',
     value: '—',
-    description: 'Venues awaiting review',
+    description: 'Venue owners awaiting review',
     icon: <Building2 className="h-4 w-4" />,
     accent: 'amber',
   },
@@ -32,7 +32,7 @@ const METRICS: DashboardMetric[] = [
     value: '—',
     description: 'Confirmed this month',
     icon: <CalendarDays className="h-4 w-4" />,
-    accent: 'blue',
+    accent: 'brand',
   },
   {
     label: 'Venue Owners',
@@ -44,16 +44,10 @@ const METRICS: DashboardMetric[] = [
   {
     label: 'Open Actions',
     value: '—',
-    description: 'Pending admin review',
+    description: 'Total admin actions logged',
     icon: <ClipboardList className="h-4 w-4" />,
     accent: 'violet',
   },
-]
-
-const MOCK_VENUES = [
-  { id: '1', name: 'The Grand Ballroom',    owner: 'Ravi Kumar',    submitted: '2h ago' },
-  { id: '2', name: 'Rooftop Events Space',  owner: 'Priya Sharma',  submitted: '5h ago' },
-  { id: '3', name: 'Garden Pavilion',       owner: 'Amit Patel',    submitted: '1d ago' },
 ]
 
 const today = new Date().toLocaleDateString('en-IN', {
@@ -65,10 +59,11 @@ function actionLabel(type: string): string {
 }
 
 function actionIcon(type: string) {
-  const ok = type.endsWith('approved') || type.endsWith('reactivated') || type.endsWith('completed')
-  return ok
-    ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-    : <XCircle className="h-3.5 w-3.5 text-red-400" />
+  if (type.endsWith('approved') || type.endsWith('reactivated') || type.endsWith('completed'))
+    return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+  if (type.endsWith('rejected') || type.endsWith('suspended') || type.endsWith('deleted'))
+    return <XCircle className="h-3.5 w-3.5 text-red-400" />
+  return <CheckCircle2 className="h-3.5 w-3.5 text-brand-secondary" />
 }
 
 function actionBadge(type: string) {
@@ -89,19 +84,41 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
+function suppressAuthErrors(e: unknown) {
+  if (e instanceof ApiError && (e.status === 401 || e.status === 403)) throw e
+  return null
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  const [recentActions, setRecentActions] = useState<AdminAction[]>([])
-  const [actionsLoading, setActionsLoading] = useState(true)
+  const { data: actionsData, isLoading: actionsLoading } = useQuery({
+    queryKey: ['admin', 'dashboard', 'actions'],
+    queryFn: () => actionsApi.listActions({ limit: 4 }).catch(suppressAuthErrors),
+  })
 
-  useEffect(() => {
-    actionsApi.listActions({ limit: 8 })
-      .then((res) => setRecentActions(res.items))
-      .catch((e) => { if (e instanceof ApiError && (e.status === 401 || e.status === 403)) throw e })
-      .finally(() => setActionsLoading(false))
-  }, [])
+  const { data: ownerStats } = useQuery({
+    queryKey: ['admin', 'dashboard', 'owner-stats'],
+    queryFn: () => usersApi.getOwnerStats().catch(suppressAuthErrors),
+  })
+
+  const { data: pendingOwnersData, isLoading: pendingLoading } = useQuery({
+    queryKey: ['admin', 'dashboard', 'pending-owners'],
+    queryFn: () =>
+      usersApi.listUsers({ role: 'venue_owner', status: 'pending', page_size: 4 }).catch(suppressAuthErrors),
+  })
+
+  const recentActions = actionsData?.items ?? []
+  const actionsTotal = actionsData?.total ?? null
+  const pendingOwners = pendingOwnersData?.items ?? []
+
+  const metrics = METRIC_TEMPLATES.map((m) => {
+    if (m.label === 'Pending Approvals') return { ...m, value: ownerStats ? String(ownerStats.pending) : '—' }
+    if (m.label === 'Venue Owners') return { ...m, value: ownerStats ? String(ownerStats.total) : '—' }
+    if (m.label === 'Open Actions') return { ...m, value: actionsTotal !== null ? String(actionsTotal) : '—' }
+    return m
+  })
 
   const firstName = user?.profile.full_name?.split(' ')[0] ?? null
 
@@ -119,7 +136,7 @@ export default function Dashboard() {
 
       {/* Metrics */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {METRICS.map((m, i) => (
+        {metrics.map((m, i) => (
           <div key={m.label} className="card-enter" style={{ '--index': i } as React.CSSProperties}>
             <MetricCard {...m} />
           </div>
@@ -129,17 +146,17 @@ export default function Dashboard() {
       {/* Content grid */}
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
 
-        {/* Pending venue approvals */}
+        {/* Pending venue owner approvals */}
         <div className="card-enter lg:col-span-2 rounded-xl border border-zinc-200 bg-white shadow-sm">
           <div className="border-b border-zinc-100 px-5 py-4">
             <SectionHeader
               title="Pending Venue Approvals"
-              description="Submissions waiting for your review"
+              description="Venue owners awaiting your review"
               action={
                 <button
                   type="button"
                   onClick={() => navigate('/venues/pending')}
-                  className="press text-xs font-medium text-blue-600 transition-colors hover:text-blue-700"
+                  className="press text-xs font-medium text-brand transition-colors hover:text-brand"
                 >
                   View all
                 </button>
@@ -147,33 +164,39 @@ export default function Dashboard() {
             />
           </div>
           <div className="px-5">
-            {MOCK_VENUES.length > 0 ? (
+            {pendingLoading && (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-4 w-4 animate-spin text-zinc-300" />
+              </div>
+            )}
+            {!pendingLoading && pendingOwners.length === 0 && (
+              <div className="py-4">
+                <EmptyState
+                  icon={<Building2 className="h-4 w-4" />}
+                  title="No pending approvals"
+                  description="All venue owner applications have been reviewed."
+                />
+              </div>
+            )}
+            {!pendingLoading && pendingOwners.length > 0 && (
               <ul className="divide-y divide-zinc-100">
-                {MOCK_VENUES.map((v) => (
-                  <li key={v.id}>
+                {pendingOwners.map((o) => (
+                  <li key={o.id}>
                     <ActivityItem
-                      title={v.name}
-                      description={`Submitted by ${v.owner}`}
-                      timestamp={v.submitted}
-                      icon={<Building2 className="h-3.5 w-3.5" />}
+                      title={o.full_name ?? 'Unknown'}
+                      description={o.email ?? ''}
+                      timestamp={timeAgo(o.created_at)}
+                      icon={<UserCheck className="h-3.5 w-3.5" />}
                       badge={<StatusBadge label="Pending" variant="pending" />}
                     />
                   </li>
                 ))}
               </ul>
-            ) : (
-              <div className="py-4">
-                <EmptyState
-                  icon={<Building2 className="h-4 w-4" />}
-                  title="No pending venues"
-                  description="All submissions have been reviewed."
-                />
-              </div>
             )}
           </div>
         </div>
 
-        {/* Recent audit actions — real data */}
+        {/* Recent audit actions */}
         <div className="card-enter rounded-xl border border-zinc-200 bg-white shadow-sm">
           <div className="border-b border-zinc-100 px-5 py-4">
             <SectionHeader
@@ -182,7 +205,7 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => navigate('/audit-log')}
-                  className="press text-xs font-medium text-blue-600 transition-colors hover:text-blue-700"
+                  className="press text-xs font-medium text-brand transition-colors hover:text-brand"
                 >
                   Full log
                 </button>
@@ -230,9 +253,9 @@ export default function Dashboard() {
         <div className="flex flex-wrap gap-2">
           {[
             { label: 'Review pending venues', href: '/venues/pending', icon: <Building2 className="h-3.5 w-3.5" /> },
-            { label: 'Manage users',           href: '/users',          icon: <UserCheck className="h-3.5 w-3.5" /> },
-            { label: 'Open audit log',         href: '/audit-log',      icon: <ClipboardList className="h-3.5 w-3.5" /> },
-            { label: 'Active bookings',        href: '/bookings',       icon: <Clock className="h-3.5 w-3.5" /> },
+            { label: 'Manage users', href: '/users', icon: <UserCheck className="h-3.5 w-3.5" /> },
+            { label: 'Open audit log', href: '/audit-log', icon: <ClipboardList className="h-3.5 w-3.5" /> },
+            { label: 'Active bookings', href: '/bookings', icon: <Clock className="h-3.5 w-3.5" /> },
           ].map((a) => (
             <button
               key={a.href}
