@@ -6,19 +6,27 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.modules.booking.models import BookingSlot
+from app.modules.booking.models import Booking
+from app.modules.profile.models import Profile  # noqa: F401
 
 from app.modules.availability.schemas import (
     AvailabilityResponse,
     OperatingWindow,
     BlockedRange,
     ValidationResponse,
+    CalendarBlockedRange,
+    CalendarBookingSummary,
+    CalendarDay,
+    CalendarResponse,
 )
 
 from app.modules.venue.service import (
     _get_active_venue_or_404,
+    _get_venue_or_404,
+    _assert_owner,
     get_pricing_quote_for_slot,
 )
-from app.modules.venue.models import VenueAvailability
+from app.modules.venue.models import VenueAvailability, VenueBlockedDate
 
 
 def _to_utc(value: datetime) -> datetime:
@@ -42,6 +50,51 @@ def _local_day_bounds(venue, booking_date: date) -> tuple[datetime, datetime]:
     ends_at = starts_at + timedelta(days=1)
 
     return starts_at.astimezone(timezone.utc), ends_at.astimezone(timezone.utc)
+
+
+def _date_range(start_date: date, end_date: date) -> list[date]:
+    days = (end_date - start_date).days
+    return [start_date + timedelta(days=offset) for offset in range(days + 1)]
+
+
+def _has_overlap(
+    starts_at: datetime,
+    ends_at: datetime,
+    range_starts_at: datetime,
+    range_ends_at: datetime,
+) -> bool:
+    return _to_utc(starts_at) < _to_utc(range_ends_at) and _to_utc(ends_at) > _to_utc(range_starts_at)
+
+
+def _covers_range(
+    ranges: list[tuple[datetime, datetime]],
+    starts_at: datetime,
+    ends_at: datetime,
+) -> bool:
+    if not ranges:
+        return False
+
+    starts_at = _to_utc(starts_at)
+    ends_at = _to_utc(ends_at)
+    clipped = sorted(
+        (
+            (max(_to_utc(range_start), starts_at), min(_to_utc(range_end), ends_at))
+            for range_start, range_end in ranges
+            if _has_overlap(range_start, range_end, starts_at, ends_at)
+        ),
+        key=lambda item: item[0],
+    )
+
+    covered_until = starts_at
+    for range_start, range_end in clipped:
+        if range_start > covered_until:
+            return False
+        if range_end > covered_until:
+            covered_until = range_end
+        if covered_until >= ends_at:
+            return True
+
+    return False
 
 
 def compute_effective_range(
@@ -377,6 +430,246 @@ def get_availability_for_date(
             )
             for slot in blocked_slots
         ],
+    )
+
+
+def _build_calendar_for_venue(
+    db: Session,
+    venue,
+    start_date: date,
+    end_date: date,
+    include_owner_details: bool = False,
+) -> CalendarResponse:
+    if end_date < start_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="end_date must be on or after start_date",
+        )
+
+    if (end_date - start_date).days > 370:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Calendar range cannot exceed 370 days",
+        )
+
+    range_start, _ = _local_day_bounds(venue, start_date)
+    _, range_end = _local_day_bounds(venue, end_date)
+    range_start -= timedelta(minutes=venue.pre_buffer_minutes)
+    range_end += timedelta(days=1, minutes=venue.post_buffer_minutes)
+
+    blocking_slots = (
+        db.query(BookingSlot)
+        .filter(
+            BookingSlot.venue_id == venue.id,
+            BookingSlot.is_blocking.is_(True),
+            BookingSlot.deleted_at.is_(None),
+            BookingSlot.effective_starts_at < range_end,
+            BookingSlot.effective_ends_at > range_start,
+        )
+        .all()
+    )
+
+    owner_bookings = []
+    if include_owner_details:
+        owner_bookings = (
+            db.query(Booking)
+            .join(BookingSlot, BookingSlot.booking_id == Booking.id)
+            .filter(
+                Booking.venue_id == venue.id,
+                Booking.deleted_at.is_(None),
+                BookingSlot.deleted_at.is_(None),
+                BookingSlot.effective_starts_at < range_end,
+                BookingSlot.effective_ends_at > range_start,
+            )
+            .order_by(BookingSlot.starts_at.asc())
+            .all()
+        )
+
+    venue_blocks = (
+        db.query(VenueBlockedDate)
+        .filter(
+            VenueBlockedDate.venue_id == venue.id,
+            VenueBlockedDate.deleted_at.is_(None),
+            VenueBlockedDate.starts_at < range_end,
+            VenueBlockedDate.ends_at > range_start,
+        )
+        .all()
+    )
+
+    now = datetime.now(timezone.utc)
+    days: list[CalendarDay] = []
+
+    for calendar_date in _date_range(start_date, end_date):
+        operating_window = resolve_operating_window(
+            venue,
+            calendar_date,
+        )
+
+        if operating_window.is_available:
+            window_start, window_end = expand_full_day_slot(venue, calendar_date)
+        else:
+            window_start, window_end = _local_day_bounds(venue, calendar_date)
+
+        effective_window_start, effective_window_end = compute_effective_range(
+            window_start,
+            window_end,
+            venue.pre_buffer_minutes,
+            venue.post_buffer_minutes,
+        )
+
+        day_blocks = [
+            block
+            for block in venue_blocks
+            if _has_overlap(
+                block.starts_at,
+                block.ends_at,
+                effective_window_start,
+                effective_window_end,
+            )
+        ]
+        day_blocking_slots = [
+            slot
+            for slot in blocking_slots
+            if _has_overlap(
+                slot.effective_starts_at,
+                slot.effective_ends_at,
+                effective_window_start,
+                effective_window_end,
+            )
+        ]
+
+        blocked_ranges = [
+            CalendarBlockedRange(
+                starts_at=block.starts_at,
+                ends_at=block.ends_at,
+                source="venue_block",
+                reason=block.reason,
+            )
+            for block in day_blocks
+        ]
+        blocked_ranges.extend(
+            CalendarBlockedRange(
+                starts_at=slot.starts_at,
+                ends_at=slot.ends_at,
+                source="booking",
+            )
+            for slot in day_blocking_slots
+        )
+        blocked_ranges.sort(key=lambda item: item.starts_at)
+
+        day_bookings = []
+        if include_owner_details:
+            day_bookings = [
+                CalendarBookingSummary(
+                    id=booking.id,
+                    booking_type=booking.booking_type.value,
+                    status=booking.status.value,
+                    starts_at=booking.slot.starts_at,
+                    ends_at=booking.slot.ends_at,
+                    effective_starts_at=booking.slot.effective_starts_at,
+                    effective_ends_at=booking.slot.effective_ends_at,
+                    is_blocking=booking.slot.is_blocking,
+                    guest_count=booking.guest_count,
+                    event_type=booking.event_type,
+                    user_id=booking.user_id,
+                )
+                for booking in owner_bookings
+                if booking.slot
+                and _has_overlap(
+                    booking.slot.effective_starts_at,
+                    booking.slot.effective_ends_at,
+                    effective_window_start,
+                    effective_window_end,
+                )
+            ]
+
+        venue_block_ranges = [(block.starts_at, block.ends_at) for block in day_blocks]
+        blocking_ranges = venue_block_ranges + [
+            (slot.starts_at, slot.ends_at) for slot in day_blocking_slots
+        ]
+
+        has_conflict = bool(day_blocks or day_blocking_slots)
+        is_future_window = window_end > now
+        supports_full_day = "full_day" in venue.allowed_booking_types
+        available_for_full_day = (
+            operating_window.is_available
+            and supports_full_day
+            and is_future_window
+            and not has_conflict
+        )
+
+        if not operating_window.is_available:
+            day_status = "closed"
+        elif _covers_range(venue_block_ranges, window_start, window_end):
+            day_status = "blocked"
+        elif _covers_range(blocking_ranges, window_start, window_end):
+            day_status = "fully_booked"
+        elif has_conflict:
+            day_status = "partially_booked"
+        else:
+            day_status = "available"
+
+        days.append(
+            CalendarDay(
+                date=calendar_date,
+                operating_window=operating_window,
+                status=day_status,
+                is_bookable=day_status in ("available", "partially_booked") and is_future_window,
+                available_for_full_day=available_for_full_day,
+                blocked_ranges=blocked_ranges,
+                bookings=day_bookings,
+            )
+        )
+
+    return CalendarResponse(
+        venue_id=venue.id,
+        timezone=venue.timezone,
+        start_date=start_date,
+        end_date=end_date,
+        days=days,
+    )
+
+
+def get_calendar(
+    db: Session,
+    venue_id: UUID,
+    start_date: date,
+    end_date: date,
+) -> CalendarResponse:
+    venue = _get_active_venue_or_404(
+        db,
+        venue_id,
+    )
+
+    return _build_calendar_for_venue(
+        db=db,
+        venue=venue,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+def get_owner_calendar(
+    db: Session,
+    venue_id: UUID,
+    owner_id: UUID,
+    start_date: date,
+    end_date: date,
+    allow_admin: bool = False,
+) -> CalendarResponse:
+    venue = _get_venue_or_404(
+        db,
+        venue_id,
+    )
+    if not allow_admin:
+        _assert_owner(venue, owner_id)
+
+    return _build_calendar_for_venue(
+        db=db,
+        venue=venue,
+        start_date=start_date,
+        end_date=end_date,
+        include_owner_details=True,
     )
 
 
