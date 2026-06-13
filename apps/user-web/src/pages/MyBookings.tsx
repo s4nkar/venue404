@@ -1,423 +1,438 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { createClient, bookingEndpoints } from '@venue404/api-client'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+
 import {
-  AppShell,
-  Card,
-  LoadingScreen,
+  createClient,
+  bookingEndpoints,
+} from '@venue404/api-client'
+
+import {
+  EmptyState,
   ErrorState,
   Button,
-  EmptyState,
+  LoadingScreen,
+  Logo,
 } from '@venue404/ui'
-import { Calendar, Clock, IndianRupee } from 'lucide-react'
+
 import { useAuth } from '../lib/AuthContext'
 
-type BookingStatus =
-  | 'requested'
-  | 'accepted'
-  | 'confirmed'
-  | 'cancelled'
-  | 'rejected'
-  | 'expired'
+import type { BookingOut } from '../types'
 
-type PaymentStatus =
-  | 'unpaid'
-  | 'partial'
-  | 'paid'
+import BookingCard from '../components/booking/BookingCard'
+import BookingStatusBadge from '../components/booking/BookingStatusBadge'
 
-type Booking = {
-  id: string
-  status: BookingStatus
-  payment_status: PaymentStatus
+import { formatDate } from '../utils'
 
-  booking_type: 'full_day' | 'time_slot'
-
-  quoted_price_paise: number
-  balance_due_paise: number
-
-  venue_name?: string
-
-  starts_at?: string
-  ends_at?: string
-}
-
-type TabType =
+type BookingTab =
   | 'upcoming'
   | 'pending'
   | 'past'
   | 'cancelled'
 
-export default function MyBookings() {
-  const navigate = useNavigate()
+const CANCELLED_STATUSES = [
+  'user_cancelled',
+  'admin_cancelled',
+  'owner_rejected',
+  'conflict_cancelled',
+  'hold_expired',
+  'request_expired',
+  'balance_overdue_cancelled',
+]
+
+function DetailNavbar() {
   const { user, signOut } = useAuth()
 
-  const [bookings, setBookings] = useState<Booking[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<TabType>('upcoming')
-
-  useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        setLoading(true)
-
-        const client = createClient()
-
-        const data =
-          await bookingEndpoints(client).listBookings()
-
-        setBookings(data as Booking[])
-      } catch (err: any) {
-        setError(
-          err?.message ??
-          'Failed to load bookings'
-        )
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchBookings()
-  }, [])
-
-  const filteredBookings = useMemo(() => {
-    const now = new Date()
-
-    switch (activeTab) {
-      case 'upcoming':
-        return bookings.filter((booking) => {
-          const end = booking.ends_at
-            ? new Date(booking.ends_at)
-            : null
-
-          return (
-            ['accepted', 'confirmed'].includes(
-              booking.status
-            ) &&
-            (!end || end > now)
-          )
-        })
-
-      case 'pending':
-        return bookings.filter(
-          (booking) =>
-            booking.status === 'requested'
-        )
-
-      case 'past':
-        return bookings.filter((booking) => {
-          const end = booking.ends_at
-            ? new Date(booking.ends_at)
-            : null
-
-          return (
-            booking.status === 'confirmed' &&
-            end &&
-            end < now
-          )
-        })
-
-      case 'cancelled':
-        return bookings.filter((booking) =>
-          [
-            'cancelled',
-            'rejected',
-            'expired',
-          ].includes(booking.status)
-        )
-
-      default:
-        return bookings
-    }
-  }, [bookings, activeTab])
-
-  const navItems = [
-    {
-      label: 'Explore',
-      href: '/',
-    },
-    {
-      label: 'My Bookings',
-      href: '/my-bookings',
-    },
-    {
-      label: 'Profile',
-      href: '/profile',
-    },
-  ]
-
-  const mappedUser = user
-    ? {
-      name:
-        user.profile.full_name ||
-        user.email ||
-        'Customer',
-      email: user.email || '',
-      role: 'Customer',
-    }
-    : undefined
-
-  if (loading) {
-    return (
-      <LoadingScreen message="Loading bookings..." />
-    )
-  }
-
-  if (error) {
-    return <ErrorState message={error} />
-  }
-
   return (
-    <AppShell
-      navItems={navItems}
-      activePath="/my-bookings"
-      onNavigate={(href) => navigate(href)}
-      pageTitle="My Bookings"
-      pageSubtitle="Track and manage your venue reservations"
-      user={mappedUser}
-      onSignOut={signOut}
-    >
-      <div className="max-w-5xl mx-auto space-y-6">
-        <BookingTabs
-          activeTab={activeTab}
-          onChange={setActiveTab}
-        />
+    <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-3">
+        <Link to="/">
+          <Logo />
+        </Link>
 
-        {filteredBookings.length === 0 ? (
-          <EmptyBookingState
-            tab={activeTab}
-            onBrowse={() => navigate('/')}
-          />
-        ) : (
-          <div className="space-y-4">
-            {filteredBookings.map((booking) => (
-              <BookingCard
-                key={booking.id}
-                booking={booking}
-                onView={() =>
-                  navigate(
-                    `/bookings/${booking.id}`
-                  )
-                }
-              />
-            ))}
-          </div>
-        )}
+        <nav className="flex items-center gap-1">
+          {user ? (
+            <>
+              <Link
+                to="/my-bookings"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-900 bg-zinc-100"
+              >
+                My Bookings
+              </Link>
+
+              <Link
+                to="/profile"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
+              >
+                Profile
+              </Link>
+
+              <button
+                onClick={signOut}
+                className="ml-1 rounded-lg px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
+              >
+                Sign out
+              </button>
+            </>
+          ) : null}
+        </nav>
       </div>
-    </AppShell>
+    </header>
   )
 }
 
-function BookingTabs({
-  activeTab,
-  onChange,
+function FeaturedBookingHero({
+  booking,
 }: {
-  activeTab: TabType
-  onChange: (tab: TabType) => void
+  booking: BookingOut
 }) {
-  const tabs: {
-    value: TabType
-    label: string
-  }[] = [
-      {
-        value: 'upcoming',
-        label: 'Upcoming',
-      },
-      {
-        value: 'pending',
-        label: 'Pending',
-      },
-      {
-        value: 'past',
-        label: 'Past',
-      },
-      {
-        value: 'cancelled',
-        label: 'Cancelled',
-      },
-    ]
-
   return (
-    <div className="flex gap-2 flex-wrap">
-      {tabs.map((tab) => (
-        <button
-          key={tab.value}
-          onClick={() =>
-            onChange(tab.value)
-          }
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === tab.value
-              ? 'bg-blue-600 text-white'
-              : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
-            }`}
-        >
-          {tab.label}
-        </button>
-      ))}
+    <div className="mb-10 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+      <div className="grid lg:grid-cols-2">
+        <div className="aspect-[16/9] lg:aspect-auto">
+          {booking.venue_cover_photo_url ? (
+            <img
+              src={booking.venue_cover_photo_url}
+              alt={booking.venue_name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="h-full w-full bg-zinc-100" />
+          )}
+        </div>
+
+        <div className="flex flex-col justify-center p-8 lg:p-10">
+          <div className="mb-4">
+            <BookingStatusBadge
+              status={booking.status}
+            />
+          </div>
+
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-900">
+            {booking.venue_name}
+          </h2>
+
+          <p className="mt-2 text-zinc-500">
+            {booking.venue_city}
+          </p>
+
+          <div className="mt-8 grid grid-cols-2 gap-6">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-zinc-400">
+                Event Date
+              </p>
+
+              <p className="mt-1 font-medium text-zinc-900">
+                {formatDate(
+                  booking.starts_at,
+                )}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-zinc-400">
+                Booking Value
+              </p>
+
+              <p className="mt-1 font-medium text-zinc-900">
+                {
+                  booking.display
+                    .quoted_price
+                }
+              </p>
+            </div>
+          </div>
+
+          {(booking.status ===
+            'owner_accepted' ||
+            (booking.status ===
+              'confirmed' &&
+              booking.payment_status ===
+                'advance_paid' &&
+              booking.balance_due_paise >
+                0)) && (
+            <div className="mt-6 inline-flex w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              Action Required
+            </div>
+          )}
+
+          <Link
+            to={`/bookings/${booking.id}`}
+            className="mt-8"
+          >
+            <Button>
+              View Booking
+            </Button>
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }
 
-function BookingCard({
-  booking,
-  onView,
+function TabButton({
+  active,
+  count,
+  children,
+  onClick,
 }: {
-  booking: Booking
-  onView: () => void
+  active: boolean
+  count: number
+  children: React.ReactNode
+  onClick: () => void
 }) {
-  const formatPrice = (paise?: number) =>
-    new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format((paise ?? 0) / 100)
-
   return (
-    <Card>
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="font-semibold text-zinc-900">
-              {booking.venue_name ??
-                'Venue'}
-            </h3>
+    <button
+      onClick={onClick}
+      className={`
+        relative pb-4 text-sm font-medium transition-colors
+        ${
+          active
+            ? 'text-zinc-900'
+            : 'text-zinc-500 hover:text-zinc-900'
+        }
+      `}
+    >
+      {children}
 
-            <div className="mt-2 flex flex-wrap gap-4 text-sm text-zinc-500">
-              {booking.starts_at && (
-                <div className="flex items-center gap-1">
-                  <Calendar size={14} />
-                  {new Date(
-                    booking.starts_at
-                  ).toLocaleDateString()}
-                </div>
-              )}
+      <span className="ml-2 text-zinc-400">
+        {count}
+      </span>
 
-              {booking.starts_at &&
-                booking.ends_at && (
-                  <div className="flex items-center gap-1">
-                    <Clock size={14} />
-                    {new Date(
-                      booking.starts_at
-                    ).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </div>
-                )}
-            </div>
-          </div>
+      {active && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+      )}
+    </button>
+  )
+}
 
-          <BookingStatusBadge
-            status={booking.status}
+export default function MyBookings() {
+  const client = createClient()
+
+  const [activeTab, setActiveTab] =
+    useState<BookingTab>('upcoming')
+
+  const {
+    data: bookings = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<BookingOut[]>({
+    queryKey: ['my-bookings'],
+    queryFn: () =>
+      bookingEndpoints(client)
+        .listBookings(),
+  })
+
+  const now = new Date()
+
+  const upcomingBookings =
+    bookings.filter(
+      (booking) =>
+        (
+          booking.status ===
+            'owner_accepted' ||
+          booking.status ===
+            'confirmed'
+        ) &&
+        new Date(
+          booking.ends_at,
+        ) > now,
+    )
+
+  const pendingBookings =
+    bookings.filter(
+      (booking) =>
+        booking.status ===
+        'requested',
+    )
+
+  const pastBookings =
+    bookings.filter(
+      (booking) =>
+        booking.status ===
+        'completed',
+    )
+
+  const cancelledBookings =
+    bookings.filter(
+      (booking) =>
+        CANCELLED_STATUSES.includes(
+          booking.status,
+        ),
+    )
+
+  const filteredBookings =
+    useMemo(() => {
+      switch (activeTab) {
+        case 'upcoming':
+          return upcomingBookings
+
+        case 'pending':
+          return pendingBookings
+
+        case 'past':
+          return pastBookings
+
+        case 'cancelled':
+          return cancelledBookings
+
+        default:
+          return []
+      }
+    }, [
+      activeTab,
+      upcomingBookings,
+      pendingBookings,
+      pastBookings,
+      cancelledBookings,
+    ])
+
+  const featuredBooking =
+    upcomingBookings[0]
+
+  if (isLoading) {
+    return <LoadingScreen />
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-white">
+        <DetailNavbar />
+
+        <div className="mx-auto max-w-6xl px-4 py-8">
+          <ErrorState
+            title="Unable to load bookings"
+            message="Failed to load your bookings."
+            action={
+              <Button
+                onClick={() =>
+                  void refetch()
+                }
+              >
+                Retry
+              </Button>
+            }
           />
         </div>
-
-        <div className="mt-4 flex items-center justify-between">
-          <div>
-            <div className="text-xs text-zinc-500">
-              Booking Type
-            </div>
-            <div className="text-sm font-medium capitalize">
-              {booking.booking_type.replace(
-                '_',
-                ' '
-              )}
-            </div>
-          </div>
-
-          <div className="text-right">
-            <div className="text-xs text-zinc-500">
-              Total Price
-            </div>
-            <div className="font-semibold text-zinc-900 flex items-center gap-1">
-              <IndianRupee size={14} />
-              {formatPrice(
-                booking.quoted_price_paise
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-5 flex justify-end">
-          <Button
-            variant="primary"
-            onClick={onView}
-          >
-            View Details
-          </Button>
-        </div>
       </div>
-    </Card>
-  )
-}
-
-function BookingStatusBadge({
-  status,
-}: {
-  status: BookingStatus
-}) {
-  const styles: Record<
-    BookingStatus,
-    string
-  > = {
-    requested:
-      'bg-amber-50 text-amber-700 border-amber-200',
-    accepted:
-      'bg-blue-50 text-blue-700 border-blue-200',
-    confirmed:
-      'bg-green-50 text-green-700 border-green-200',
-    cancelled:
-      'bg-red-50 text-red-700 border-red-200',
-    rejected:
-      'bg-zinc-100 text-zinc-700 border-zinc-200',
-    expired:
-      'bg-zinc-100 text-zinc-700 border-zinc-200',
+    )
   }
 
   return (
-    <span
-      className={`px-2.5 py-1 rounded-full border text-xs font-medium capitalize ${styles[status]}`}
-    >
-      {status.replace('_', ' ')}
-    </span>
-  )
-}
+    <div className="min-h-screen bg-zinc-50">
+      <DetailNavbar />
 
-function EmptyBookingState({
-  tab,
-  onBrowse,
-}: {
-  tab: TabType
-  onBrowse: () => void
-}) {
-  const messages: Record<
-    TabType,
-    string
-  > = {
-    upcoming:
-      'No upcoming bookings found.',
-    pending:
-      'No pending booking requests.',
-    past: 'No completed bookings yet.',
-    cancelled:
-      'No cancelled bookings.',
-  }
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mb-10">
+          <h1 className="text-4xl font-bold tracking-tight text-zinc-900">
+            My Bookings
+          </h1>
 
-  return (
-    <Card>
-      <div className="p-10 text-center space-y-4">
-        <p className="text-zinc-500">
-          {messages[tab]}
-        </p>
+          <p className="mt-2 max-w-2xl text-zinc-500">
+            Manage reservations,
+            complete payments and
+            track upcoming events.
+          </p>
+        </div>
 
-        {tab === 'upcoming' && (
-          <Button
-            variant="primary"
-            onClick={onBrowse}
-          >
-            Browse Venues
-          </Button>
+        {featuredBooking && (
+          <FeaturedBookingHero
+            booking={
+              featuredBooking
+            }
+          />
+        )}
+
+        <div className="mb-8 border-b border-zinc-200">
+          <div className="flex gap-8 overflow-x-auto">
+            <TabButton
+              active={
+                activeTab ===
+                'upcoming'
+              }
+              count={
+                upcomingBookings.length
+              }
+              onClick={() =>
+                setActiveTab(
+                  'upcoming',
+                )
+              }
+            >
+              Upcoming
+            </TabButton>
+
+            <TabButton
+              active={
+                activeTab ===
+                'pending'
+              }
+              count={
+                pendingBookings.length
+              }
+              onClick={() =>
+                setActiveTab(
+                  'pending',
+                )
+              }
+            >
+              Pending
+            </TabButton>
+
+            <TabButton
+              active={
+                activeTab === 'past'
+              }
+              count={
+                pastBookings.length
+              }
+              onClick={() =>
+                setActiveTab('past')
+              }
+            >
+              Past
+            </TabButton>
+
+            <TabButton
+              active={
+                activeTab ===
+                'cancelled'
+              }
+              count={
+                cancelledBookings.length
+              }
+              onClick={() =>
+                setActiveTab(
+                  'cancelled',
+                )
+              }
+            >
+              Cancelled
+            </TabButton>
+          </div>
+        </div>
+
+        {filteredBookings.length ===
+        0 ? (
+          <EmptyState
+            title={`No ${activeTab} bookings`}
+            description="Bookings will appear here once available."
+          />
+        ) : (
+          <div className="space-y-6">
+            {filteredBookings.map(
+              (booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                />
+              ),
+            )}
+          </div>
         )}
       </div>
-    </Card>
+    </div>
   )
 }
+

@@ -158,6 +158,9 @@ export type BookingDisplay = {
 export type BookingOut = {
   id: string
   venue_id: string
+  venue_name: string
+  venue_city: string
+  venue_cover_photo_url: string | null
   user_id: string
   booking_type: string
   status: string
