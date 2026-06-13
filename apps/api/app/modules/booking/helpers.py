@@ -112,9 +112,22 @@ def _slot_for_update(db: Session, booking_id: UUID) -> BookingSlot:
 
 def _booking_out(booking: Booking) -> BookingOut:
     slot = booking.slot
+
+    cover_photo = next(
+        (
+            photo.image_url
+            for photo in booking.venue.photos
+            if photo.is_cover and photo.deleted_at is None
+        ),
+        None,
+    )
+
     return BookingOut(
         id=booking.id,
         venue_id=booking.venue_id,
+        venue_name=booking.venue.name,
+        venue_city=booking.venue.city,
+        venue_cover_photo_url=cover_photo,
         user_id=booking.user_id,
         booking_type=_enum_value(booking.booking_type),
         status=_enum_value(booking.status),
