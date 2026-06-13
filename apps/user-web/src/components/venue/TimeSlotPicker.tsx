@@ -8,12 +8,12 @@ type VenueConfig = Pick<
 >
 
 type Props = {
-  date: string                   // YYYY-MM-DD, used to build full ISO datetimes
+  date: string // YYYY-MM-DD, used to build full ISO datetimes
   availability: AvailabilityResponse
   venueConfig: VenueConfig
-  selectedStart: string | null   // ISO datetime
-  selectedEnd: string | null     // ISO datetime
-  onSelect: (start: string, end: string) => void
+  selectedStart: string | null // ISO datetime
+  selectedEnd: string | null // ISO datetime
+  onSelect: (start: string, end: string | null) => void
   onClear: () => void
 }
 
@@ -26,7 +26,9 @@ function toMinutes(timeStr: string): number {
 
 /** Build ISO datetime string for a given date + minutes-since-midnight */
 function minutesToISO(date: string, minutes: number): string {
-  const h = Math.floor(minutes / 60).toString().padStart(2, '0')
+  const h = Math.floor(minutes / 60)
+    .toString()
+    .padStart(2, '0')
   const m = (minutes % 60).toString().padStart(2, '0')
   return `${date}T${h}:${m}:00`
 }
@@ -51,14 +53,19 @@ export function TimeSlotPicker({
   onClear,
 }: Props) {
   const { operating_window, blocked_slots = [] } = availability
-  const { slot_interval_minutes, min_booking_duration_minutes, max_booking_duration_minutes } = venueConfig
+  const { slot_interval_minutes, min_booking_duration_minutes, max_booking_duration_minutes } =
+    venueConfig
 
   // All possible slot start times
   const allSlots = useMemo<number[]>(() => {
-    if (!operating_window.is_available || !operating_window.opens_at || !operating_window.closes_at) {
+    if (
+      !operating_window.is_available ||
+      !operating_window.opens_at ||
+      !operating_window.closes_at
+    ) {
       return []
     }
-    const openMin  = toMinutes(operating_window.opens_at)
+    const openMin = toMinutes(operating_window.opens_at)
     const closeMin = toMinutes(operating_window.closes_at)
     const slots: number[] = []
     for (let m = openMin; m < closeMin; m += slot_interval_minutes) {
@@ -78,7 +85,7 @@ export function TimeSlotPicker({
   }
 
   const selectedStartMin = selectedStart ? toMinutes(selectedStart) : null
-  const selectedEndMin   = selectedEnd   ? toMinutes(selectedEnd)   : null
+  const selectedEndMin = selectedEnd ? toMinutes(selectedEnd) : null
 
   const closeMin = operating_window.closes_at ? toMinutes(operating_window.closes_at) : 0
 
@@ -94,31 +101,37 @@ export function TimeSlotPicker({
       if (!isBlocked(selectedStartMin, m)) valid.add(m)
     }
     return valid
-  }, [selectedStartMin, min_booking_duration_minutes, max_booking_duration_minutes, closeMin, slot_interval_minutes, blockedRanges])
+  }, [
+    selectedStartMin,
+    min_booking_duration_minutes,
+    max_booking_duration_minutes,
+    closeMin,
+    slot_interval_minutes,
+    blockedRanges,
+  ])
 
   function handleSlotClick(minutes: number) {
+    // First click = choose start only
     if (selectedStartMin == null) {
-      // First click — set start
-      onSelect(minutesToISO(date, minutes), minutesToISO(date, minutes + min_booking_duration_minutes))
-      // Note: onSelect will be called again when end is finalized; we call with provisional end here
-      // so parent can show the start visually. The parent ignores end until user clicks an end slot.
-    } else if (selectedEndMin == null || minutes <= selectedStartMin) {
-      // Clicking before or on the start — reset start
-      onClear()
-      onSelect(minutesToISO(date, minutes), minutesToISO(date, minutes + min_booking_duration_minutes))
-    } else {
-      // Second click — set end (only if valid)
-      if (validEndSlots.has(minutes)) {
-        onSelect(minutesToISO(date, selectedStartMin), minutesToISO(date, minutes))
-      }
+      onSelect(minutesToISO(date, minutes), null)
+      return
+    }
+
+    // User clicks earlier slot -> restart selection
+    if (minutes <= selectedStartMin) {
+      onSelect(minutesToISO(date, minutes), null)
+      return
+    }
+
+    // User choosing end
+    if (validEndSlots.has(minutes)) {
+      onSelect(minutesToISO(date, selectedStartMin), minutesToISO(date, minutes))
     }
   }
 
   if (!operating_window.is_available) {
     return (
-      <p className="text-sm text-zinc-400 italic text-center py-4">
-        Venue is closed on this date.
-      </p>
+      <p className="text-sm text-zinc-400 italic text-center py-4">Venue is closed on this date.</p>
     )
   }
 
@@ -130,13 +143,9 @@ export function TimeSlotPicker({
     )
   }
 
-  // Determine step phase: picking start or end
-  const pickingEnd = selectedStartMin != null && selectedEndMin != null &&
-    toMinutes(selectedEnd!) === toMinutes(selectedStart!) + min_booking_duration_minutes &&
-    !validEndSlots.has(toMinutes(selectedEnd!))
   // simpler: phase = 'start' if no start chosen, 'end' if start chosen
-  const phase: 'start' | 'end' = selectedStartMin == null ? 'start' : 'end'
-
+  const phase: 'start' | 'end' =
+    selectedStartMin == null || selectedEndMin != null ? 'start' : 'end'
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -153,15 +162,30 @@ export function TimeSlotPicker({
         )}
       </div>
 
+      {selectedStartMin != null && selectedEndMin == null && (
+        <div className="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+          Start selected: <strong>{formatTime(selectedStart!)}</strong> · Select an end time
+        </div>
+      )}
+
       {/* Duration hint */}
       {selectedStartMin != null && selectedEndMin != null && (
         <div className="mb-3 flex items-center gap-2 text-xs text-zinc-500 bg-blue-50 rounded-lg px-3 py-2">
-          <svg className="h-3.5 w-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg
+            className="h-3.5 w-3.5 text-blue-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
           <span>
-            {formatTime(selectedStart!)} – {formatTime(selectedEnd!)}
-            {' '}·{' '}
+            {formatTime(selectedStart!)} – {formatTime(selectedEnd!)} ·{' '}
             <strong className="text-blue-700">
               {durationLabel(selectedStartMin, selectedEndMin)}
             </strong>
@@ -172,9 +196,9 @@ export function TimeSlotPicker({
       {/* Slot grid */}
       <div className="grid grid-cols-3 gap-1.5">
         {allSlots.map((minutes) => {
-          const slotISO   = minutesToISO(date, minutes)
-          const isStart   = selectedStartMin === minutes
-          const isEnd     = selectedEndMin === minutes
+          const slotISO = minutesToISO(date, minutes)
+          const isStart = selectedStartMin === minutes
+          const isEnd = selectedEndMin === minutes
           const isInRange =
             selectedStartMin != null &&
             selectedEndMin != null &&
@@ -185,11 +209,13 @@ export function TimeSlotPicker({
           const blockedAsStart = isBlocked(minutes, minutes + min_booking_duration_minutes)
 
           // In "end" phase, non-valid slots are dimmed
-          const isValidEnd = phase === 'end' ? validEndSlots.has(minutes) : true
-          const isDisabled = phase === 'start' ? blockedAsStart : !isValidEnd
-
-          let cls =
-            'px-2 py-2 rounded-lg text-xs font-medium text-center transition-all border '
+          const isValidEnd =
+            selectedStartMin != null && selectedEndMin == null ? validEndSlots.has(minutes) : true
+          const isDisabled =
+            selectedStartMin == null
+              ? blockedAsStart
+              : selectedEndMin == null && !validEndSlots.has(minutes) && minutes > selectedStartMin
+          let cls = 'px-2 py-2 rounded-lg text-xs font-medium text-center transition-all border '
 
           if (isStart || isEnd) {
             cls += 'bg-blue-600 text-white border-blue-600'
@@ -198,7 +224,8 @@ export function TimeSlotPicker({
           } else if (isDisabled) {
             cls += 'bg-zinc-50 text-zinc-300 border-zinc-100 cursor-not-allowed'
           } else {
-            cls += 'bg-white text-zinc-700 border-zinc-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
+            cls +=
+              'bg-white text-zinc-700 border-zinc-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
           }
 
           return (
