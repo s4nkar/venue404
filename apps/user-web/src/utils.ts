@@ -56,3 +56,9 @@ export const VENUE_TYPE_LABELS: Record<string, string> = {
   event_space: 'Event Space',
   meeting_room: 'Meeting Room',
 }
+
+export function toUtcIso(value?: string | null) {
+  if (!value) return undefined
+
+  return new Date(value).toISOString()
+}

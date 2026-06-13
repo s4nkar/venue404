@@ -7,6 +7,7 @@ import { AvailabilityCalendar } from './AvailabilityCalendar'
 import { TimeSlotPicker } from './TimeSlotPicker'
 import { QuoteBreakdown } from './QuoteBreakdown'
 import type { VenueResponse, AvailabilityResponse, PricingQuote, BookingType } from '../../types'
+import { toUtcIso } from '../../utils'
 
 type Props = { venue: VenueResponse }
 type Step = 'date' | 'time' | 'quote'
@@ -86,7 +87,7 @@ export function BookingPanel({ venue }: Props) {
     isError: availError,
   } = useQuery<AvailabilityResponse>({
     queryKey: ['availability-date', venue.id, selectedDate],
-    queryFn: () => venueEndpoints(client).getDateAvailability(venue.id, selectedDate!),
+    queryFn: () => venueEndpoints(client).getDateAvailability(venue.id, toUtcIso(selectedDate)!),
     enabled: !!selectedDate,
     staleTime: 2 * 60 * 1000,
   })
@@ -131,8 +132,8 @@ export function BookingPanel({ venue }: Props) {
     queryKey: ['quote', venue.id, selectedStart, selectedEnd, bookingType],
     queryFn: () =>
       venueEndpoints(client).getQuote(venue.id, {
-        starts_at: selectedStart!,
-        ends_at: selectedEnd!,
+        starts_at: toUtcIso(selectedStart)!,
+        ends_at: toUtcIso(selectedEnd)!,
         booking_type: bookingType,
       }),
     enabled: quoteEnabled,
@@ -144,9 +145,9 @@ export function BookingPanel({ venue }: Props) {
     mutationFn: () =>
       venueEndpoints(client).validateSlot(venue.id, {
         booking_type: bookingType,
-        starts_at: selectedStart ?? undefined,
-        ends_at: selectedEnd ?? undefined,
-        booking_date: bookingType === 'full_day' ? (selectedDate ?? undefined) : undefined,
+        starts_at: toUtcIso(selectedStart) ?? undefined,
+        ends_at: toUtcIso(selectedEnd) ?? undefined,
+        booking_date: bookingType === 'full_day' ? (toUtcIso(selectedDate) ?? undefined) : undefined,
       }),
     onSuccess: (validation) => {
       if (!validation.valid) {
@@ -161,7 +162,7 @@ export function BookingPanel({ venue }: Props) {
           bookingType,
           startsAt: validation.effective_starts_at,
           endsAt: validation.effective_ends_at,
-          bookingDate: selectedDate,
+          bookingDate: toUtcIso(selectedDate),
           quote,
         },
       })

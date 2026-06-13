@@ -336,14 +336,21 @@ def validate_booking_request(
         operating_window.opens_at,
         venue_tz,
     )
+    print("window_starts_at", window_starts_at)
     window_ends_at = _localize(
         local_starts_at.date(),
         operating_window.closes_at,
         venue_tz,
     )
+    print("window_ends_at", window_ends_at)
 
     if operating_window.spans_next_day:
         window_ends_at += timedelta(days=1)
+        
+    print("local_starts_at", local_starts_at)
+    print("local_ends_at", local_ends_at)
+    print("window_starts_at", window_starts_at)
+    print("window_ends_at", window_ends_at)
 
     if local_starts_at < window_starts_at or local_ends_at > window_ends_at:
         raise HTTPException(
