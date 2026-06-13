@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { createClient, venueEndpoints } from '@venue404/api-client'
 import { useAuth } from '../lib/AuthContext'
 
@@ -8,7 +9,16 @@ import { HeroSearch }  from '../components/home/HeroSearch'
 import { VenueGrid }   from '../components/home/VenueGrid'
 import { TrustStrip }  from '../components/home/TrustStrip'
 import { HomeFooter }  from '../components/home/HomeFooter'
-import type { SearchResult } from '../types'
+
+
+  async function searchVenues(params: URLSearchParams) {
+  const client = createClient()
+  const query: Record<string, any> = { page: 1, page_size: 100 }
+  if (params.get('q'))          query.q          = params.get('q')
+  if (params.get('city'))       query.city       = params.get('city')
+  if (params.get('venue_type')) query.venue_type = params.get('venue_type')
+  return venueEndpoints(client).search(query)
+}
 
 export default function Home() {
   const { user, signOut } = useAuth()
@@ -20,36 +30,16 @@ export default function Home() {
   const [city,      setCity]      = useState(searchParams.get('city')       ?? '')
   const [venueType, setVenueType] = useState(searchParams.get('venue_type') ?? '')
 
-  // ── Results state ─────────────────────────────────────────────────────────
-  const [venues,  setVenues]  = useState<SearchResult[]>([])
-  const [total,   setTotal]   = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState<string | null>(null)
 
-  // ── Data fetching ─────────────────────────────────────────────────────────
-  const fetchVenues = useCallback(async (params: URLSearchParams) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const client = createClient()
-      const query: Record<string, any> = { page: 1, page_size: 100 }
-      if (params.get('q'))          query.q          = params.get('q')
-      if (params.get('city'))       query.city       = params.get('city')
-      if (params.get('venue_type')) query.venue_type = params.get('venue_type')
+// TanStack Query — key includes serialised URL params, auto-refetches on change
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['venues', 'search', searchParams.toString()],
+    queryFn:  () => searchVenues(searchParams),
+  })
 
-      const data = await venueEndpoints(client).search(query)
-      setVenues(data.items ?? [])
-      setTotal(data.total ?? 0)
-    } catch (err: any) {
-      setError(err.message ?? 'Failed to load venues')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchVenues(searchParams)
-  }, [searchParams, fetchVenues])
+  const venues     = data?.items ?? []
+  const total      = data?.total ?? null
+  const hasFilters = !!(q || city || venueType)
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -80,7 +70,6 @@ export default function Home() {
     setSearchParams({})
   }
 
-  const hasFilters = !!(q || city || venueType)
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -105,11 +94,11 @@ export default function Home() {
       <VenueGrid
         venues={venues}
         total={total}
-        loading={loading}
-        error={error}
+        loading={isLoading}
+        error={isError ? (error as Error).message : null}
         hasFilters={hasFilters}
         onVenueClick={(id) => navigate(`/venues/${id}`)}
-        onRetry={() => fetchVenues(searchParams)}
+        onRetry={() => refetch()}
         onClearFilters={handleClearFilters}
       />
 
