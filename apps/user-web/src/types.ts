@@ -169,6 +169,7 @@ export type BookingOut = {
   guest_count: number
   event_type?: string | null
   user_notes?: string | null
+  owner_notes?: string | null
   quoted_price_paise: number
   platform_commission_pct: number
   platform_fee_paise: number

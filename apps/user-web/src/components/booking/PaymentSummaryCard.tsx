@@ -1,0 +1,117 @@
+import type { BookingOut } from '../../types'
+
+import {
+  formatPrice,
+} from '../../utils'
+
+type Props = {
+  booking: BookingOut
+}
+
+export function PaymentSummaryCard({
+  booking,
+}: Props) {
+  const totalPaid =
+    booking.amount_paid_paise
+
+  const refundAmount =
+    booking.refund_amount_paise
+
+  return (
+    <div className="rounded-2xl border border-zinc-200 shadow-sm bg-white p-6">
+      <div className="space-y-6">
+        <div className="text-xs uppercase tracking-wider text-zinc-400 font-semibold">
+          Payment Summary
+        </div>
+
+        {/* Primary Amount */}
+        <div>
+          <div className="text-sm text-zinc-500">Total Booking Amount</div>
+
+          <div className="mt-1 text-[28px] font-bold text-zinc-900">
+            {formatPrice(booking.quoted_price_paise)}
+          </div>
+        </div>
+
+        {/* Breakdown */}
+        <div className="space-y-3 border-t border-zinc-100 pt-5">
+          <SummaryRow label="Venue Fee" value={formatPrice(booking.quoted_price_paise)} />
+
+          <SummaryRow label="Platform Fee" value={formatPrice(booking.platform_fee_paise)} />
+        </div>
+
+        {/* Payment Status */}
+        <div className="space-y-3 border-t border-zinc-100 pt-5">
+          <SummaryRow label="Advance Due" value={formatPrice(booking.advance_due_paise)} />
+
+          <SummaryRow
+            label="Remaining Balance"
+            value={formatPrice(booking.balance_due_paise)}
+            emphasized
+          />
+        </div>
+
+        {/* Paid */}
+        <div className="space-y-3 border-t border-zinc-100 pt-5">
+          <SummaryRow label="Amount Paid" value={formatPrice(totalPaid)} />
+
+          {refundAmount > 0 && <SummaryRow label="Refunded" value={formatPrice(refundAmount)} />}
+        </div>
+
+        {/* Helpful Summary */}
+        <div className="rounded-xl bg-zinc-50 px-4 py-4">
+          <div className="text-sm font-medium text-zinc-900">Payment Status</div>
+
+          <div className="mt-1 text-sm text-zinc-600 capitalize">
+            {booking.payment_status.replace(/_/g, ' ')}
+          </div>
+        </div>
+
+        {/* Balance Due Date */}
+        {booking.balance_due_date && (
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-4">
+            <div className="text-sm font-medium text-amber-900">Balance Due</div>
+
+            <div className="mt-1 text-sm text-amber-700">
+              Payment must be completed before the due date to avoid cancellation.
+            </div>
+
+            <div className="mt-2 text-sm font-semibold text-amber-900">
+              {booking.balance_due_date}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+type SummaryRowProps = {
+  label: string
+  value: string
+  emphasized?: boolean
+}
+
+function SummaryRow({
+  label,
+  value,
+  emphasized = false,
+}: SummaryRowProps) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-sm text-zinc-600">
+        {label}
+      </span>
+
+      <span
+        className={
+          emphasized
+            ? 'font-semibold text-zinc-900'
+            : 'text-zinc-900'
+        }
+      >
+        {value}
+      </span>
+    </div>
+  )
+}
