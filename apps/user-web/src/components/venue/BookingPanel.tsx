@@ -94,9 +94,11 @@ export function BookingPanel({ venue }: Props) {
         },
       })
     },
-    onError: () => {
-      setSlotError('Could not validate slot. Please try again.')
-    },
+   onError: (error: any) => {
+  setSlotError(
+    error?.message ?? 'Unable to create booking. Please try again.'
+  )
+}
   })
 
   // ── Date selected handler ──────────────────────────────────────────────
