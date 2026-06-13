@@ -357,8 +357,10 @@ class PricingDisplay(BaseModel):
 class PricingPreviewResponse(BaseModel):
     pricing_mode: PricingMode
     quoted_price_paise: int
+    platform_commission_pct: float
     platform_fee_paise: int
     owner_payout_paise: int
+    advance_pct: float
     advance_due_paise: int
     balance_due_paise: int
     display: PricingDisplay
