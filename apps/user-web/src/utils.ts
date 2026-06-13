@@ -6,3 +6,53 @@ export function formatPrice(paise: number | null): string {
     maximumFractionDigits: 0,
   }).format(paise / 100)
 }
+
+export function formatTime(isoTime: string): string {
+  // isoTime can be "HH:MM:SS" or full ISO datetime
+  const t = isoTime.length <= 8 ? `1970-01-01T${isoTime}` : isoTime
+  return new Date(t).toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+export function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+/** Returns YYYY-MM-DD for a given Date */
+export function toDateString(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+/** Adds `n` months to a date, returns new Date */
+export function addMonths(d: Date, n: number): Date {
+  const result = new Date(d)
+  result.setMonth(result.getMonth() + n)
+  return result
+}
+
+/** Build ISO datetime string for a given date + HH:MM time string, in venue timezone.
+ *  We produce a plain local datetime and let the backend handle tz via the venue. */
+export function buildISODateTime(date: string, time: string): string {
+  return `${date}T${time}:00`
+}
+
+export const VENUE_TYPE_LABELS: Record<string, string> = {
+  banquet_hall: 'Banquet Hall',
+  wedding_hall: 'Wedding Hall',
+  auditorium: 'Auditorium',
+  conference_room: 'Conference Room',
+  club: 'Club',
+  rooftop: 'Rooftop',
+  resort: 'Resort',
+  lawn: 'Lawn',
+  event_space: 'Event Space',
+  meeting_room: 'Meeting Room',
+}
