@@ -142,9 +142,9 @@ export type BookingType = 'full_day' | 'time_slot'
 
 export type SlotSelection = {
   bookingType: BookingType
-  date: string          // YYYY-MM-DD
-  startsAt: string | null  // ISO datetime (time_slot only)
-  endsAt: string | null    // ISO datetime (time_slot only)
+  date: string // YYYY-MM-DD
+  startsAt: string | null // ISO datetime (time_slot only)
+  endsAt: string | null // ISO datetime (time_slot only)
 }
 
 export type BookingDisplay = {
@@ -155,3 +155,62 @@ export type BookingDisplay = {
   owner_payout: string
 }
 
+export type BookingOut = {
+  id: string
+  venue_id: string
+  user_id: string
+  booking_type: string
+  status: string
+  payment_status: string
+  starts_at: string
+  ends_at: string
+  effective_starts_at: string
+  effective_ends_at: string
+  guest_count: number
+  event_type?: string | null
+  user_notes?: string | null
+  quoted_price_paise: number
+  platform_commission_pct: number
+  platform_fee_paise: number
+  owner_payout_paise: number
+  advance_pct: number
+  advance_due_paise: number
+  balance_due_paise: number
+  balance_due_date?: string | null
+  hold_expires_at?: string | null
+  confirmed_at?: string | null
+  cancelled_at?: string | null
+  amount_paid_paise: number
+  refund_amount_paise: number
+  stripe_advance_payment_intent_id?: string | null
+  stripe_balance_payment_intent_id?: string | null
+  deadline_extension_count: number
+  balance_overdue_at?: string | null
+  owner_action_deadline?: string | null
+  display: BookingDisplay
+}
+export type CancellationPreviewOut = {
+  refund_amount_paise: number
+  penalty_amount_paise: number
+  refund_pct_applied: number
+  tier_matched: string | null
+  display: { refund_amount: string; penalty_amount: string }
+}
+export type PaymentIntentResponse = {
+  payment_id: string
+  booking_id: string
+  client_secret: string | null
+  amount_paise: number
+  currency: string
+  status: string
+}
+export type NotificationResponse = {
+  id: string
+  user_id: string
+  booking_id: string | null
+  type: string
+  title: string
+  body: string
+  read_at: string | null
+  created_at: string
+}
