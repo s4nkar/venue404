@@ -139,7 +139,7 @@ class AdminVenueItem(BaseModel):
     open_time: str
     close_time: str
     pricing_mode: str
-    base_price_paise: int | None
+    starting_price_paise: int | None
     hourly_rate_paise: int | None
     advance_pct: float
     platform_commission_pct: float

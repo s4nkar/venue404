@@ -80,7 +80,7 @@ def list_admin_venues(
             "open_time": str(v.open_time),
             "close_time": str(v.close_time),
             "pricing_mode": v.pricing_mode,
-            "base_price_paise": v.base_price_paise,
+            "starting_price_paise": v.starting_price_paise,
             "hourly_rate_paise": v.hourly_rate_paise,
             "advance_pct": float(v.advance_pct),
             "platform_commission_pct": float(v.platform_commission_pct),
