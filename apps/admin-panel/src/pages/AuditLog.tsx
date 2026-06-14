@@ -1,10 +1,11 @@
-﻿import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  CheckCircle2, XCircle, ShieldOff, ShieldCheck,
+  CheckCircle2, XCircle, ShieldOff,
   Sparkles, User, Building2, CalendarDays, ClipboardList,
 } from 'lucide-react'
 import { createClient, adminActionEndpoints } from '@venue404/api-client'
-import type { AdminAction, AdminActionListResponse } from '@venue404/api-client'
+import type { AdminAction } from '@venue404/api-client'
 import { AdminLayout } from '../components/AdminLayout'
 import {
   SectionHeader, EmptyState, LoadingScreen, ErrorState, Button,
@@ -26,8 +27,8 @@ const TABS: { label: string; value: TargetTab; icon: React.ReactNode }[] = [
 type ActionMeta = {
   label: string
   icon: React.ReactNode
-  color: string       // text colour
-  bg: string          // badge bg
+  color: string
+  bg: string
 }
 
 function getActionMeta(type: string): ActionMeta {
@@ -37,8 +38,6 @@ function getActionMeta(type: string): ActionMeta {
     return { label: fmtType(type), icon: <XCircle className="h-3.5 w-3.5" />, color: 'text-red-600', bg: 'bg-red-50' }
   if (type.endsWith('suspended'))
     return { label: fmtType(type), icon: <ShieldOff className="h-3.5 w-3.5" />, color: 'text-orange-600', bg: 'bg-orange-50' }
-  if (type.endsWith('reactivated'))
-    return { label: fmtType(type), icon: <ShieldCheck className="h-3.5 w-3.5" />, color: 'text-emerald-700', bg: 'bg-emerald-50' }
   if (type.includes('created') || type.includes('updated'))
     return { label: fmtType(type), icon: <Sparkles className="h-3.5 w-3.5" />, color: 'text-brand', bg: 'bg-brand-light' }
   return { label: fmtType(type), icon: <ClipboardList className="h-3.5 w-3.5" />, color: 'text-zinc-600', bg: 'bg-zinc-100' }
@@ -77,36 +76,24 @@ function fmtDate(iso: string): string {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function AuditLog() {
-  const [response, setResponse] = useState<AdminActionListResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+const PAGE_SIZE = 25
 
+export default function AuditLog() {
+  const qc = useQueryClient()
   const [activeTab, setActiveTab] = useState<TargetTab>('')
   const [page, setPage] = useState(1)
-  const PAGE_SIZE = 25
 
-  const fetchActions = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await api.listActions({
-        page,
-        page_size: PAGE_SIZE,
-        target_type: activeTab || undefined,
-      })
-      setResponse(res)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load audit log')
-    } finally {
-      setLoading(false)
-    }
-  }, [page, activeTab])
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['admin', 'audit-log', { page, target_type: activeTab }],
+    queryFn: () => api.listActions({
+      page,
+      page_size: PAGE_SIZE,
+      target_type: activeTab || undefined,
+    }),
+  })
 
-  useEffect(() => { fetchActions() }, [fetchActions])
-
-  const total = response?.total ?? 0
-  const totalPages = response?.total_pages ?? 1
+  const total = data?.total ?? 0
+  const totalPages = data?.total_pages ?? 1
 
   return (
     <AdminLayout
@@ -120,7 +107,7 @@ export default function AuditLog() {
           <SectionHeader
             title="Admin actions"
             description={
-              !loading && response
+              !isLoading && data
                 ? `${total.toLocaleString()} ${total === 1 ? 'entry' : 'entries'}`
                 : undefined
             }
@@ -149,24 +136,28 @@ export default function AuditLog() {
         </div>
 
         {/* States */}
-        {loading && (
+        {isLoading && (
           <div className="px-5 py-12">
             <LoadingScreen message="Loading audit log…" fullScreen={false} />
           </div>
         )}
 
-        {!loading && error && (
+        {!isLoading && error && (
           <div className="px-5 py-12">
             <ErrorState
               title="Could not load audit log"
-              message={error}
+              message={error instanceof Error ? error.message : 'Failed to load audit log'}
               fullScreen={false}
-              action={<Button variant="secondary" onClick={fetchActions}>Retry</Button>}
+              action={
+                <Button variant="secondary" onClick={() => qc.invalidateQueries({ queryKey: ['admin', 'audit-log'] })}>
+                  Retry
+                </Button>
+              }
             />
           </div>
         )}
 
-        {!loading && !error && response?.items.length === 0 && (
+        {!isLoading && !error && data?.items.length === 0 && (
           <div className="px-5 py-12">
             <EmptyState
               icon={<ClipboardList className="h-4 w-4" />}
@@ -180,7 +171,7 @@ export default function AuditLog() {
           </div>
         )}
 
-        {!loading && !error && response && response.items.length > 0 && (
+        {!isLoading && !error && data && data.items.length > 0 && (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -194,7 +185,7 @@ export default function AuditLog() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-50">
-                  {response.items.map((action) => (
+                  {data.items.map((action) => (
                     <ActionRow key={action.id} action={action} />
                   ))}
                 </tbody>

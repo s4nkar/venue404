@@ -10,6 +10,17 @@ export { default as DatePicker } from './DatePicker'
 
 // Utilities
 export { cn } from './lib/utils'
+export { formatPaise } from './lib/money'
+
+// Payments
+export { PaymentStatusBadge } from './components/payment/PaymentStatusBadge'
+export { ConfirmPaymentDialog } from './components/payment/ConfirmPaymentDialog'
+export { RefundDialog } from './components/payment/RefundDialog'
+
+// Notifications
+export { NotificationList } from './components/notification/NotificationList'
+export { NotificationItem } from './components/notification/NotificationItem'
+export type { NotificationView } from './components/notification/NotificationItem'
 
 // Brand
 export { Logo, BrandMark } from './components/brand/Logo'

@@ -39,16 +39,28 @@ def _get_venue_or_404(db: Session, venue_id: UUID) -> Venue:
         raise NotFoundError("Venue not found")
     return venue
 
-
-def _get_active_venue_or_404(db: Session, venue_id: UUID) -> Venue:
-    venue = db.query(Venue).filter(
+# Acquire exclusive write lock on Venue to serialize slot check and creation
+def _get_active_venue_or_404(
+    db: Session,
+    venue_id: UUID,
+    *,
+    for_update: bool = False,
+) -> Venue:
+    query = db.query(Venue).filter(
         Venue.id == venue_id,
         Venue.status == VenueStatus.approved,
-        Venue.is_active == True,
+        Venue.is_active.is_(True),
         Venue.deleted_at.is_(None),
-    ).first()
+    )
+
+    if for_update:
+        query = query.with_for_update()
+
+    venue = query.first()
+
     if not venue:
         raise NotFoundError("Venue not found")
+
     return venue
 
 
@@ -83,7 +95,7 @@ def get_pricing_preview(
     ends_at: datetime,
     booking_type: BookingType,
 ) -> PricingPreviewResponse:
-    
+
     venue = _get_active_venue_or_404(db, venue_id)
 
     if venue.pricing_mode == "flat" or (venue.pricing_mode == "mixed" and booking_type == BookingType.full_day):
@@ -103,7 +115,6 @@ def get_pricing_preview(
     else:
         raise ConflictError(f"Invalid pricing_mode or booking_type combination: {venue.pricing_mode} / {booking_type}")
 
-   
     platform_fee_paise = _banker_round(
         Decimal(str(quoted_price_paise))
         * Decimal(str(venue.platform_commission_pct))
@@ -126,8 +137,10 @@ def get_pricing_preview(
     return PricingPreviewResponse(
         pricing_mode=venue.pricing_mode,
         quoted_price_paise=quoted_price_paise,
+        platform_commission_pct=float(venue.platform_commission_pct),
         platform_fee_paise=platform_fee_paise,
         owner_payout_paise=owner_payout_paise,
+        advance_pct=float(venue.advance_pct),
         advance_due_paise=advance_due_paise,
         balance_due_paise=balance_due_paise,
         display=PricingDisplay(
@@ -600,75 +613,6 @@ def delete_venue_photo(db: Session, venue_id: UUID, photo_id: UUID, owner_id: UU
     db.commit()
 
 
-def _compute_pricing_quote(
-    venue,
-    starts_at: datetime,
-    ends_at: datetime,
-    booking_type: str = None,
-) -> PricingQuote:
-    """
-    Compute pricing quote.
-    Supports flat, hourly, and mixed pricing modes.
-    Uses Decimal with banker's rounding for financial precision.
-    """
-
-    if venue.pricing_mode == "flat" or (
-        venue.pricing_mode == "mixed" and booking_type == "full_day"
-    ):
-        quoted_price_paise = venue.base_price_paise or 0
-
-    elif venue.pricing_mode == "hourly" or (
-        venue.pricing_mode == "mixed" and booking_type == "time_slot"
-    ):
-        if ends_at <= starts_at:
-            raise ConflictError("ends_at must be after starts_at")
-
-        duration_seconds = (ends_at - starts_at).total_seconds()
-        duration_hours = Decimal(str(duration_seconds)) / Decimal("3600")
-
-        quoted_price_paise = _banker_round(
-            Decimal(str(venue.hourly_rate_paise or 0)) * duration_hours
-        )
-
-    else:
-        raise ConflictError(
-            f"Unsupported pricing mode or booking type combination: {venue.pricing_mode} / {booking_type}"
-        )
-
-    platform_fee_paise = _banker_round(
-        Decimal(str(quoted_price_paise))
-        * Decimal(str(venue.platform_commission_pct))
-        / Decimal("100")
-    )
-
-    owner_payout_paise = quoted_price_paise - platform_fee_paise
-
-    advance_due_paise = _banker_round(
-        Decimal(str(quoted_price_paise))
-        * Decimal(str(venue.advance_pct))
-        / Decimal("100")
-    )
-
-    balance_due_paise = quoted_price_paise - advance_due_paise
-
-    # Validate pricing invariant
-    if advance_due_paise + balance_due_paise != quoted_price_paise:
-        raise ConflictError(
-            "Pricing invariant violated: advance_due + balance_due != quoted_price"
-        )
-
-    return PricingQuote(
-        quoted_price_paise=quoted_price_paise,
-        platform_commission_pct=float(venue.platform_commission_pct),
-        platform_fee_paise=platform_fee_paise,
-        owner_payout_paise=owner_payout_paise,
-        advance_pct=float(venue.advance_pct),
-        advance_due_paise=advance_due_paise,
-        balance_due_paise=balance_due_paise,
-        pricing_mode=venue.pricing_mode,
-    )
-
-
 def get_pricing_quote(
     db: Session,
     venue_id: UUID,
@@ -676,15 +620,24 @@ def get_pricing_quote(
     ends_at: datetime,
     booking_type: BookingType,
 ) -> PricingQuote:
-    """
-    Get raw pricing quote for a venue.
-    """
-    venue = _get_active_venue_or_404(db, venue_id)
-    return _compute_pricing_quote(
-        venue=venue,
+
+    preview = get_pricing_preview(
+        db=db,
+        venue_id=venue_id,
         starts_at=starts_at,
         ends_at=ends_at,
-        booking_type=booking_type.value,
+        booking_type=booking_type,
+    )
+
+    return PricingQuote(
+        quoted_price_paise=preview.quoted_price_paise,
+        platform_commission_pct=preview.platform_commission_pct,
+        platform_fee_paise=preview.platform_fee_paise,
+        owner_payout_paise=preview.owner_payout_paise,
+        advance_pct=preview.advance_pct,
+        advance_due_paise=preview.advance_due_paise,
+        balance_due_paise=preview.balance_due_paise,
+        pricing_mode=preview.pricing_mode,
     )
 
 
@@ -699,10 +652,11 @@ def get_pricing_quote_for_slot(
     Get pricing quote for a booking slot.
     For use by availability and booking modules.
     """
-    venue = _get_active_venue_or_404(db, venue_id)
-    return _compute_pricing_quote(
-        venue=venue,
+
+    return get_pricing_quote(
+        db=db,
+        venue_id=venue_id,
         starts_at=starts_at,
         ends_at=ends_at,
-        booking_type=booking_type,
+        booking_type=BookingType(booking_type),
     )

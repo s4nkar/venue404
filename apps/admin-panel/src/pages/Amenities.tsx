@@ -1,4 +1,5 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Sparkles, Plus, Pencil, Trash2, Search,
   AlertTriangle, CheckCircle2,
@@ -17,9 +18,7 @@ const api = adminAmenityEndpoints(createClient())
 const DEBOUNCE_MS = 350
 
 export default function Amenities() {
-  const [allAmenities, setAllAmenities] = useState<AdminAmenity[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const qc = useQueryClient()
 
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -29,20 +28,14 @@ export default function Amenities() {
   const [createOpen, setCreateOpen] = useState(false)
   const [createName, setCreateName] = useState('')
   const [createIcon, setCreateIcon] = useState('')
-  const [createLoading, setCreateLoading] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
 
   // Edit modal
   const [editTarget, setEditTarget] = useState<AdminAmenity | null>(null)
   const [editName, setEditName] = useState('')
   const [editIcon, setEditIcon] = useState('')
-  const [editLoading, setEditLoading] = useState(false)
-  const [editError, setEditError] = useState<string | null>(null)
 
   // Delete modal
   const [deleteTarget, setDeleteTarget] = useState<AdminAmenity | null>(null)
-  const [deleteLoading, setDeleteLoading] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   function handleSearchChange(value: string) {
@@ -52,22 +45,45 @@ export default function Amenities() {
   }
   useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
 
-  const fetchAmenities = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await api.listAmenities({ include_deleted: true })
-      setAllAmenities(data.items)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to load amenities')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // ── Query ───────────────────────────────────────────────────────────────────
 
-  useEffect(() => { fetchAmenities() }, [fetchAmenities])
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['admin', 'amenities'],
+    queryFn: () => api.listAmenities({ include_deleted: true }),
+  })
 
-  // Client-side filtering
+  const allAmenities = data?.items ?? []
+
+  // ── Mutations ───────────────────────────────────────────────────────────────
+
+  const createMutation = useMutation({
+    mutationFn: (input: { name: string; icon: string | null }) =>
+      api.createAmenity(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'amenities'] })
+      closeCreate()
+    },
+  })
+
+  const editMutation = useMutation({
+    mutationFn: ({ id, name, icon }: { id: string; name: string; icon: string | null }) =>
+      api.updateAmenity(id, { name, icon }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'amenities'] })
+      closeEdit()
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.deleteAmenity(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'amenities'] })
+      closeDelete()
+    },
+  })
+
+  // ── Client-side filtering ───────────────────────────────────────────────────
+
   const filtered = allAmenities
     .filter((a) => showArchived || !a.deleted_at)
     .filter((a) => !search || a.name.toLowerCase().includes(search.toLowerCase()))
@@ -78,100 +94,52 @@ export default function Amenities() {
     archived: allAmenities.filter((a) => !!a.deleted_at).length,
   }
 
-  // ── Create ──────────────────────────────────────────────────────────────────
+  // ── Modal helpers ───────────────────────────────────────────────────────────
 
   function openCreate() {
     setCreateName('')
     setCreateIcon('')
-    setCreateError(null)
+    createMutation.reset()
     setCreateOpen(true)
   }
 
   function closeCreate() {
     setCreateOpen(false)
-    setCreateError(null)
-    setCreateLoading(false)
+    createMutation.reset()
   }
-
-  async function handleCreate() {
-    if (!createName.trim()) {
-      setCreateError('Name is required')
-      return
-    }
-    setCreateLoading(true)
-    setCreateError(null)
-    try {
-      await api.createAmenity({
-        name: createName.trim(),
-        icon: createIcon.trim() || null,
-      })
-      closeCreate()
-      fetchAmenities()
-    } catch (e: unknown) {
-      setCreateError(e instanceof Error ? e.message : 'Failed to create amenity')
-    } finally {
-      setCreateLoading(false)
-    }
-  }
-
-  // ── Edit ────────────────────────────────────────────────────────────────────
 
   function openEdit(a: AdminAmenity) {
     setEditTarget(a)
     setEditName(a.name)
     setEditIcon(a.icon ?? '')
-    setEditError(null)
+    editMutation.reset()
   }
 
   function closeEdit() {
     setEditTarget(null)
-    setEditError(null)
-    setEditLoading(false)
+    editMutation.reset()
   }
-
-  async function handleEdit() {
-    if (!editTarget) return
-    if (!editName.trim()) {
-      setEditError('Name is required')
-      return
-    }
-    setEditLoading(true)
-    setEditError(null)
-    try {
-      await api.updateAmenity(editTarget.id, {
-        name: editName.trim(),
-        icon: editIcon.trim() || null,
-      })
-      closeEdit()
-      fetchAmenities()
-    } catch (e: unknown) {
-      setEditError(e instanceof Error ? e.message : 'Failed to update amenity')
-    } finally {
-      setEditLoading(false)
-    }
-  }
-
-  // ── Delete ──────────────────────────────────────────────────────────────────
 
   function closeDelete() {
     setDeleteTarget(null)
-    setDeleteError(null)
-    setDeleteLoading(false)
+    deleteMutation.reset()
   }
 
-  async function handleDelete() {
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
+  function handleCreate() {
+    if (!createName.trim()) return
+    createMutation.mutate({ name: createName.trim(), icon: createIcon.trim() || null })
+  }
+
+  function handleEdit() {
+    if (!editTarget || !editName.trim()) return
+    editMutation.mutate({ id: editTarget.id, name: editName.trim(), icon: editIcon.trim() || null })
+  }
+
+  function handleDelete() {
     if (!deleteTarget) return
-    setDeleteLoading(true)
-    setDeleteError(null)
-    try {
-      await api.deleteAmenity(deleteTarget.id)
-      closeDelete()
-      fetchAmenities()
-    } catch (e: unknown) {
-      setDeleteError(e instanceof Error ? e.message : 'Failed to archive amenity')
-    } finally {
-      setDeleteLoading(false)
-    }
+    deleteMutation.mutate(deleteTarget.id)
   }
 
   const hasFilters = !!(search || showArchived)
@@ -184,7 +152,7 @@ export default function Amenities() {
         <div className="card-enter" style={{ '--index': 0 } as React.CSSProperties}>
           <MetricCard
             label="Active Amenities"
-            value={loading ? '—' : String(stats.total)}
+            value={isLoading ? '—' : String(stats.total)}
             description="Available for venue owners to select"
             icon={<Sparkles className="h-4 w-4" />}
             accent="brand"
@@ -193,7 +161,7 @@ export default function Amenities() {
         <div className="card-enter" style={{ '--index': 1 } as React.CSSProperties}>
           <MetricCard
             label="In Use"
-            value={loading ? '—' : String(stats.inUse)}
+            value={isLoading ? '—' : String(stats.inUse)}
             description="Assigned to at least one venue"
             icon={<CheckCircle2 className="h-4 w-4" />}
             accent="emerald"
@@ -202,7 +170,7 @@ export default function Amenities() {
         <div className="card-enter" style={{ '--index': 2 } as React.CSSProperties}>
           <MetricCard
             label="Archived"
-            value={loading ? '—' : String(stats.archived)}
+            value={isLoading ? '—' : String(stats.archived)}
             description="Soft-deleted, hidden from owners"
             icon={<Trash2 className="h-4 w-4" />}
             accent="amber"
@@ -218,7 +186,7 @@ export default function Amenities() {
           <SectionHeader
             title="All amenities"
             description={
-              !loading
+              !isLoading
                 ? `${filtered.length} ${filtered.length === 1 ? 'amenity' : 'amenities'}${hasFilters ? ' matching filters' : ''}`
                 : undefined
             }
@@ -264,24 +232,28 @@ export default function Amenities() {
         </div>
 
         {/* Content states */}
-        {loading && (
+        {isLoading && (
           <div className="px-5 py-10">
             <LoadingScreen message="Loading amenities…" fullScreen={false} />
           </div>
         )}
 
-        {!loading && error && (
+        {!isLoading && error && (
           <div className="px-5 py-10">
             <ErrorState
               title="Could not load amenities"
-              message={error}
+              message={error instanceof Error ? error.message : 'Failed to load amenities'}
               fullScreen={false}
-              action={<Button variant="secondary" onClick={fetchAmenities}>Retry</Button>}
+              action={
+                <Button variant="secondary" onClick={() => qc.invalidateQueries({ queryKey: ['admin', 'amenities'] })}>
+                  Retry
+                </Button>
+              }
             />
           </div>
         )}
 
-        {!loading && !error && filtered.length === 0 && (
+        {!isLoading && !error && filtered.length === 0 && (
           <div className="px-5 py-10">
             <EmptyState
               icon={<Sparkles className="h-4 w-4" />}
@@ -295,7 +267,7 @@ export default function Amenities() {
           </div>
         )}
 
-        {!loading && !error && filtered.length > 0 && (
+        {!isLoading && !error && filtered.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-zinc-100 bg-zinc-50/60">
@@ -400,7 +372,7 @@ export default function Amenities() {
                   type="text"
                   placeholder="e.g. Swimming Pool"
                   value={createName}
-                  onChange={(e) => { setCreateName(e.target.value); setCreateError(null) }}
+                  onChange={(e) => { setCreateName(e.target.value); createMutation.reset() }}
                   autoFocus
                 />
               </div>
@@ -419,21 +391,23 @@ export default function Amenities() {
               </div>
             </div>
 
-            {createError && (
-              <p className="mt-3 text-xs font-medium text-red-500">{createError}</p>
+            {createMutation.error && (
+              <p className="mt-3 text-xs font-medium text-red-500">
+                {createMutation.error instanceof Error ? createMutation.error.message : 'Failed to create amenity'}
+              </p>
             )}
 
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeCreate} disabled={createLoading}>
+              <Button variant="secondary" onClick={closeCreate} disabled={createMutation.isPending}>
                 Cancel
               </Button>
               <button
                 type="button"
                 onClick={handleCreate}
-                disabled={createLoading || !createName.trim()}
+                disabled={createMutation.isPending || !createName.trim()}
                 className="press rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {createLoading ? 'Creating…' : 'Create amenity'}
+                {createMutation.isPending ? 'Creating…' : 'Create amenity'}
               </button>
             </div>
           </div>
@@ -461,7 +435,7 @@ export default function Amenities() {
                   id="edit-name"
                   type="text"
                   value={editName}
-                  onChange={(e) => { setEditName(e.target.value); setEditError(null) }}
+                  onChange={(e) => { setEditName(e.target.value); editMutation.reset() }}
                   autoFocus
                 />
               </div>
@@ -480,21 +454,23 @@ export default function Amenities() {
               </div>
             </div>
 
-            {editError && (
-              <p className="mt-3 text-xs font-medium text-red-500">{editError}</p>
+            {editMutation.error && (
+              <p className="mt-3 text-xs font-medium text-red-500">
+                {editMutation.error instanceof Error ? editMutation.error.message : 'Failed to update amenity'}
+              </p>
             )}
 
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeEdit} disabled={editLoading}>
+              <Button variant="secondary" onClick={closeEdit} disabled={editMutation.isPending}>
                 Cancel
               </Button>
               <button
                 type="button"
                 onClick={handleEdit}
-                disabled={editLoading || !editName.trim()}
+                disabled={editMutation.isPending || !editName.trim()}
                 className="press rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {editLoading ? 'Saving…' : 'Save changes'}
+                {editMutation.isPending ? 'Saving…' : 'Save changes'}
               </button>
             </div>
           </div>
@@ -524,23 +500,23 @@ export default function Amenities() {
               </div>
             )}
 
-            {deleteError && (
+            {deleteMutation.error && (
               <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
-                {deleteError}
+                {deleteMutation.error instanceof Error ? deleteMutation.error.message : 'Failed to archive amenity'}
               </div>
             )}
 
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeDelete} disabled={deleteLoading}>
+              <Button variant="secondary" onClick={closeDelete} disabled={deleteMutation.isPending}>
                 Cancel
               </Button>
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={deleteLoading}
+                disabled={deleteMutation.isPending}
                 className="press rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {deleteLoading ? 'Archiving…' : 'Archive amenity'}
+                {deleteMutation.isPending ? 'Archiving…' : 'Archive amenity'}
               </button>
             </div>
           </div>

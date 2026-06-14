@@ -1,10 +1,11 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Building2, MapPin, Users, Clock, IndianRupee,
   CheckCircle2, XCircle, ShieldOff, ShieldCheck,
   ImageOff, Search,
 } from 'lucide-react'
-import { createClient, adminVenueEndpoints, ApiError } from '@venue404/api-client'
+import { createClient, adminVenueEndpoints } from '@venue404/api-client'
 import type { AdminVenueItem, AdminVenueStats } from '@venue404/api-client'
 import { AdminLayout } from '../components/AdminLayout'
 import {
@@ -62,22 +63,25 @@ function formatTime(t: string): string {
   return `${hr}:${String(m).padStart(2, '0')} ${ampm}`
 }
 
+const PAGE_SIZE = 10
+
 export default function VenueApprovals() {
-  const [stats, setStats] = useState<AdminVenueStats | null>(null)
-  const [items, setItems] = useState<AdminVenueItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const [page, setPage] = useState(1)
-  const PAGE_SIZE = 10
+  const qc = useQueryClient()
 
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabStatus>('pending_approval')
-
+  const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Modal targets — no loading/error state needed, mutations own that
+  const [approveTarget, setApproveTarget] = useState<AdminVenueItem | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<AdminVenueItem | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [suspendTarget, setSuspendTarget] = useState<AdminVenueItem | null>(null)
+  const [suspendReason, setSuspendReason] = useState('')
+  const [reactivateTarget, setReactivateTarget] = useState<AdminVenueItem | null>(null)
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   function handleSearchChange(value: string) {
     setSearchInput(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -85,105 +89,76 @@ export default function VenueApprovals() {
   }
   useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
 
-  // Approve
-  const [approveTarget, setApproveTarget] = useState<AdminVenueItem | null>(null)
-  const [approveLoading, setApproveLoading] = useState(false)
-  const [approveError, setApproveError] = useState<string | null>(null)
+  // ── Query ───────────────────────────────────────────────────────────────────
 
-  // Reject
-  const [rejectTarget, setRejectTarget] = useState<AdminVenueItem | null>(null)
-  const [rejectReason, setRejectReason] = useState('')
-  const [rejectLoading, setRejectLoading] = useState(false)
-  const [rejectError, setRejectError] = useState<string | null>(null)
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['admin', 'venues', { page, status: activeTab, search }],
+    queryFn: () => api.listVenues({
+      page,
+      page_size: PAGE_SIZE,
+      status: activeTab || undefined,
+      search: search.trim() || undefined,
+    }),
+  })
 
-  // Suspend
-  const [suspendTarget, setSuspendTarget] = useState<AdminVenueItem | null>(null)
-  const [suspendReason, setSuspendReason] = useState('')
-  const [suspendLoading, setSuspendLoading] = useState(false)
-  const [suspendError, setSuspendError] = useState<string | null>(null)
+  const items = data?.items ?? []
+  const total = data?.total ?? 0
+  const totalPages = data?.total_pages ?? 1
+  const stats = data?.stats ?? null
 
-  // Reactivate
-  const [reactivateTarget, setReactivateTarget] = useState<AdminVenueItem | null>(null)
-  const [reactivateLoading, setReactivateLoading] = useState(false)
-  const [reactivateError, setReactivateError] = useState<string | null>(null)
+  const invalidateVenues = () => qc.invalidateQueries({ queryKey: ['admin', 'venues'] })
 
-  const fetchVenues = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await api.listVenues({
-        page,
-        page_size: PAGE_SIZE,
-        status: activeTab || undefined,
-        search: search.trim() || undefined,
-      })
-      setItems(res.items)
-      setTotal(res.total)
-      setTotalPages(res.total_pages)
-      setStats(res.stats)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load venues')
-    } finally {
-      setLoading(false)
-    }
-  }, [page, activeTab, search])
+  // ── Mutations ───────────────────────────────────────────────────────────────
 
-  useEffect(() => { fetchVenues() }, [fetchVenues])
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => api.approveVenue(id),
+    onSuccess: () => { invalidateVenues(); closeApprove() },
+  })
 
-  // ── Modal helpers ──────────────────────────────────────────────────────────
-  function closeApprove()    { setApproveTarget(null);    setApproveError(null);    setApproveLoading(false) }
-  function closeReject()     { setRejectTarget(null);     setRejectReason('');      setRejectError(null);    setRejectLoading(false) }
-  function closeSuspend()    { setSuspendTarget(null);    setSuspendReason('');     setSuspendError(null);   setSuspendLoading(false) }
-  function closeReactivate() { setReactivateTarget(null); setReactivateError(null); setReactivateLoading(false) }
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      api.rejectVenue(id, { reason }),
+    onSuccess: () => { invalidateVenues(); closeReject() },
+  })
 
-  async function handleApprove() {
+  const suspendMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.suspendVenue(id, { reason }),
+    onSuccess: () => { invalidateVenues(); closeSuspend() },
+  })
+
+  const reactivateMutation = useMutation({
+    mutationFn: (id: string) => api.reactivateVenue(id),
+    onSuccess: () => { invalidateVenues(); closeReactivate() },
+  })
+
+  // ── Modal helpers ───────────────────────────────────────────────────────────
+
+  function closeApprove()    { setApproveTarget(null);    approveMutation.reset() }
+  function closeReject()     { setRejectTarget(null);     setRejectReason('');  rejectMutation.reset() }
+  function closeSuspend()    { setSuspendTarget(null);    setSuspendReason(''); suspendMutation.reset() }
+  function closeReactivate() { setReactivateTarget(null); reactivateMutation.reset() }
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
+  function handleApprove() {
     if (!approveTarget) return
-    setApproveLoading(true); setApproveError(null)
-    try {
-      await api.approveVenue(approveTarget.id)
-      closeApprove(); fetchVenues()
-    } catch (e) {
-      setApproveError(e instanceof Error ? e.message : 'Failed to approve venue')
-    } finally { setApproveLoading(false) }
+    approveMutation.mutate(approveTarget.id)
   }
 
-  async function handleReject() {
+  function handleReject() {
     if (!rejectTarget) return
-    setRejectLoading(true); setRejectError(null)
-    try {
-      await api.rejectVenue(rejectTarget.id, { reason: rejectReason.trim() || undefined })
-      closeReject(); fetchVenues()
-    } catch (e) {
-      setRejectError(e instanceof Error ? e.message : 'Failed to reject venue')
-    } finally { setRejectLoading(false) }
+    rejectMutation.mutate({ id: rejectTarget.id, reason: rejectReason.trim() || undefined })
   }
 
-  async function handleSuspend() {
-    if (!suspendTarget) return
-    if (!suspendReason.trim()) { setSuspendError('A reason is required'); return }
-    const savedReason = suspendReason
-    setSuspendLoading(true); setSuspendError(null)
-    try {
-      await api.suspendVenue(suspendTarget.id, { reason: savedReason.trim() })
-      closeSuspend(); fetchVenues()
-    } catch (e) {
-      setSuspendReason(savedReason)
-      const msg = e instanceof ApiError
-        ? (e.message ?? 'Failed to suspend venue')
-        : e instanceof Error ? e.message : 'Failed to suspend venue'
-      setSuspendError(msg)
-    } finally { setSuspendLoading(false) }
+  function handleSuspend() {
+    if (!suspendTarget || !suspendReason.trim()) return
+    suspendMutation.mutate({ id: suspendTarget.id, reason: suspendReason.trim() })
   }
 
-  async function handleReactivate() {
+  function handleReactivate() {
     if (!reactivateTarget) return
-    setReactivateLoading(true); setReactivateError(null)
-    try {
-      await api.reactivateVenue(reactivateTarget.id)
-      closeReactivate(); fetchVenues()
-    } catch (e) {
-      setReactivateError(e instanceof Error ? e.message : 'Failed to reactivate venue')
-    } finally { setReactivateLoading(false) }
+    reactivateMutation.mutate(reactivateTarget.id)
   }
 
   return (
@@ -216,7 +191,7 @@ export default function VenueApprovals() {
         <div className="border-b border-zinc-100 px-5 pt-4">
           <SectionHeader
             title="Venue listings"
-            description={!loading ? `${total} ${total === 1 ? 'venue' : 'venues'}` : undefined}
+            description={!isLoading ? `${total} ${total === 1 ? 'venue' : 'venues'}` : undefined}
           />
           <div className="mt-3 flex items-center gap-0.5 border-b border-zinc-100 -mx-5 px-5">
             {TABS.map((tab) => {
@@ -267,24 +242,24 @@ export default function VenueApprovals() {
         </div>
 
         {/* Content */}
-        {loading && (
+        {isLoading && (
           <div className="px-5 py-12">
             <LoadingScreen message="Loading venues…" fullScreen={false} />
           </div>
         )}
 
-        {!loading && error && (
+        {!isLoading && error && (
           <div className="px-5 py-12">
             <ErrorState
               title="Could not load venues"
-              message={error}
+              message={error instanceof Error ? error.message : 'Failed to load venues'}
               fullScreen={false}
-              action={<Button variant="secondary" onClick={fetchVenues}>Retry</Button>}
+              action={<Button variant="secondary" onClick={invalidateVenues}>Retry</Button>}
             />
           </div>
         )}
 
-        {!loading && !error && items.length === 0 && (
+        {!isLoading && !error && items.length === 0 && (
           <div className="px-5 py-12">
             <EmptyState
               icon={<Building2 className="h-4 w-4" />}
@@ -298,7 +273,7 @@ export default function VenueApprovals() {
           </div>
         )}
 
-        {!loading && !error && items.length > 0 && (
+        {!isLoading && !error && items.length > 0 && (
           <div className="divide-y divide-zinc-100">
             {items.map((venue) => (
               <VenueCard
@@ -314,7 +289,7 @@ export default function VenueApprovals() {
         )}
 
         {/* Pagination */}
-        {!loading && totalPages > 1 && (
+        {!isLoading && totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-zinc-100 px-5 py-3 text-xs text-zinc-500">
             <span>
               {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
@@ -354,20 +329,20 @@ export default function VenueApprovals() {
               <span className="font-medium text-zinc-800">{approveTarget?.name}</span> will be
               listed publicly and visible to customers immediately.
             </p>
-            {approveError && (
+            {approveMutation.error && (
               <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
-                {approveError}
+                {approveMutation.error instanceof Error ? approveMutation.error.message : 'Failed to approve venue'}
               </div>
             )}
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeApprove} disabled={approveLoading}>Cancel</Button>
+              <Button variant="secondary" onClick={closeApprove} disabled={approveMutation.isPending}>Cancel</Button>
               <button
                 type="button"
                 onClick={handleApprove}
-                disabled={approveLoading}
+                disabled={approveMutation.isPending}
                 className="press rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
               >
-                {approveLoading ? 'Approving…' : 'Approve venue'}
+                {approveMutation.isPending ? 'Approving…' : 'Approve venue'}
               </button>
             </div>
           </div>
@@ -395,20 +370,24 @@ export default function VenueApprovals() {
                 type="text"
                 placeholder="e.g. Incomplete information, poor photos"
                 value={rejectReason}
-                onChange={(e) => { setRejectReason(e.target.value); setRejectError(null) }}
+                onChange={(e) => { setRejectReason(e.target.value); rejectMutation.reset() }}
                 autoFocus
               />
-              {rejectError && <p className="mt-1.5 text-xs font-medium text-red-500">{rejectError}</p>}
+              {rejectMutation.error && (
+                <p className="mt-1.5 text-xs font-medium text-red-500">
+                  {rejectMutation.error instanceof Error ? rejectMutation.error.message : 'Failed to reject venue'}
+                </p>
+              )}
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeReject} disabled={rejectLoading}>Cancel</Button>
+              <Button variant="secondary" onClick={closeReject} disabled={rejectMutation.isPending}>Cancel</Button>
               <button
                 type="button"
                 onClick={handleReject}
-                disabled={rejectLoading}
+                disabled={rejectMutation.isPending}
                 className="press rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50"
               >
-                {rejectLoading ? 'Rejecting…' : 'Reject venue'}
+                {rejectMutation.isPending ? 'Rejecting…' : 'Reject venue'}
               </button>
             </div>
           </div>
@@ -440,20 +419,24 @@ export default function VenueApprovals() {
                 type="text"
                 placeholder="e.g. Violation of platform terms"
                 value={suspendReason}
-                onChange={(e) => { setSuspendReason(e.target.value); setSuspendError(null) }}
+                onChange={(e) => { setSuspendReason(e.target.value); suspendMutation.reset() }}
                 autoFocus
               />
-              {suspendError && <p className="mt-1.5 text-xs font-medium text-red-500">{suspendError}</p>}
+              {suspendMutation.error && (
+                <p className="mt-1.5 text-xs font-medium text-red-500">
+                  {suspendMutation.error instanceof Error ? suspendMutation.error.message : 'Failed to suspend venue'}
+                </p>
+              )}
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeSuspend} disabled={suspendLoading}>Cancel</Button>
+              <Button variant="secondary" onClick={closeSuspend} disabled={suspendMutation.isPending}>Cancel</Button>
               <button
                 type="button"
                 onClick={handleSuspend}
-                disabled={suspendLoading || !suspendReason.trim()}
+                disabled={suspendMutation.isPending || !suspendReason.trim()}
                 className="press rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50"
               >
-                {suspendLoading ? 'Suspending…' : 'Suspend venue'}
+                {suspendMutation.isPending ? 'Suspending…' : 'Suspend venue'}
               </button>
             </div>
           </div>
@@ -472,20 +455,20 @@ export default function VenueApprovals() {
               <span className="font-medium text-zinc-800">{reactivateTarget?.name}</span> will be
               restored to approved status and visible to customers again.
             </p>
-            {reactivateError && (
+            {reactivateMutation.error && (
               <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
-                {reactivateError}
+                {reactivateMutation.error instanceof Error ? reactivateMutation.error.message : 'Failed to reactivate venue'}
               </div>
             )}
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={closeReactivate} disabled={reactivateLoading}>Cancel</Button>
+              <Button variant="secondary" onClick={closeReactivate} disabled={reactivateMutation.isPending}>Cancel</Button>
               <button
                 type="button"
                 onClick={handleReactivate}
-                disabled={reactivateLoading}
+                disabled={reactivateMutation.isPending}
                 className="press rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
               >
-                {reactivateLoading ? 'Reactivating…' : 'Reactivate venue'}
+                {reactivateMutation.isPending ? 'Reactivating…' : 'Reactivate venue'}
               </button>
             </div>
           </div>
@@ -511,8 +494,6 @@ function VenueCard({ venue, onApprove, onReject, onSuspend, onReactivate }: Venu
 
   useEffect(() => { setImgError(false) }, [venue.id])
 
-  const handleImgError = useCallback(() => setImgError(true), [])
-
   return (
     <div className="p-5">
       <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -524,21 +505,19 @@ function VenueCard({ venue, onApprove, onReject, onSuspend, onReactivate }: Venu
               src={venue.cover_photo_url}
               alt={venue.name}
               className="h-full w-full object-cover"
-              onError={handleImgError}
+              onError={() => setImgError(true)}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
               <ImageOff className="h-8 w-8 text-zinc-300" />
             </div>
           )}
-          {/* Status overlay */}
           <div className="absolute right-3 top-3">
             <StatusBadge
               label={statusLabel(venue.status)}
               variant={statusVariant(venue.status)}
             />
           </div>
-          {/* Inactive badge */}
           {venue.status === 'approved' && !venue.is_active && (
             <div className="absolute left-3 top-3">
               <StatusBadge label="Inactive" variant="neutral" dot={false} />

@@ -9,6 +9,9 @@ import app.modules.profile.models  # noqa: F401
 import app.modules.admin.models  # noqa: F401
 import app.modules.venue.models  # noqa: F401
 import app.modules.booking.models  
+import app.modules.availability.models  # noqa: F401
+import app.modules.payment.models  # noqa: F401
+import app.modules.notification.models  # noqa: F401
 
 config = context.config
 

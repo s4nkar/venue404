@@ -1,11 +1,13 @@
 from datetime import date, datetime
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.modules.auth.dependencies import AuthContext, require_owner
 from app.modules.availability import service
-from app.modules.availability.schemas import AvailabilityResponse, ValidationResponse
+from app.modules.availability.schemas import AvailabilityResponse, CalendarResponse, ValidationResponse
 from app.modules.venue.schemas import BookingType, PricingQuote
 
 router = APIRouter()
@@ -24,6 +26,45 @@ def availability_for_date_query(
         db=db,
         venue_id=venue_id,
         booking_date=availability_date,
+    )
+
+
+@router.get(
+    "/venues/{venue_id}/calendar",
+    response_model=CalendarResponse,
+)
+def calendar(
+    venue_id: UUID,
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    db: Session = Depends(get_db),
+):
+    return service.get_calendar(
+        db=db,
+        venue_id=venue_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+@router.get(
+    "/venues/{venue_id}/calendar/owner",
+    response_model=CalendarResponse,
+)
+def owner_calendar(
+    venue_id: UUID,
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    return service.get_owner_calendar(
+        db=db,
+        venue_id=venue_id,
+        owner_id=auth.user_id,
+        start_date=start_date,
+        end_date=end_date,
+        allow_admin=auth.is_admin(),
     )
 
 

@@ -1,3 +1,438 @@
-export default function MyBookings() {
-  return <div>MyBookings</div>
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+
+import {
+  createClient,
+  bookingEndpoints,
+} from '@venue404/api-client'
+
+import {
+  EmptyState,
+  ErrorState,
+  Button,
+  LoadingScreen,
+  Logo,
+} from '@venue404/ui'
+
+import { useAuth } from '../lib/AuthContext'
+
+import type { BookingOut } from '../types'
+
+import BookingCard from '../components/booking/BookingCard'
+import BookingStatusBadge from '../components/booking/BookingStatusBadge'
+
+import { formatDate } from '../utils'
+
+type BookingTab =
+  | 'upcoming'
+  | 'pending'
+  | 'past'
+  | 'cancelled'
+
+const CANCELLED_STATUSES = [
+  'user_cancelled',
+  'admin_cancelled',
+  'owner_rejected',
+  'conflict_cancelled',
+  'hold_expired',
+  'request_expired',
+  'balance_overdue_cancelled',
+]
+
+function DetailNavbar() {
+  const { user, signOut } = useAuth()
+
+  return (
+    <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-3">
+        <Link to="/">
+          <Logo />
+        </Link>
+
+        <nav className="flex items-center gap-1">
+          {user ? (
+            <>
+              <Link
+                to="/my-bookings"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-900 bg-zinc-100"
+              >
+                My Bookings
+              </Link>
+
+              <Link
+                to="/profile"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
+              >
+                Profile
+              </Link>
+
+              <button
+                onClick={signOut}
+                className="ml-1 rounded-lg px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
+              >
+                Sign out
+              </button>
+            </>
+          ) : null}
+        </nav>
+      </div>
+    </header>
+  )
 }
+
+function FeaturedBookingHero({
+  booking,
+}: {
+  booking: BookingOut
+}) {
+  return (
+    <div className="mb-10 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+      <div className="grid lg:grid-cols-2">
+        <div className="aspect-[16/9] lg:aspect-auto">
+          {booking.venue_cover_photo_url ? (
+            <img
+              src={booking.venue_cover_photo_url}
+              alt={booking.venue_name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="h-full w-full bg-zinc-100" />
+          )}
+        </div>
+
+        <div className="flex flex-col justify-center p-8 lg:p-10">
+          <div className="mb-4">
+            <BookingStatusBadge
+              status={booking.status}
+            />
+          </div>
+
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-900">
+            {booking.venue_name}
+          </h2>
+
+          <p className="mt-2 text-zinc-500">
+            {booking.venue_city}
+          </p>
+
+          <div className="mt-8 grid grid-cols-2 gap-6">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-zinc-400">
+                Event Date
+              </p>
+
+              <p className="mt-1 font-medium text-zinc-900">
+                {formatDate(
+                  booking.starts_at,
+                )}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-zinc-400">
+                Booking Value
+              </p>
+
+              <p className="mt-1 font-medium text-zinc-900">
+                {
+                  booking.display
+                    .quoted_price
+                }
+              </p>
+            </div>
+          </div>
+
+          {(booking.status ===
+            'owner_accepted' ||
+            (booking.status ===
+              'confirmed' &&
+              booking.payment_status ===
+                'advance_paid' &&
+              booking.balance_due_paise >
+                0)) && (
+            <div className="mt-6 inline-flex w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              Action Required
+            </div>
+          )}
+
+          <Link
+            to={`/bookings/${booking.id}`}
+            className="mt-8"
+          >
+            <Button>
+              View Booking
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TabButton({
+  active,
+  count,
+  children,
+  onClick,
+}: {
+  active: boolean
+  count: number
+  children: React.ReactNode
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`
+        relative pb-4 text-sm font-medium transition-colors
+        ${
+          active
+            ? 'text-zinc-900'
+            : 'text-zinc-500 hover:text-zinc-900'
+        }
+      `}
+    >
+      {children}
+
+      <span className="ml-2 text-zinc-400">
+        {count}
+      </span>
+
+      {active && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+      )}
+    </button>
+  )
+}
+
+export default function MyBookings() {
+  const client = createClient()
+
+  const [activeTab, setActiveTab] =
+    useState<BookingTab>('upcoming')
+
+  const {
+    data: bookings = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<BookingOut[]>({
+    queryKey: ['my-bookings'],
+    queryFn: () =>
+      bookingEndpoints(client)
+        .listBookings(),
+  })
+
+  const now = new Date()
+
+  const upcomingBookings =
+    bookings.filter(
+      (booking) =>
+        (
+          booking.status ===
+            'owner_accepted' ||
+          booking.status ===
+            'confirmed'
+        ) &&
+        new Date(
+          booking.ends_at,
+        ) > now,
+    )
+
+  const pendingBookings =
+    bookings.filter(
+      (booking) =>
+        booking.status ===
+        'requested',
+    )
+
+  const pastBookings =
+    bookings.filter(
+      (booking) =>
+        booking.status ===
+        'completed',
+    )
+
+  const cancelledBookings =
+    bookings.filter(
+      (booking) =>
+        CANCELLED_STATUSES.includes(
+          booking.status,
+        ),
+    )
+
+  const filteredBookings =
+    useMemo(() => {
+      switch (activeTab) {
+        case 'upcoming':
+          return upcomingBookings
+
+        case 'pending':
+          return pendingBookings
+
+        case 'past':
+          return pastBookings
+
+        case 'cancelled':
+          return cancelledBookings
+
+        default:
+          return []
+      }
+    }, [
+      activeTab,
+      upcomingBookings,
+      pendingBookings,
+      pastBookings,
+      cancelledBookings,
+    ])
+
+  const featuredBooking =
+    upcomingBookings[0]
+
+  if (isLoading) {
+    return <LoadingScreen />
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-white">
+        <DetailNavbar />
+
+        <div className="mx-auto max-w-6xl px-4 py-8">
+          <ErrorState
+            title="Unable to load bookings"
+            message="Failed to load your bookings."
+            action={
+              <Button
+                onClick={() =>
+                  void refetch()
+                }
+              >
+                Retry
+              </Button>
+            }
+          />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-50">
+      <DetailNavbar />
+
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mb-10">
+          <h1 className="text-4xl font-bold tracking-tight text-zinc-900">
+            My Bookings
+          </h1>
+
+          <p className="mt-2 max-w-2xl text-zinc-500">
+            Manage reservations,
+            complete payments and
+            track upcoming events.
+          </p>
+        </div>
+
+        {featuredBooking && (
+          <FeaturedBookingHero
+            booking={
+              featuredBooking
+            }
+          />
+        )}
+
+        <div className="mb-8 border-b border-zinc-200">
+          <div className="flex gap-8 overflow-x-auto">
+            <TabButton
+              active={
+                activeTab ===
+                'upcoming'
+              }
+              count={
+                upcomingBookings.length
+              }
+              onClick={() =>
+                setActiveTab(
+                  'upcoming',
+                )
+              }
+            >
+              Upcoming
+            </TabButton>
+
+            <TabButton
+              active={
+                activeTab ===
+                'pending'
+              }
+              count={
+                pendingBookings.length
+              }
+              onClick={() =>
+                setActiveTab(
+                  'pending',
+                )
+              }
+            >
+              Pending
+            </TabButton>
+
+            <TabButton
+              active={
+                activeTab === 'past'
+              }
+              count={
+                pastBookings.length
+              }
+              onClick={() =>
+                setActiveTab('past')
+              }
+            >
+              Past
+            </TabButton>
+
+            <TabButton
+              active={
+                activeTab ===
+                'cancelled'
+              }
+              count={
+                cancelledBookings.length
+              }
+              onClick={() =>
+                setActiveTab(
+                  'cancelled',
+                )
+              }
+            >
+              Cancelled
+            </TabButton>
+          </div>
+        </div>
+
+        {filteredBookings.length ===
+        0 ? (
+          <EmptyState
+            title={`No ${activeTab} bookings`}
+            description="Bookings will appear here once available."
+          />
+        ) : (
+          <div className="space-y-6">
+            {filteredBookings.map(
+              (booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                />
+              ),
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
