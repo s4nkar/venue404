@@ -48,7 +48,7 @@ def search(db: Session, params: SearchParams) -> Page[SearchResult]:
 
     results = []
     for v in venues:
-        starting_price = v.base_price_paise if v.pricing_mode in ('flat', 'mixed') else v.hourly_rate_paise
+        starting_price = v.starting_price_paise if v.pricing_mode in ('flat', 'mixed') else v.hourly_rate_paise
         
         results.append(SearchResult(
             id=v.id,

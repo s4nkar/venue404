@@ -231,10 +231,10 @@ export function BookingPanel({ venue }: Props) {
       <div className="px-6 pt-6 pb-5 border-b border-zinc-100">
         <div className="flex items-start justify-between">
           <div>
-            {venue.pricing_mode === 'flat' && venue.base_price_paise != null ? (
+            {venue.pricing_mode === 'flat' && venue.starting_price_paise != null ? (
               <>
                 <p className="text-[28px] font-bold tracking-tight text-zinc-900 leading-none">
-                  {formatPrice(venue.base_price_paise)}
+                  {formatPrice(venue.starting_price_paise)}
                 </p>
                 <p className="text-sm text-zinc-400 mt-1">per day</p>
               </>
