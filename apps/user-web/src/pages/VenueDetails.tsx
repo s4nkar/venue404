@@ -1,9 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { createClient, venueEndpoints } from '@venue404/api-client'
-import { useAuth } from '../lib/AuthContext'
-import { Link } from 'react-router-dom'
-import { Logo } from '@venue404/ui'
+import { Navbar } from '../components/Navbar'
 import { VenueGallery }           from '../components/venue/VenueGallery'
 import { VenueInfo }              from '../components/venue/VenueInfo'
 import { AmenitiesList }          from '../components/venue/AmenitiesList'
@@ -36,40 +34,6 @@ function VenueDetailSkeleton() {
   )
 }
 
-// ─── Minimal navbar (used on detail pages — no hero, just nav) ────────────────
-
-function DetailNavbar() {
-  const { user, signOut } = useAuth()
-  return (
-    <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-3">
-        <Link to="/">
-          <Logo />
-        </Link>
-        <nav className="flex items-center gap-1">
-          {user ? (
-            <>
-              <Link to="/my-bookings" className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
-                My Bookings
-              </Link>
-              <Link to="/profile" className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
-                Profile
-              </Link>
-              <button onClick={signOut} className="ml-1 rounded-lg px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
-                Sign out
-              </button>
-            </>
-          ) : (
-            <>
-              <Link to="/login" className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">Sign in</Link>
-              <Link to="/register" className="ml-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover transition-colors">Get started</Link>
-            </>
-          )}
-        </nav>
-      </div>
-    </header>
-  )
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -87,7 +51,7 @@ export default function VenueDetails() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white">
-        <DetailNavbar />
+        <Navbar />
         <VenueDetailSkeleton />
       </div>
     )
@@ -96,7 +60,7 @@ export default function VenueDetails() {
   if (isError || !venue) {
     return (
       <div className="min-h-screen bg-white">
-        <DetailNavbar />
+        <Navbar />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-32 text-center">
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 mb-6">
             <svg className="h-7 w-7 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,7 +84,7 @@ export default function VenueDetails() {
 
   return (
     <div className="min-h-screen bg-white">
-      <DetailNavbar />
+      <Navbar />
 
       {/* ── Gallery — edge-to-edge, full bleed ───────────────────── */}
       <div className="w-full">

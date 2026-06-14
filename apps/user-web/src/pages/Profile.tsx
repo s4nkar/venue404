@@ -1,66 +1,29 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 import {
   Button,
   Card,
-  Logo,
 } from '@venue404/ui'
 
 import { useAuth } from '../lib/AuthContext'
+import { Navbar } from '../components/Navbar'
 
-function DetailNavbar() {
-  const { user, signOut } = useAuth()
 
-  return (
-    <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-3">
-        <Link to="/">
-          <Logo />
-        </Link>
-
-        <nav className="flex items-center gap-1">
-          {user ? (
-            <>
-              <Link
-                to="/my-bookings"
-                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
-              >
-                My Bookings
-              </Link>
-
-              <Link
-                to="/profile"
-                className="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900"
-              >
-                Profile
-              </Link>
-
-              <button
-                onClick={signOut}
-                className="ml-1 rounded-lg px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
-              >
-                Sign out
-              </button>
-            </>
-          ) : null}
-        </nav>
-      </div>
-    </header>
-  )
-}
 
 export default function Profile() {
   const navigate = useNavigate()
 
+  const { user, signOut } = useAuth()
+
   const profile = {
-    full_name: 'Akhil Sharma',
-    email: 'akhil@example.com',
-    role: 'customer',
+    full_name: user?.full_name ?? 'User',
+    email: user?.email ?? '',
+    role: user?.role ?? 'customer',
   }
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <DetailNavbar />
+      <Navbar />
 
       <div className="mx-auto max-w-3xl px-4 py-8">
         {/* Header */}
@@ -200,9 +163,7 @@ export default function Profile() {
 
               <Button
                 variant="secondary"
-                onClick={() =>
-                  navigate('/login')
-                }
+                onClick={signOut}
               >
                 Sign Out
               </Button>

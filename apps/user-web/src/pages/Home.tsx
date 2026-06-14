@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient, venueEndpoints } from '@venue404/api-client'
 import { useAuth } from '../lib/AuthContext'
 
-import { HomeNavbar }  from '../components/home/HomeNavbar'
+import { Navbar }  from '../components/Navbar'
 import { HeroSearch }  from '../components/home/HeroSearch'
 import { VenueGrid }   from '../components/home/VenueGrid'
 import { TrustStrip }  from '../components/home/TrustStrip'
@@ -74,10 +74,7 @@ export default function Home() {
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white">
-      <HomeNavbar
-        isLoggedIn={!!user}
-        onSignOut={signOut}
-      />
+      <Navbar />
 
       <HeroSearch
         q={q}

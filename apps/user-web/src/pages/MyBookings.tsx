@@ -12,10 +12,9 @@ import {
   ErrorState,
   Button,
   LoadingScreen,
-  Logo,
 } from '@venue404/ui'
 
-import { useAuth } from '../lib/AuthContext'
+import { Navbar } from '../components/Navbar'
 
 import type { BookingOut } from '../types'
 
@@ -40,46 +39,7 @@ const CANCELLED_STATUSES = [
   'balance_overdue_cancelled',
 ]
 
-function DetailNavbar() {
-  const { user, signOut } = useAuth()
 
-  return (
-    <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-3">
-        <Link to="/">
-          <Logo />
-        </Link>
-
-        <nav className="flex items-center gap-1">
-          {user ? (
-            <>
-              <Link
-                to="/my-bookings"
-                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-900 bg-zinc-100"
-              >
-                My Bookings
-              </Link>
-
-              <Link
-                to="/profile"
-                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
-              >
-                Profile
-              </Link>
-
-              <button
-                onClick={signOut}
-                className="ml-1 rounded-lg px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
-              >
-                Sign out
-              </button>
-            </>
-          ) : null}
-        </nav>
-      </div>
-    </header>
-  )
-}
 
 function FeaturedBookingHero({
   booking,
@@ -298,7 +258,7 @@ export default function MyBookings() {
   if (isError) {
     return (
       <div className="min-h-screen bg-white">
-        <DetailNavbar />
+        <Navbar />
 
         <div className="mx-auto max-w-6xl px-4 py-8">
           <ErrorState
@@ -321,7 +281,7 @@ export default function MyBookings() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <DetailNavbar />
+      <Navbar />
 
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-10">
