@@ -50,11 +50,10 @@ export function SearchSidebar({
           <button
             type="button"
             onClick={() => onVenueTypeChange('')}
-            className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors text-left ${
-              venueType === ''
-                ? 'bg-brand-light text-brand font-medium'
-                : 'text-zinc-600 hover:bg-zinc-50'
-            }`}
+            className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors text-left ${venueType === ''
+              ? 'bg-brand-light text-brand font-medium'
+              : 'text-zinc-600 hover:bg-zinc-50'
+              }`}
           >
             <span className="text-base">🏛️</span>
             All types
@@ -64,11 +63,10 @@ export function SearchSidebar({
               key={c.venue_type}
               type="button"
               onClick={() => onVenueTypeChange(c.venue_type === venueType ? '' : c.venue_type)}
-              className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors text-left ${
-                venueType === c.venue_type
-                  ? 'bg-brand-light text-brand font-medium'
-                  : 'text-zinc-600 hover:bg-zinc-50'
-              }`}
+              className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors text-left ${venueType === c.venue_type
+                ? 'bg-brand-light text-brand font-medium'
+                : 'text-zinc-600 hover:bg-zinc-50'
+                }`}
             >
               <span className="text-base">{c.icon}</span>
               {c.label}
@@ -89,11 +87,10 @@ export function SearchSidebar({
           <button
             type="button"
             onClick={() => onCapacityChange('')}
-            className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
-              capacity === ''
-                ? 'bg-brand-light text-brand font-medium'
-                : 'text-zinc-600 hover:bg-zinc-50'
-            }`}
+            className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${capacity === ''
+              ? 'bg-brand-light text-brand font-medium'
+              : 'text-zinc-600 hover:bg-zinc-50'
+              }`}
           >
             <span>Any size</span>
             {capacity === '' && (
@@ -107,11 +104,10 @@ export function SearchSidebar({
               key={p.value}
               type="button"
               onClick={() => onCapacityChange(capacity === p.value ? '' : p.value)}
-              className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
-                capacity === p.value
-                  ? 'bg-brand-light text-brand font-medium'
-                  : 'text-zinc-600 hover:bg-zinc-50'
-              }`}
+              className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${capacity === p.value
+                ? 'bg-brand-light text-brand font-medium'
+                : 'text-zinc-600 hover:bg-zinc-50'
+                }`}
             >
               <span>{p.label} guests</span>
               {capacity === p.value && (
@@ -139,6 +135,25 @@ export function SearchSidebar({
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">guests</span>
           </div>
         </div>
+      </div>
+
+      {/* Deep Research card */}
+      <div className="rounded-2xl bg-zinc-900 p-5">
+        <div className="mb-2 flex items-center gap-2">
+          <svg className="h-4 w-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span className="text-sm font-bold text-white">Deep Research</span>
+        </div>
+        <p className="mb-4 text-xs leading-relaxed text-zinc-400">
+          Can't find the right venue? Our researchers will source every option, not just what's listed.
+        </p>
+        <button
+          type="button"
+          className="w-full rounded-xl bg-brand py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-hover active:scale-[0.98]"
+        >
+          Try Deep Research
+        </button>
       </div>
     </aside>
   )
