@@ -99,7 +99,7 @@ def get_pricing_preview(
     venue = _get_active_venue_or_404(db, venue_id)
 
     if venue.pricing_mode == "flat" or (venue.pricing_mode == "mixed" and booking_type == BookingType.full_day):
-        quoted_price_paise = venue.base_price_paise
+        quoted_price_paise = venue.starting_price_paise
 
     elif venue.pricing_mode == "hourly" or (venue.pricing_mode == "mixed" and booking_type == BookingType.time_slot):
         if ends_at <= starts_at:
@@ -217,7 +217,7 @@ def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue
 
         
         pricing_mode=body.pricing_mode.value,
-        base_price_paise=body.base_price_paise,
+        starting_price_paise=body.starting_price_paise,
         hourly_rate_paise=body.hourly_rate_paise,
 
         
@@ -264,18 +264,18 @@ def update_venue(
         setattr(venue, field, value)
 
     if venue.pricing_mode == "flat":
-        if venue.base_price_paise is None:
-            raise ConflictError("base_price_paise is required when pricing_mode is 'flat'")
+        if venue.starting_price_paise is None:
+            raise ConflictError("starting_price_paise is required when pricing_mode is 'flat'")
         if venue.hourly_rate_paise is not None:
             raise ConflictError("hourly_rate_paise must be null when pricing_mode is 'flat'")
     elif venue.pricing_mode == "hourly":
         if venue.hourly_rate_paise is None:
             raise ConflictError("hourly_rate_paise is required when pricing_mode is 'hourly'")
-        if venue.base_price_paise is not None:
-            raise ConflictError("base_price_paise must be null when pricing_mode is 'hourly'")
+        if venue.starting_price_paise is not None:
+            raise ConflictError("starting_price_paise must be null when pricing_mode is 'hourly'")
     elif venue.pricing_mode == "mixed":
-        if venue.base_price_paise is None or venue.hourly_rate_paise is None:
-            raise ConflictError("Both base_price_paise and hourly_rate_paise are required when pricing_mode is 'mixed'")
+        if venue.starting_price_paise is None or venue.hourly_rate_paise is None:
+            raise ConflictError("Both starting_price_paise and hourly_rate_paise are required when pricing_mode is 'mixed'")
 
     if venue.min_capacity is not None and venue.min_capacity > venue.max_capacity:
         raise ConflictError("min_capacity cannot exceed max_capacity")

@@ -152,7 +152,7 @@ class VenueResponse(BaseModel):
 
     
     pricing_mode: PricingMode
-    base_price_paise: Optional[int] = None     
+    starting_price_paise: Optional[int] = None     
     hourly_rate_paise: Optional[int] = None   
 
     
@@ -224,7 +224,7 @@ class CreateVenueRequest(BaseModel):
 
     
     pricing_mode: PricingMode = PricingMode.flat
-    base_price_paise: Optional[int] = Field(default=None, ge=0)
+    starting_price_paise: Optional[int] = Field(default=None, ge=0)
     hourly_rate_paise: Optional[int] = Field(default=None, ge=0)
 
     
@@ -259,18 +259,18 @@ class CreateVenueRequest(BaseModel):
                 raise ValueError("pricing_mode must be 'hourly' when only time_slot is allowed")
 
         if self.pricing_mode == PricingMode.flat:
-            if self.base_price_paise is None:
-                raise ValueError("base_price_paise is required when pricing_mode is 'flat'")
+            if self.starting_price_paise is None:
+                raise ValueError("starting_price_paise is required when pricing_mode is 'flat'")
             if self.hourly_rate_paise is not None:
                 raise ValueError("hourly_rate_paise must be null when pricing_mode is 'flat'")
         elif self.pricing_mode == PricingMode.hourly:
             if self.hourly_rate_paise is None:
                 raise ValueError("hourly_rate_paise is required when pricing_mode is 'hourly'")
-            if self.base_price_paise is not None:
-                raise ValueError("base_price_paise must be null when pricing_mode is 'hourly'")
+            if self.starting_price_paise is not None:
+                raise ValueError("starting_price_paise must be null when pricing_mode is 'hourly'")
         elif self.pricing_mode == PricingMode.mixed:
-            if self.base_price_paise is None or self.hourly_rate_paise is None:
-                raise ValueError("Both base_price_paise and hourly_rate_paise are required when pricing_mode is 'mixed'")
+            if self.starting_price_paise is None or self.hourly_rate_paise is None:
+                raise ValueError("Both starting_price_paise and hourly_rate_paise are required when pricing_mode is 'mixed'")
 
         
         if (
@@ -317,7 +317,7 @@ class UpdateVenueRequest(BaseModel):
     post_buffer_minutes: Optional[int] = Field(default=None, ge=0)
 
     pricing_mode: Optional[PricingMode] = None
-    base_price_paise: Optional[int] = Field(default=None, ge=0)
+    starting_price_paise: Optional[int] = Field(default=None, ge=0)
     hourly_rate_paise: Optional[int] = Field(default=None, ge=0)
 
     advance_pct: Optional[Decimal] = Field(default=None, gt=0, le=100)
@@ -352,8 +352,8 @@ class UpdateVenueRequest(BaseModel):
 
         if self.pricing_mode == PricingMode.flat and self.hourly_rate_paise is not None:
              raise ValueError("hourly_rate_paise must be null when pricing_mode is 'flat'")
-        if self.pricing_mode == PricingMode.hourly and self.base_price_paise is not None:
-             raise ValueError("base_price_paise must be null when pricing_mode is 'hourly'")
+        if self.pricing_mode == PricingMode.hourly and self.starting_price_paise is not None:
+             raise ValueError("starting_price_paise must be null when pricing_mode is 'hourly'")
 
         if (
             self.min_capacity is not None
@@ -403,7 +403,7 @@ class VenueSearchResult(BaseModel):
     state: str
     max_capacity: int
     pricing_mode: PricingMode
-    base_price_paise: Optional[int] = None
+    starting_price_paise: Optional[int] = None
     hourly_rate_paise: Optional[int] = None
     cover_photo_url: Optional[str] = None
     status: VenueStatus

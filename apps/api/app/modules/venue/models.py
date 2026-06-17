@@ -55,7 +55,7 @@ class Venue(Base):
     post_buffer_minutes: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
     pricing_mode: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'flat'"))
-    base_price_paise: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    starting_price_paise: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     hourly_rate_paise: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     platform_commission_pct: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, server_default="10.00")
@@ -94,7 +94,7 @@ class Venue(Base):
         CheckConstraint("pre_buffer_minutes >= 0", name="ck_venues_pre_buffer"),
         CheckConstraint("post_buffer_minutes >= 0", name="ck_venues_post_buffer"),
         CheckConstraint("pricing_mode IN ('flat', 'hourly', 'mixed')", name="ck_venues_pricing_mode"),
-        CheckConstraint("base_price_paise >= 0", name="ck_venues_base_price"),
+        CheckConstraint("starting_price_paise >= 0", name="ck_venues_base_price"),
         CheckConstraint("hourly_rate_paise >= 0", name="ck_venues_hourly_rate"),
         CheckConstraint("platform_commission_pct >= 0 AND platform_commission_pct <= 100", name="ck_venues_commission"),
         CheckConstraint("advance_pct > 0 AND advance_pct <= 100", name="ck_venues_advance_pct"),
