@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, Input, SectionHeader } from '@venue404/ui'
+import { Button, Card, Input, SectionHeader, LocationPickerMap } from '@venue404/ui'
 import * as Icons from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
 
@@ -32,7 +32,10 @@ export default function CreateVenueWizard() {
     address_line2: '',
     city: '',
     state: '',
+    country: 'India',
     postal_code: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
     open_time: '09:00',
     close_time: '23:00',
     min_booking_duration_minutes: 60,
@@ -56,6 +59,7 @@ export default function CreateVenueWizard() {
     tier_3_hours: '',
     tier_3_refund_pct: '',
     no_show_refund_pct: '0',
+    notes: '',
   })
 
   const [photos, setPhotos] = useState<File[]>([])
@@ -139,8 +143,10 @@ export default function CreateVenueWizard() {
       address_line2: formData.address_line2 || null,
       city: formData.city || 'TBD',
       state: formData.state || 'TBD',
-      country: 'India',
+      country: formData.country || 'India',
       postal_code: formData.postal_code || null,
+      latitude: formData.latitude,
+      longitude: formData.longitude,
       timezone: 'Asia/Kolkata',
       min_capacity: formData.min_capacity ? parseInt(formData.min_capacity.toString(), 10) : null,
       max_capacity: formData.max_capacity ? parseInt(formData.max_capacity.toString(), 10) : 100, // required
@@ -184,6 +190,7 @@ export default function CreateVenueWizard() {
         const policyPayload: any = {
           no_show_refund_pct: parseFloat(formData.no_show_refund_pct.toString() || '0'),
           platform_fee_refundable: false,
+          notes: formData.notes || null,
         }
         if (formData.tier_1_hours && formData.tier_1_refund_pct !== '') {
           policyPayload.tier_1_hours = parseInt(formData.tier_1_hours.toString(), 10)
@@ -212,7 +219,7 @@ export default function CreateVenueWizard() {
         }
       }
 
-      navigate(`/venues/${newVenue.id}/overview`)
+      navigate(`/venues/${newVenue.slug || newVenue.id}/overview`)
     } catch (err: any) {
       console.error('Failed to create venue', err)
       setError(err.message || 'Failed to create venue. Check your inputs.')
@@ -243,12 +250,12 @@ export default function CreateVenueWizard() {
       />
 
       {/* Progress Bar */}
-      <div className="flex items-center gap-2 mb-8 mt-6 overflow-x-auto pb-2">
+      <div className="flex flex-wrap items-center gap-y-4 gap-x-2 mb-8 mt-6 pb-2">
         {STEPS.map((step, index) => {
           const isCompleted = index < currentStep
           const isCurrent = index === currentStep
           return (
-            <div key={step} className="flex items-center gap-2 shrink-0">
+            <div key={step} className="flex items-center gap-2">
               <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold ${
                 isCompleted ? 'bg-emerald-500 text-white' :
                 isCurrent ? 'bg-brand text-white' : 'bg-zinc-100 text-zinc-400'
@@ -273,13 +280,14 @@ export default function CreateVenueWizard() {
       )}
 
       {/* Step Content */}
-      <Card className="p-8">
-        {currentStep === 0 && (
-          <div className="space-y-6">
-            <Input label="Venue Name" name="name" value={formData.name} onChange={handleChange} placeholder="e.g. Skyline Rooftop" />
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-700">Venue Type</label>
-              <select name="venue_type" value={formData.venue_type} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
+      <form onSubmit={(e) => { e.preventDefault(); handleNext(); }}>
+        <Card className="p-8">
+          {currentStep === 0 && (
+            <div className="space-y-6">
+              <Input label="Venue Name" name="name" value={formData.name} onChange={handleChange} placeholder="e.g. Skyline Rooftop" required />
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-zinc-700">Venue Type</label>
+                <select name="venue_type" value={formData.venue_type} onChange={handleChange} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
                 <option value="">Select a type...</option>
                 <option value="banquet_hall">Banquet Hall</option>
                 <option value="wedding_hall">Wedding Hall</option>
@@ -305,18 +313,30 @@ export default function CreateVenueWizard() {
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Min Capacity" name="min_capacity" type="number" value={formData.min_capacity} onChange={handleChange} placeholder="e.g. 50" />
-              <Input label="Max Capacity" name="max_capacity" type="number" value={formData.max_capacity} onChange={handleChange} placeholder="e.g. 300" />
+              <Input label="Min Capacity" name="min_capacity" type="number" min={1} value={formData.min_capacity} onChange={handleChange} placeholder="e.g. 50" />
+              <Input label="Max Capacity" name="max_capacity" type="number" min={1} required value={formData.max_capacity} onChange={handleChange} placeholder="e.g. 300" />
             </div>
             <div className="space-y-4 pt-4 border-t border-zinc-100">
               <h4 className="font-medium text-zinc-900">Location</h4>
-              <Input label="Address Line 1" name="address_line1" value={formData.address_line1} onChange={handleChange} placeholder="Street address" />
+              <Input label="Address Line 1" name="address_line1" required value={formData.address_line1} onChange={handleChange} placeholder="Street address" />
               <Input label="Address Line 2" name="address_line2" value={formData.address_line2} onChange={handleChange} placeholder="Suite, floor, etc. (optional)" />
               <div className="grid grid-cols-2 gap-4">
-                <Input label="City" name="city" value={formData.city} onChange={handleChange} />
-                <Input label="State" name="state" value={formData.state} onChange={handleChange} />
+                <Input label="City" name="city" required value={formData.city} onChange={handleChange} />
+                <Input label="State" name="state" required value={formData.state} onChange={handleChange} />
               </div>
-              <Input label="Postal Code" name="postal_code" value={formData.postal_code} onChange={handleChange} />
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Country" name="country" required value={formData.country} onChange={handleChange} />
+                <Input label="Postal Code" name="postal_code" value={formData.postal_code} onChange={handleChange} />
+              </div>
+              <div className="pt-2">
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Pinpoint Location on Map</label>
+                <LocationPickerMap
+                  latitude={formData.latitude}
+                  longitude={formData.longitude}
+                  onChange={(lat, lng) => setFormData({ ...formData, latitude: lat, longitude: lng })}
+                />
+                <p className="text-xs text-zinc-500 mt-1">Click on the map to set the exact coordinates of your venue.</p>
+              </div>
             </div>
           </div>
         )}
@@ -360,18 +380,15 @@ export default function CreateVenueWizard() {
         )}
 
         {currentStep === 2 && (
-          <div className="space-y-6">
-            <h4 className="font-medium text-zinc-900">Default Operating Hours</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Opening Time" name="open_time" type="time" value={formData.open_time} onChange={handleChange} />
-              <Input label="Closing Time" name="close_time" type="time" value={formData.close_time} onChange={handleChange} />
+            <div className="space-y-6">
+              <Input label="Opening Time" name="open_time" type="time" required value={formData.open_time} onChange={handleChange} />
+              <Input label="Closing Time" name="close_time" type="time" required value={formData.close_time} onChange={handleChange} />
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="spans_next_day" checked={formData.spans_next_day} onChange={handleChange} className="rounded text-brand focus:ring-brand" />
+                <span className="text-sm text-zinc-700">Closes next day</span>
+              </label>
+              <p className="text-sm text-zinc-500 italic mt-4">Per-day overrides can be set after creating the venue.</p>
             </div>
-            <label className="flex items-center gap-2 mt-4 text-sm font-medium text-zinc-700">
-              <input type="checkbox" name="spans_next_day" checked={formData.spans_next_day} onChange={handleChange} className="rounded text-brand focus:ring-brand" />
-              Operating hours span into the next day (e.g., closes after midnight)
-            </label>
-            <p className="text-sm text-zinc-500 italic mt-4">Per-day overrides can be set after creating the venue.</p>
-          </div>
         )}
 
         {currentStep === 3 && (
@@ -389,36 +406,36 @@ export default function CreateVenueWizard() {
                 </label>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              <Input label="Min Booking Duration (min)" name="min_booking_duration_minutes" type="number" value={formData.min_booking_duration_minutes} onChange={handleChange} />
-              <Input label="Max Booking Duration (min)" name="max_booking_duration_minutes" type="number" value={formData.max_booking_duration_minutes} onChange={handleChange} />
-              <Input label="Slot Interval (min)" name="slot_interval_minutes" type="number" value={formData.slot_interval_minutes} onChange={handleChange} />
-            </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Pre-Buffer (Setup time in min)" name="pre_buffer_minutes" type="number" value={formData.pre_buffer_minutes} onChange={handleChange} />
-              <Input label="Post-Buffer (Teardown time in min)" name="post_buffer_minutes" type="number" value={formData.post_buffer_minutes} onChange={handleChange} />
+                <Input label="Min Booking Duration (min)" name="min_booking_duration_minutes" type="number" min={1} required value={formData.min_booking_duration_minutes} onChange={handleChange} />
+                <Input label="Max Booking Duration (min)" name="max_booking_duration_minutes" type="number" min={1} required value={formData.max_booking_duration_minutes} onChange={handleChange} />
             </div>
+            <Input label="Slot Interval (min)" name="slot_interval_minutes" type="number" min={1} required value={formData.slot_interval_minutes} onChange={handleChange} helperText="e.g. 30 means bookings start at :00 and :30" />
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Owner Action Window (Hours)" name="owner_action_window_hours" type="number" min={24} max={72} value={formData.owner_action_window_hours} onChange={handleChange} />
+              <Input label="Pre-Buffer (Setup time in min)" name="pre_buffer_minutes" type="number" min={0} required value={formData.pre_buffer_minutes} onChange={handleChange} helperText="Gap required before a booking" />
+              <Input label="Post-Buffer (Teardown time in min)" name="post_buffer_minutes" type="number" min={0} required value={formData.post_buffer_minutes} onChange={handleChange} helperText="Gap required after a booking" />
             </div>
+            <Input label="Owner Action Window (Hours)" name="owner_action_window_hours" type="number" min={24} max={72} required value={formData.owner_action_window_hours} onChange={handleChange} helperText="How long you have to accept/reject a pending request before it auto-cancels." />
           </div>
         )}
 
         {currentStep === 4 && (
           <div className="space-y-6">
-
-            <div className="grid grid-cols-2 gap-4">
-              {(formData.pricing_mode === 'flat' || formData.pricing_mode === 'mixed') && (
-                <Input label="Base Price (₹)" name="base_price" type="number" value={formData.base_price} onChange={handleChange} placeholder="e.g. 50000" />
-              )}
-              {(formData.pricing_mode === 'hourly' || formData.pricing_mode === 'mixed') && (
-                <Input label="Hourly Rate (₹)" name="hourly_rate" type="number" value={formData.hourly_rate} onChange={handleChange} placeholder="e.g. 5000" />
-              )}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-zinc-700">Pricing Mode</label>
+              <select name="pricing_mode" value={formData.pricing_mode} onChange={handleChange} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
+                <option value="flat">Flat Rate (Per Day)</option>
+                <option value="hourly">Hourly Rate</option>
+                <option value="mixed">Mixed (Both)</option>
+              </select>
             </div>
-            <div className="space-y-4 pt-4 border-t border-zinc-100">
-              <h4 className="font-medium text-zinc-900">Payment Terms</h4>
-              <Input label="Token Advance (%)" name="advance_pct" type="number" value={formData.advance_pct} onChange={handleChange} />
-              <Input label="Balance Due (Days before event)" name="balance_due" type="number" value={formData.balance_due} onChange={handleChange} />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Base Price (₹)" name="base_price" type="number" min={0} required={formData.pricing_mode !== 'hourly'} disabled={formData.pricing_mode === 'hourly'} value={formData.base_price} onChange={handleChange} placeholder="e.g. 50000" />
+              <Input label="Hourly Rate (₹)" name="hourly_rate" type="number" min={0} required={formData.pricing_mode !== 'flat'} disabled={formData.pricing_mode === 'flat'} value={formData.hourly_rate} onChange={handleChange} placeholder="e.g. 5000" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Token Advance (%)" name="advance_pct" type="number" min={0.01} max={100} step="0.01" required value={formData.advance_pct} onChange={handleChange} />
+              <Input label="Balance Due (Days before event)" name="balance_due" type="number" min={1} required value={formData.balance_due} onChange={handleChange} />
             </div>
           </div>
         )}
@@ -429,28 +446,35 @@ export default function CreateVenueWizard() {
               Define your cancellation refund tiers. The hours must be in descending order (e.g. 168 hours = 7 days, 72 hours = 3 days).
             </p>
 
-            <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
-              <Input label="Tier 1: Cancel before (Hours)" name="tier_1_hours" type="number" value={formData.tier_1_hours} onChange={handleChange} placeholder="e.g. 168" />
-              <Input label="Refund %" name="tier_1_refund_pct" type="number" step="0.01" min="0" max="100" value={formData.tier_1_refund_pct} onChange={handleChange} placeholder="e.g. 100" />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Tier 1: Cancel before (Hours)" name="tier_1_hours" type="number" min={1} value={formData.tier_1_hours} onChange={handleChange} placeholder="e.g. 168" />
+              <Input label="Refund %" name="tier_1_refund_pct" type="number" step="0.01" min={0} max={100} value={formData.tier_1_refund_pct} onChange={handleChange} placeholder="e.g. 100" />
             </div>
-
-            <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
-              <Input label="Tier 2: Cancel before (Hours)" name="tier_2_hours" type="number" value={formData.tier_2_hours} onChange={handleChange} placeholder="e.g. 72" />
-              <Input label="Refund %" name="tier_2_refund_pct" type="number" step="0.01" min="0" max="100" value={formData.tier_2_refund_pct} onChange={handleChange} placeholder="e.g. 50" />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Tier 2: Cancel before (Hours)" name="tier_2_hours" type="number" min={1} value={formData.tier_2_hours} onChange={handleChange} placeholder="e.g. 72" />
+              <Input label="Refund %" name="tier_2_refund_pct" type="number" step="0.01" min={0} max={100} value={formData.tier_2_refund_pct} onChange={handleChange} placeholder="e.g. 50" />
             </div>
-
-            <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
-              <Input label="Tier 3: Cancel before (Hours) (Optional)" name="tier_3_hours" type="number" value={formData.tier_3_hours} onChange={handleChange} placeholder="e.g. 24" />
-              <Input label="Refund % (Optional)" name="tier_3_refund_pct" type="number" step="0.01" min="0" max="100" value={formData.tier_3_refund_pct} onChange={handleChange} placeholder="e.g. 25" />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Tier 3: Cancel before (Hours) (Optional)" name="tier_3_hours" type="number" min={1} value={formData.tier_3_hours} onChange={handleChange} placeholder="e.g. 24" />
+              <Input label="Refund % (Optional)" name="tier_3_refund_pct" type="number" step="0.01" min={0} max={100} value={formData.tier_3_refund_pct} onChange={handleChange} placeholder="e.g. 25" />
             </div>
-
-            <div className="pt-4 border-t border-zinc-100">
-              <Input label="No Show Refund (%)" name="no_show_refund_pct" type="number" step="0.01" min={0} max={100} value={formData.no_show_refund_pct} onChange={handleChange} />
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-100">
+              <Input label="No Show Refund (%)" name="no_show_refund_pct" type="number" step="0.01" min={0} max={100} required value={formData.no_show_refund_pct} onChange={handleChange} />
+              <Input label="Overdue Advance Refund (%)" name="overdue_advance_refund_pct" type="number" step="0.01" min={0} max={100} required value={formData.overdue_advance_refund_pct} onChange={handleChange} />
             </div>
-            
-            <div className="pt-4 border-t border-zinc-100">
-              <Input label="Overdue Advance Refund (%)" name="overdue_advance_refund_pct" type="number" step="0.01" min={0} max={100} value={formData.overdue_advance_refund_pct} onChange={handleChange} />
+            <div>
               <p className="text-xs text-zinc-500 mt-1">Refund given if you (the owner) fail to accept/reject a booking request in time.</p>
+            </div>
+            <div className="pt-4 border-t border-zinc-100">
+              <label className="block text-sm font-medium text-zinc-700 mb-1">Additional Policy Notes (Optional)</label>
+              <textarea 
+                name="notes"
+                value={formData.notes}
+                onChange={handleChange}
+                rows={3}
+                className="w-full px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                placeholder="e.g. In case of severe weather, full refunds are provided regardless of the cancellation window."
+              />
             </div>
           </div>
         )}
@@ -506,17 +530,18 @@ export default function CreateVenueWizard() {
             </div>
           </div>
         )}
-      </Card>
+        </Card>
 
-      {/* Footer Actions */}
-      <div className="mt-8 flex items-center justify-between">
-        <Button variant="ghost" onClick={handleBack} className={currentStep === 0 ? 'invisible' : ''}>
-          Previous Step
-        </Button>
-        <Button variant="primary" onClick={handleNext} disabled={submitting}>
-          {currentStep === STEPS.length - 1 ? (submitting ? 'Creating...' : 'Create Draft Workspace') : 'Continue'}
-        </Button>
-      </div>
+        {/* Footer Actions */}
+        <div className="mt-8 flex items-center justify-between">
+          <Button type="button" variant="ghost" onClick={handleBack} className={currentStep === 0 ? 'invisible' : ''}>
+            Previous Step
+          </Button>
+          <Button type="submit" variant="primary" disabled={submitting}>
+            {currentStep === STEPS.length - 1 ? (submitting ? 'Creating...' : 'Create Draft Workspace') : 'Continue'}
+          </Button>
+        </div>
+      </form>
     </div>
   )
 }

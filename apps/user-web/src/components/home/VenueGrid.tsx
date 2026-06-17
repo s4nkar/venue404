@@ -86,7 +86,7 @@ export function VenueGrid({
               <VenueCard
                 key={venue.id}
                 venue={venue}
-                onClick={() => onVenueClick(venue.id)}
+                onClick={() => onVenueClick(venue.slug || venue.id)}
               />
             ))}
           </div>

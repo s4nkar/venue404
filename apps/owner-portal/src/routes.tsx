@@ -16,6 +16,7 @@ import Rejected from './pages/Rejected'
 import CreateVenueWizard from './pages/venues/CreateVenueWizard'
 import VenueOverview from './pages/venues/VenueOverview'
 import VenueEdit from './pages/venues/VenueEdit'
+import VenueCalendarManagement from './pages/venues/VenueCalendarManagement'
 
 // Placeholders for future pages
 const Placeholder = ({ title }: { title: string }) => (
@@ -51,7 +52,7 @@ export const router = createBrowserRouter([
       { path: 'venues/new', element: <CreateVenueWizard /> },
       { path: 'venues/:venueId/overview', element: <VenueOverview /> },
       { path: 'venues/:venueId/edit/*', element: <VenueEdit /> },
-      { path: 'venues/:venueId/calendar', element: <Placeholder title="Venue Calendar" /> },
+      { path: 'venues/:venueId/calendar', element: <VenueCalendarManagement /> },
       { path: 'venues/:venueId/bookings', element: <Placeholder title="Venue Bookings Queue" /> },
 
       // Bookings

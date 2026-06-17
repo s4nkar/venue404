@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_EVEN
@@ -30,11 +31,19 @@ DEFAULT_PLATFORM_COMMISSION_PCT = Decimal("10.00")
 
 # Internal helpers
 
-def _get_venue_or_404(db: Session, venue_id: UUID) -> Venue:
-    venue = db.query(Venue).filter(
-        Venue.id == venue_id,
-        Venue.deleted_at.is_(None),
-    ).first()
+def _get_venue_or_404(db: Session, venue_id: str | UUID) -> Venue:
+    try:
+        vid = UUID(str(venue_id))
+        venue = db.query(Venue).filter(
+            Venue.id == vid,
+            Venue.deleted_at.is_(None),
+        ).first()
+    except ValueError:
+        venue = db.query(Venue).filter(
+            Venue.slug == str(venue_id),
+            Venue.deleted_at.is_(None),
+        ).first()
+
     if not venue:
         raise NotFoundError("Venue not found")
     return venue
@@ -42,16 +51,21 @@ def _get_venue_or_404(db: Session, venue_id: UUID) -> Venue:
 # Acquire exclusive write lock on Venue to serialize slot check and creation
 def _get_active_venue_or_404(
     db: Session,
-    venue_id: UUID,
+    venue_id: str | UUID,
     *,
     for_update: bool = False,
 ) -> Venue:
     query = db.query(Venue).filter(
-        Venue.id == venue_id,
         Venue.status == VenueStatus.approved,
         Venue.is_active.is_(True),
         Venue.deleted_at.is_(None),
     )
+
+    try:
+        vid = UUID(str(venue_id))
+        query = query.filter(Venue.id == vid)
+    except ValueError:
+        query = query.filter(Venue.slug == str(venue_id))
 
     if for_update:
         query = query.with_for_update()
@@ -79,13 +93,38 @@ def _format_inr(paise: int) -> str:
     return f"₹{rupees:,.0f}"
 
 
+def _generate_slug(db: Session, name: str) -> str:
+    base_slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+    if not base_slug:
+        base_slug = "venue"
+    
+    slug = base_slug
+    counter = 1
+    while db.query(Venue).filter(Venue.slug == slug).first():
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+    return slug
+
+
 # Public service functions
 
 def get_platform_amenities(db: Session) -> list[Amenity]:
     return db.query(Amenity).filter(Amenity.deleted_at.is_(None)).order_by(Amenity.name.asc()).all()
 
-def get_venue(db: Session, venue_id: UUID) -> Venue:
-    return _get_active_venue_or_404(db, venue_id)
+def get_venue(db: Session, identifier: str) -> Venue:
+    try:
+        venue_id = UUID(identifier)
+        return _get_active_venue_or_404(db, venue_id)
+    except ValueError:
+        venue = db.query(Venue).filter(
+            Venue.slug == identifier,
+            Venue.status == VenueStatus.approved,
+            Venue.is_active.is_(True),
+            Venue.deleted_at.is_(None),
+        ).first()
+        if not venue:
+            raise NotFoundError("Venue not found")
+        return venue
 
 
 def get_pricing_preview(
@@ -182,6 +221,7 @@ def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue
 
        
         name=body.name,
+        slug=_generate_slug(db, body.name),
         description=body.description,
         venue_type=body.venue_type.value,
 

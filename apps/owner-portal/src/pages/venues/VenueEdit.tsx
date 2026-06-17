@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Card, SectionHeader, Button, Input } from '@venue404/ui'
+import { Card, SectionHeader, Button, Input, LocationPickerMap } from '@venue404/ui'
 import { ArrowLeft } from 'lucide-react'
 import * as Icons from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
@@ -119,10 +119,17 @@ export default function VenueEdit() {
       updates.name = formData.get('name')
       updates.description = formData.get('description')
       updates.venue_type = formData.get('venue_type')
+      const minCap = formData.get('min_capacity')
+      updates.min_capacity = minCap ? parseInt(minCap as string, 10) : null
       updates.max_capacity = parseInt(formData.get('max_capacity') as string, 10)
       updates.city = formData.get('city')
       updates.state = formData.get('state')
+      updates.country = formData.get('country') || 'India'
+      updates.postal_code = formData.get('postal_code')
+      updates.latitude = venue.latitude
+      updates.longitude = venue.longitude
       updates.address_line1 = formData.get('address_line1')
+      updates.address_line2 = formData.get('address_line2')
     } else if (editSection === 'operating-hours') {
       const ot = formData.get('open_time') as string
       updates.open_time = ot.split(':').length === 2 ? ot + ':00' : ot
@@ -169,6 +176,7 @@ export default function VenueEdit() {
         const policyPayload: any = {
           no_show_refund_pct: parseFloat(formData.get('no_show_refund_pct') as string || '0'),
           platform_fee_refundable: false,
+          notes: formData.get('notes') as string || null,
         }
         
         const t1h = formData.get('tier_1_hours') as string
@@ -279,16 +287,31 @@ export default function VenueEdit() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <Input label="Max Capacity" name="max_capacity" type="number" defaultValue={venue.max_capacity} required />
-              </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Min Capacity" name="min_capacity" type="number" min={1} defaultValue={venue.min_capacity || ''} />
+                  <Input label="Max Capacity" name="max_capacity" type="number" min={1} defaultValue={venue.max_capacity} required />
+                </div>
 
               <div className="space-y-4 pt-4 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Location</h4>
                 <Input label="Address Line 1" name="address_line1" defaultValue={venue.address_line1} required />
+                <Input label="Address Line 2" name="address_line2" defaultValue={venue.address_line2} />
                 <div className="grid grid-cols-2 gap-4">
                   <Input label="City" name="city" defaultValue={venue.city} required />
                   <Input label="State" name="state" defaultValue={venue.state} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Country" name="country" defaultValue={venue.country || 'India'} required />
+                  <Input label="Postal Code" name="postal_code" defaultValue={venue.postal_code} />
+                </div>
+                <div className="pt-2">
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">Pinpoint Location on Map</label>
+                  <LocationPickerMap
+                    latitude={venue.latitude}
+                    longitude={venue.longitude}
+                    onChange={(lat, lng) => setVenue({ ...venue, latitude: lat, longitude: lng })}
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">Click on the map to set the exact coordinates of your venue.</p>
                 </div>
               </div>
             </div>
@@ -324,12 +347,20 @@ export default function VenueEdit() {
 
               <div className="space-y-4 pt-6 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Pricing</h4>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-zinc-700">Pricing Mode</label>
+                  <select name="pricing_mode" defaultValue={venue.pricing_mode} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
+                    <option value="flat">Flat Rate (Per Day)</option>
+                    <option value="hourly">Hourly Rate</option>
+                    <option value="mixed">Mixed (Both)</option>
+                  </select>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className={!allowFullDay ? 'opacity-50 pointer-events-none' : ''}>
-                    <Input label="Base Price (₹) (Full Day)" name="base_price" type="number" defaultValue={(venue.base_price_paise || 0) / 100} disabled={!allowFullDay} />
+                    <Input label="Base Price (₹) (Full Day)" name="base_price" type="number" min={0} defaultValue={(venue.starting_price_paise || 0) / 100} disabled={!allowFullDay} required={allowFullDay} />
                   </div>
                   <div className={!allowTimeSlot ? 'opacity-50 pointer-events-none' : ''}>
-                    <Input label="Hourly Rate (₹) (Time Slot)" name="hourly_rate" type="number" defaultValue={(venue.hourly_rate_paise || 0) / 100} disabled={!allowTimeSlot} />
+                    <Input label="Hourly Rate (₹) (Time Slot)" name="hourly_rate" type="number" min={0} defaultValue={(venue.hourly_rate_paise || 0) / 100} disabled={!allowTimeSlot} required={allowTimeSlot} />
                   </div>
                 </div>
                 <p className="text-sm text-zinc-500 italic mt-2">Prices will only be applied if the corresponding booking type is enabled above.</p>
@@ -337,29 +368,28 @@ export default function VenueEdit() {
 
               <div className="space-y-4 pt-6 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Payment Terms</h4>
-                <Input label="Token Advance (%)" name="advance_pct" type="number" step="0.01" defaultValue={venue.advance_pct} required />
-                <Input label="Balance Due (Days before event)" name="balance_due" type="number" defaultValue={venue.balance_due_days_before_event} required />
+                <Input label="Token Advance (%)" name="advance_pct" type="number" step="0.01" min={0.01} max={100} defaultValue={venue.advance_pct} required />
+                <Input label="Balance Due (Days before event)" name="balance_due" type="number" min={1} defaultValue={venue.balance_due_days_before_event} required />
               </div>
 
               <div className="space-y-4 pt-6 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Booking Limits & Buffers</h4>
                 <div className="grid grid-cols-3 gap-4">
-                  <Input label="Min Duration (min)" name="min_booking_duration_minutes" type="number" defaultValue={venue.min_booking_duration_minutes} required />
-                  <Input label="Max Duration (min)" name="max_booking_duration_minutes" type="number" defaultValue={venue.max_booking_duration_minutes} required />
-                  <Input label="Slot Interval (min)" name="slot_interval_minutes" type="number" defaultValue={venue.slot_interval_minutes} required />
+                  <Input label="Min Duration (min)" name="min_booking_duration_minutes" type="number" min={1} defaultValue={venue.min_booking_duration_minutes} required />
+                  <Input label="Max Duration (min)" name="max_booking_duration_minutes" type="number" min={1} defaultValue={venue.max_booking_duration_minutes} required />
+                  <Input label="Slot Interval (min)" name="slot_interval_minutes" type="number" min={1} defaultValue={venue.slot_interval_minutes} required helperText="e.g. 30 means bookings start at :00 and :30" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="Pre-Buffer (Setup min)" name="pre_buffer_minutes" type="number" defaultValue={venue.pre_buffer_minutes} required />
-                  <Input label="Post-Buffer (Teardown min)" name="post_buffer_minutes" type="number" defaultValue={venue.post_buffer_minutes} required />
+                  <Input label="Pre-Buffer (Setup min)" name="pre_buffer_minutes" type="number" min={0} defaultValue={venue.pre_buffer_minutes} required helperText="Gap required before a booking" />
+                  <Input label="Post-Buffer (Teardown min)" name="post_buffer_minutes" type="number" min={0} defaultValue={venue.post_buffer_minutes} required helperText="Gap required after a booking" />
                 </div>
               </div>
 
               <div className="space-y-4 pt-6 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Approval Window</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="Owner Action Window (Hours)" name="owner_action_window_hours" type="number" min={24} max={72} defaultValue={venue.owner_action_window_hours} required />
+                  <Input label="Owner Action Window (Hours)" name="owner_action_window_hours" type="number" min={24} max={72} defaultValue={venue.owner_action_window_hours} required helperText="How long you have to accept/reject a pending request before it auto-cancels." />
                 </div>
-                <p className="text-xs text-zinc-500">How long you have to accept/reject a pending request before it auto-cancels.</p>
               </div>
             </div>
           )}
@@ -532,28 +562,40 @@ export default function VenueEdit() {
                 Define your cancellation refund tiers. The hours must be in descending order (e.g. 168 hours = 7 days, 72 hours = 3 days).
               </p>
 
-              <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
-                <Input label="Tier 1: Cancel before (Hours)" name="tier_1_hours" type="number" defaultValue={venue.cancellation_policy?.tier_1_hours || ''} placeholder="e.g. 168" />
-                <Input label="Refund %" name="tier_1_refund_pct" type="number" step="0.01" min="0" max="100" defaultValue={venue.cancellation_policy?.tier_1_refund_pct || ''} placeholder="e.g. 100" />
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
+                  <Input label="Tier 1: Cancel before (Hours)" name="tier_1_hours" type="number" min={1} defaultValue={venue.cancellation_policy?.tier_1_hours || ''} placeholder="e.g. 168" />
+                  <Input label="Refund %" name="tier_1_refund_pct" type="number" step="0.01" min="0" max="100" defaultValue={venue.cancellation_policy?.tier_1_refund_pct || ''} placeholder="e.g. 100" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
+                  <Input label="Tier 2: Cancel before (Hours)" name="tier_2_hours" type="number" min={1} defaultValue={venue.cancellation_policy?.tier_2_hours || ''} placeholder="e.g. 72" />
+                  <Input label="Refund %" name="tier_2_refund_pct" type="number" step="0.01" min="0" max="100" defaultValue={venue.cancellation_policy?.tier_2_refund_pct || ''} placeholder="e.g. 50" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
+                  <Input label="Tier 3: Cancel before (Hours) (Optional)" name="tier_3_hours" type="number" min={1} defaultValue={venue.cancellation_policy?.tier_3_hours || ''} placeholder="e.g. 24" />
+                  <Input label="Refund % (Optional)" name="tier_3_refund_pct" type="number" step="0.01" min="0" max="100" defaultValue={venue.cancellation_policy?.tier_3_refund_pct || ''} placeholder="e.g. 25" />
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
-                <Input label="Tier 2: Cancel before (Hours)" name="tier_2_hours" type="number" defaultValue={venue.cancellation_policy?.tier_2_hours || ''} placeholder="e.g. 72" />
-                <Input label="Refund %" name="tier_2_refund_pct" type="number" step="0.01" min="0" max="100" defaultValue={venue.cancellation_policy?.tier_2_refund_pct || ''} placeholder="e.g. 50" />
+              <div className="grid grid-cols-2 gap-4 pt-6 border-t border-zinc-100">
+                <Input label="No Show Refund (%)" name="no_show_refund_pct" type="number" step="0.01" min="0" max="100" required defaultValue={venue.cancellation_policy?.no_show_refund_pct || '0'} />
+                <Input label="Overdue Advance Refund (%)" name="overdue_advance_refund_pct" type="number" step="0.01" min="0" max="100" required defaultValue={venue.overdue_advance_refund_pct || '0'} />
               </div>
-
-              <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
-                <Input label="Tier 3: Cancel before (Hours) (Optional)" name="tier_3_hours" type="number" defaultValue={venue.cancellation_policy?.tier_3_hours || ''} placeholder="e.g. 24" />
-                <Input label="Refund % (Optional)" name="tier_3_refund_pct" type="number" step="0.01" min="0" max="100" defaultValue={venue.cancellation_policy?.tier_3_refund_pct || ''} placeholder="e.g. 25" />
-              </div>
-
-              <div className="pt-4 border-t border-zinc-100">
-                <Input label="No Show Refund (%)" name="no_show_refund_pct" type="number" step="0.01" min="0" max="100" defaultValue={venue.cancellation_policy?.no_show_refund_pct || '0'} />
-              </div>
-              
-              <div className="pt-4 border-t border-zinc-100">
-                <Input label="Overdue Advance Refund (%)" name="overdue_advance_refund_pct" type="number" step="0.01" min="0" max="100" defaultValue={venue.overdue_advance_refund_pct || '0'} />
+              <div>
                 <p className="text-xs text-zinc-500 mt-1">Refund given if you (the owner) fail to accept/reject a booking request in time.</p>
+              </div>
+
+              <div className="pt-4 border-t border-zinc-100">
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Additional Policy Notes (Optional)</label>
+                <textarea 
+                  name="notes"
+                  defaultValue={venue.cancellation_policy?.notes || ''}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  placeholder="e.g. In case of severe weather, full refunds are provided regardless of the cancellation window."
+                />
               </div>
             </div>
           )}

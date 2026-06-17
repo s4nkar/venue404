@@ -85,9 +85,10 @@ export default function ManageVenues() {
           {filteredVenues.map(venue => {
             const coverPhoto = venue.photos?.find((p: any) => p.is_cover)?.image_url || venue.photos?.[0]?.image_url
             return (
-            <Card key={venue.id} className="overflow-hidden flex flex-col">
-              {/* Image Header */}
-              <div className="h-48 bg-zinc-100 relative border-b border-zinc-200 flex items-center justify-center">
+            <Link key={venue.id} to={`/venues/${venue.slug || venue.id}/overview`} className="block group">
+              <Card className="overflow-hidden flex flex-col h-full transition-all group-hover:shadow-md group-hover:border-zinc-300">
+                {/* Image Header */}
+                <div className="h-48 bg-zinc-100 relative border-b border-zinc-200 flex items-center justify-center">
                 {coverPhoto ? (
                   <img src={coverPhoto} alt={venue.name} className="w-full h-full object-cover" />
                 ) : (
@@ -130,15 +131,16 @@ export default function ManageVenues() {
               </div>
 
               {/* Action Footer */}
-              <div className="bg-zinc-50/50 p-3 border-t border-zinc-200">
-                <Link to={`/venues/${venue.id}/overview`} className="block">
-                  <Button variant="secondary" className="w-full flex items-center justify-center gap-2">
+              <div className="bg-zinc-50/50 p-3 border-t border-zinc-200 mt-auto">
+                <div className="block">
+                  <Button variant="secondary" className="w-full flex items-center justify-center gap-2 pointer-events-none">
                     <Settings className="h-4 w-4" />
                     Manage
                   </Button>
-                </Link>
+                </div>
               </div>
             </Card>
+            </Link>
           )})}
         </div>
       )}

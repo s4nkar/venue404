@@ -12,6 +12,8 @@ export const venueEndpoints = (client: ReturnType<typeof createClient>) => ({
   updateCancellationPolicy: (id: string, body: unknown) => client.put<any>(`/api/venues/${id}/cancellation-policy`, body),
   getPlatformAmenities: () => client.get<any[]>('/api/venues/amenities'),
   updateVenueAmenities: (id: string, body: unknown) => client.put<any>(`/api/venues/${id}/amenities`, body),
+  getVenueAvailability: (id: string) => client.get<any[]>(`/api/venues/${id}/availability`),
+  bulkUpdateVenueAvailability: (id: string, body: unknown) => client.put<any[]>(`/api/venues/${id}/availability`, body),
   getBlockedDates: (id: string) => client.get<any[]>(`/api/venues/${id}/blocked-dates`),
   createBlockedDate: (id: string, body: unknown) => client.post<any>(`/api/venues/${id}/blocked-dates`, body),
   deleteBlockedDate: (venueId: string, blockedId: string) => client.delete<any>(`/api/venues/${venueId}/blocked-dates/${blockedId}`),
