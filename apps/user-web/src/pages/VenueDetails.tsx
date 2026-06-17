@@ -1,15 +1,21 @@
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { createClient, venueEndpoints } from '@venue404/api-client'
-import { AppNavbar }             from '../components/shared/AppNavbar'
-import { VenueGallery }          from '../components/venue/VenueGallery'
-import { VenueInfo }             from '../components/venue/VenueInfo'
-import { AmenitiesList }         from '../components/venue/AmenitiesList'
-import { VenueReviews }          from '../components/venue/VenueReviews'
-import { VenueWhereYoullBe }     from '../components/venue/VenueWhereYoullBe'
-import { VenueMeetHost }         from '../components/venue/VenueMeetHost'
-import { VenueThingsToKnow }     from '../components/venue/VenueThingsToKnow'
-import { BookingPanel }          from '../components/venue/BookingPanel'
+import { toUtcIso } from '../utils'
+
+import { AppNavbar }                from '../components/shared/AppNavbar'
+import { VenueGallery }             from '../components/venue/VenueGallery'
+import { VenueInfo }                from '../components/venue/VenueInfo'
+import { AmenitiesList }            from '../components/venue/AmenitiesList'
+import { VenueAvailabilitySection } from '../components/venue/VenueAvailabilitySection'
+import { VenueReserveCard }         from '../components/venue/VenueReserveCard'
+import { VenueReviews }             from '../components/venue/VenueReviews'
+import { VenueWhereYoullBe }        from '../components/venue/VenueWhereYoullBe'
+import { VenueMeetHost }            from '../components/venue/VenueMeetHost'
+import { VenueThingsToKnow }        from '../components/venue/VenueThingsToKnow'
+
+import type { VenueResponse, AvailabilityResponse, PricingQuote, BookingType } from '../types'
 
 // ─── Section divider ──────────────────────────────────────────────────────────
 
@@ -22,23 +28,17 @@ function Divider() {
 function VenueDetailSkeleton() {
   return (
     <div className="animate-pulse space-y-8">
-      {/* Gallery */}
       <div className="h-[500px] w-full rounded-2xl bg-zinc-100" />
-
       <div className="flex flex-col gap-10 lg:flex-row lg:gap-16">
-        {/* Left */}
-        <div className="flex-1 space-y-8">
-          <div className="space-y-3">
-            <div className="h-9 w-2/3 rounded-xl bg-zinc-100" />
-            <div className="h-4 w-1/3 rounded bg-zinc-100" />
-            <div className="h-3.5 w-1/4 rounded bg-zinc-100" />
-          </div>
+        <div className="flex-1 space-y-6">
+          <div className="h-9 w-2/3 rounded-xl bg-zinc-100" />
+          <div className="h-4 w-1/3 rounded bg-zinc-100" />
           <div className="h-px w-full bg-zinc-100" />
           <div className="flex items-center gap-4">
             <div className="h-11 w-11 rounded-full bg-zinc-100" />
-            <div className="space-y-2">
-              <div className="h-4 w-32 rounded bg-zinc-100" />
-              <div className="h-3 w-24 rounded bg-zinc-100" />
+            <div className="space-y-2 flex-1">
+              <div className="h-4 w-40 rounded bg-zinc-100" />
+              <div className="h-3 w-28 rounded bg-zinc-100" />
             </div>
           </div>
           <div className="h-px w-full bg-zinc-100" />
@@ -52,10 +52,8 @@ function VenueDetailSkeleton() {
             </div>
           ))}
         </div>
-
-        {/* Right */}
         <div className="w-full lg:w-[400px] shrink-0">
-          <div className="h-[520px] rounded-2xl bg-zinc-100" />
+          <div className="h-[480px] rounded-2xl bg-zinc-100" />
         </div>
       </div>
     </div>
@@ -87,6 +85,148 @@ function VenueNotFound({ onBack }: { onBack: () => void }) {
       </button>
     </div>
   )
+}
+
+// ─── Booking logic (lifted from BookingPanel) ─────────────────────────────────
+
+function useVenueBooking(venue: VenueResponse) {
+  const navigate = useNavigate()
+  const client   = createClient()
+
+  const isTimeSlotVenue = venue.allowed_booking_types.includes('time_slot')
+  const isFullDayVenue  = venue.allowed_booking_types.includes('full_day')
+  const showTypeToggle  = isTimeSlotVenue && isFullDayVenue
+
+  const [bookingType,   setBookingType]   = useState<BookingType>(
+    isTimeSlotVenue && !isFullDayVenue ? 'time_slot' : 'full_day'
+  )
+  const [selectedDate,  setSelectedDate]  = useState<string | null>(null)
+  const [selectedStart, setSelectedStart] = useState<string | null>(null)
+  const [selectedEnd,   setSelectedEnd]   = useState<string | null>(null)
+  const [slotError,     setSlotError]     = useState<string | null>(null)
+
+  // Sync booking type if venue config changes
+  useEffect(() => {
+    if (isTimeSlotVenue && !isFullDayVenue)  setBookingType('time_slot')
+    else if (isFullDayVenue && !isTimeSlotVenue) setBookingType('full_day')
+  }, [isTimeSlotVenue, isFullDayVenue])
+
+  // Availability for selected date (needed for time slot picker)
+  const availQuery = useQuery<AvailabilityResponse>({
+    queryKey: ['availability-date', venue.id, selectedDate],
+    queryFn:  () => venueEndpoints(client).getDateAvailability(venue.id, toUtcIso(selectedDate)!),
+    enabled:  !!selectedDate,
+    staleTime: 2 * 60 * 1000,
+  })
+
+  // Auto-set full day start/end from operating window
+  useEffect(() => {
+    if (
+      bookingType === 'full_day' &&
+      selectedDate &&
+      availQuery.data?.operating_window?.is_available &&
+      !selectedStart
+    ) {
+      const ow = availQuery.data.operating_window
+      if (ow.opens_at && ow.closes_at) {
+        setSelectedStart(`${selectedDate}T${ow.opens_at.slice(0, 5)}:00`)
+        setSelectedEnd(`${selectedDate}T${ow.closes_at.slice(0, 5)}:00`)
+      }
+    }
+  }, [bookingType, availQuery.data, selectedDate, selectedStart])
+
+  // Pricing quote
+  const quoteEnabled = !!selectedDate && !!selectedStart && !!selectedEnd && selectedStart !== selectedEnd
+
+  const quoteQuery = useQuery<PricingQuote>({
+    queryKey: ['quote', venue.id, selectedStart, selectedEnd, bookingType],
+    queryFn:  () => venueEndpoints(client).getQuote(venue.id, {
+      starts_at:    toUtcIso(selectedStart)!,
+      ends_at:      toUtcIso(selectedEnd)!,
+      booking_type: bookingType,
+    }),
+    enabled:   quoteEnabled,
+    staleTime: 60 * 1000,
+  })
+
+  // Validate & navigate to checkout
+  const validateMutation = useMutation({
+    mutationFn: () =>
+      venueEndpoints(client).validateSlot(venue.id, {
+        booking_type: bookingType,
+        starts_at:    toUtcIso(selectedStart) ?? undefined,
+        ends_at:      toUtcIso(selectedEnd)   ?? undefined,
+        booking_date: bookingType === 'full_day' ? (toUtcIso(selectedDate) ?? undefined) : undefined,
+      }),
+    onSuccess: (validation) => {
+      if (!validation.valid) {
+        setSlotError('This slot is no longer available. Please choose another date.')
+        return
+      }
+      navigate('/checkout', {
+        state: {
+          venueId:         venue.id,
+          venueName:       venue.name,
+          venueCoverImage: venue.photos?.find((p) => p.is_cover)?.image_url ?? null,
+          bookingType,
+          startsAt:        validation.effective_starts_at,
+          endsAt:          validation.effective_ends_at,
+          bookingDate:     toUtcIso(selectedDate),
+          quote:           quoteQuery.data,
+        },
+      })
+    },
+    onError: (err: any) => setSlotError(err?.message ?? 'Unable to book. Please try again.'),
+  })
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  function handleBookingTypeChange(next: BookingType) {
+    if (next === bookingType) return
+    setBookingType(next)
+    setSelectedDate(null); setSelectedStart(null); setSelectedEnd(null); setSlotError(null)
+  }
+
+  function handleDateSelect(date: string) {
+    setSelectedDate(date)
+    setSelectedStart(null); setSelectedEnd(null); setSlotError(null)
+  }
+
+  function handleSlotSelect(start: string, end: string | null) {
+    setSelectedStart(start); setSelectedEnd(end); setSlotError(null)
+  }
+
+  function resetDate() {
+    setSelectedDate(null); setSelectedStart(null); setSelectedEnd(null); setSlotError(null)
+  }
+
+  function resetSlot() {
+    setSelectedStart(null); setSelectedEnd(null); setSlotError(null)
+  }
+
+  function handleBook() {
+    setSlotError(null)
+    validateMutation.mutate()
+  }
+
+  return {
+    bookingType, showTypeToggle,
+    selectedDate, selectedStart, selectedEnd,
+    slotError,
+    availability:  availQuery.data,
+    availLoading:  availQuery.isLoading,
+    availError:    availQuery.isError,
+    quote:         quoteQuery.data,
+    quoteLoading:  quoteQuery.isLoading,
+    quoteError:    quoteQuery.isError,
+    isPending:     validateMutation.isPending,
+    handleBookingTypeChange,
+    handleDateSelect,
+    handleSlotSelect,
+    resetDate,
+    resetSlot,
+    handleBook,
+  }
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -125,74 +265,115 @@ export default function VenueDetails() {
           <VenueNotFound onBack={() => navigate('/')} />
         )}
 
-        {venue && (
-          <>
-            {/* ── Gallery ──────────────────────────────────── */}
-            <VenueGallery photos={venue.photos ?? []} venueName={venue.name} />
-
-            {/* ── Two-column body ──────────────────────────── */}
-            <div className="mt-10 flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-16 xl:gap-20">
-
-              {/* ════ LEFT COLUMN ═══════════════════════════ */}
-              <div className="flex-1 min-w-0">
-
-                {/* 1 · Title, rating, hosted-by, highlights, description */}
-                <VenueInfo venue={venue} />
-
-                <Divider />
-
-                {/* 2 · What this place offers */}
-                <AmenitiesList amenities={venue.amenities ?? []} />
-
-                <Divider />
-
-                {/* 3 · Reviews */}
-                <VenueReviews />
-
-                <Divider />
-
-                {/* 4 · Where you'll be */}
-                <VenueWhereYoullBe venue={venue} />
-
-                <Divider />
-
-                {/* 5 · Meet your host */}
-                <VenueMeetHost venue={venue} />
-
-                <Divider />
-
-                {/* 6 · Things to know */}
-                <VenueThingsToKnow venue={venue} />
-
-                {/* Space so booking panel doesn't overlap on mobile */}
-                <div className="h-32 lg:hidden" />
-              </div>
-
-              {/* ════ RIGHT COLUMN — sticky reserve panel ═══ */}
-              <div className="w-full lg:w-[400px] xl:w-[420px] shrink-0">
-                <div className="lg:sticky lg:top-[82px]">
-                  <BookingPanel venue={venue} />
-
-                  {/* Trust micro-copy */}
-                  <div className="mt-5 space-y-3 px-1">
-                    {[
-                      { icon: '🛡️', text: 'No charge until the owner accepts your request' },
-                      { icon: '✓',  text: 'Verified venue on Venue404' },
-                      { icon: '↩',  text: 'Cancellation terms as per policy above' },
-                    ].map(({ icon, text }) => (
-                      <div key={text} className="flex items-start gap-2.5 text-xs text-zinc-400">
-                        <span className="mt-0.5">{icon}</span>
-                        <span>{text}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </>
-        )}
+        {venue && <VenueContent venue={venue} />}
       </main>
     </div>
+  )
+}
+
+// ─── Content (separate component so hooks run after venue loads) ──────────────
+
+function VenueContent({ venue }: { venue: VenueResponse }) {
+  const booking = useVenueBooking(venue)
+
+  return (
+    <>
+      {/* Gallery */}
+      <VenueGallery photos={venue.photos ?? []} venueName={venue.name} />
+
+      {/* Two-column body */}
+      <div className="mt-10 flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-16 xl:gap-20">
+
+        {/* ════ LEFT COLUMN ════════════════════════════════════ */}
+        <div className="flex-1 min-w-0">
+
+          {/* 1 · Title / hosted-by / highlights / description */}
+          <VenueInfo venue={venue} />
+
+          <Divider />
+
+          {/* 2 · Amenities */}
+          <AmenitiesList amenities={venue.amenities ?? []} />
+
+          <Divider />
+
+          {/* 3 · Date / time selection (two-month calendar) */}
+          <VenueAvailabilitySection
+            venue={venue}
+            bookingType={booking.bookingType}
+            selectedDate={booking.selectedDate}
+            selectedStart={booking.selectedStart}
+            selectedEnd={booking.selectedEnd}
+            availability={booking.availability}
+            availLoading={booking.availLoading}
+            availError={booking.availError}
+            onDateSelect={booking.handleDateSelect}
+            onSlotSelect={booking.handleSlotSelect}
+            onClearDate={booking.resetDate}
+            onClearSlot={booking.resetSlot}
+          />
+
+          <Divider />
+
+          {/* 4 · Reviews */}
+          <VenueReviews />
+
+          <Divider />
+
+          {/* 5 · Where you'll be */}
+          <VenueWhereYoullBe venue={venue} />
+
+          <Divider />
+
+          {/* 6 · Meet your host */}
+          <VenueMeetHost venue={venue} />
+
+          <Divider />
+
+          {/* 7 · Things to know */}
+          <VenueThingsToKnow venue={venue} />
+
+          {/* Mobile bottom padding */}
+          <div className="h-32 lg:hidden" />
+        </div>
+
+        {/* ════ RIGHT COLUMN — sticky reserve card ═════════════ */}
+        <div className="w-full lg:w-[400px] xl:w-[420px] shrink-0">
+          <div className="lg:sticky lg:top-[82px]">
+            <VenueReserveCard
+              venue={venue}
+              bookingType={booking.bookingType}
+              showTypeToggle={booking.showTypeToggle}
+              selectedDate={booking.selectedDate}
+              selectedStart={booking.selectedStart}
+              selectedEnd={booking.selectedEnd}
+              quote={booking.quote}
+              quoteLoading={booking.quoteLoading}
+              quoteError={booking.quoteError}
+              slotError={booking.slotError}
+              isPending={booking.isPending}
+              onBookingTypeChange={booking.handleBookingTypeChange}
+              onReset={booking.resetDate}
+              onBook={booking.handleBook}
+            />
+
+            {/* Trust micro-copy */}
+            <div className="mt-5 space-y-3 px-1">
+              {[
+                { icon: '🛡️', text: 'No charge until the owner accepts your request' },
+                { icon: '✓',  text: 'Verified venue on Venue404' },
+                { icon: '↩',  text: 'Cancellation terms as per the policy listed below' },
+              ].map(({ icon, text }) => (
+                <div key={text} className="flex items-start gap-2.5 text-xs text-zinc-400">
+                  <span className="mt-0.5">{icon}</span>
+                  <span>{text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </>
   )
 }
