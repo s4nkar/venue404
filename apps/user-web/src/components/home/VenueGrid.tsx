@@ -12,10 +12,10 @@ type SortKey = 'recommended' | 'price_asc' | 'price_desc' | 'capacity_desc'
 function sortVenues(venues: SearchResult[], sort: SortKey): SearchResult[] {
   const copy = [...venues]
   switch (sort) {
-    case 'price_asc':     return copy.sort((a, b) => (a.starting_price_paise ?? 0) - (b.starting_price_paise ?? 0))
-    case 'price_desc':    return copy.sort((a, b) => (b.starting_price_paise ?? 0) - (a.starting_price_paise ?? 0))
+    case 'price_asc': return copy.sort((a, b) => (a.starting_price_paise ?? 0) - (b.starting_price_paise ?? 0))
+    case 'price_desc': return copy.sort((a, b) => (b.starting_price_paise ?? 0) - (a.starting_price_paise ?? 0))
     case 'capacity_desc': return copy.sort((a, b) => (b.capacity ?? 0) - (a.capacity ?? 0))
-    default:              return copy
+    default: return copy
   }
 }
 
@@ -38,14 +38,14 @@ type Props = {
 
 function Breadcrumbs() {
   const [params] = useSearchParams()
-  const city      = params.get('city')
+  const city = params.get('city')
   const venueType = params.get('venue_type')
-  const q         = params.get('q')
+  const q = params.get('q')
 
   const crumbs: { label: string; href?: string }[] = [{ label: 'Home', href: '/' }]
-  if (city)               crumbs.push({ label: city })
-  if (venueType)          crumbs.push({ label: VENUE_TYPE_LABELS[venueType] ?? venueType })
-  else if (q)             crumbs.push({ label: `"${q}"` })
+  if (city) crumbs.push({ label: city })
+  if (venueType) crumbs.push({ label: VENUE_TYPE_LABELS[venueType] ?? venueType })
+  else if (q) crumbs.push({ label: `"${q}"` })
 
   return (
     <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-zinc-400">
@@ -67,9 +67,9 @@ function Breadcrumbs() {
 
 function ResultsHeading({ total, loading }: { total: number | null; loading: boolean }) {
   const [params] = useSearchParams()
-  const city      = params.get('city')
+  const city = params.get('city')
   const venueType = params.get('venue_type')
-  const q         = params.get('q')
+  const q = params.get('q')
 
   const typeLabel = venueType ? (VENUE_TYPE_LABELS[venueType] ?? venueType) : ''
   const parts = [typeLabel ? `${typeLabel} venues` : 'venues', city ? `in ${city}` : ''].filter(Boolean)
@@ -142,21 +142,21 @@ export function VenueGrid({
   onVenueClick, onRetry, onClearFilters,
   onVenueTypeChange, onCapacityChange,
 }: Props) {
-  const [sort, setSort]                           = useState<SortKey>('recommended')
-  const [page, setPage]                           = useState(1)
+  const [sort, setSort] = useState<SortKey>('recommended')
+  const [page, setPage] = useState(1)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   const activeFilterCount = [venueType, capacity].filter(Boolean).length
-  const sorted     = useMemo(() => sortVenues(venues, sort), [venues, sort])
+  const sorted = useMemo(() => sortVenues(venues, sort), [venues, sort])
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
-  const paged      = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   function handleSort(next: SortKey) { setSort(next); setPage(1) }
 
   const sidebarProps = {
     venueType, capacity,
     onVenueTypeChange: (t: string) => { onVenueTypeChange(t); setPage(1) },
-    onCapacityChange:  (v: string) => { onCapacityChange(v); setPage(1) },
+    onCapacityChange: (v: string) => { onCapacityChange(v); setPage(1) },
     onClearFilters,
     hasFilters,
     totalResults: total,
@@ -166,12 +166,12 @@ export function VenueGrid({
     <div className="bg-white">
       {/* Breadcrumb strip */}
       <div className="border-b border-zinc-100 bg-white px-6 py-3.5">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-7xl px-6">
           <Breadcrumbs />
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="flex gap-8">
 
           {/* Desktop sidebar */}
@@ -272,9 +272,8 @@ export function VenueGrid({
                     <button
                       key={p}
                       onClick={() => setPage(p)}
-                      className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-medium transition-colors ${
-                        isActive ? 'bg-zinc-900 text-white' : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
-                      }`}
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-zinc-900 text-white' : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
+                        }`}
                     >
                       {p}
                     </button>

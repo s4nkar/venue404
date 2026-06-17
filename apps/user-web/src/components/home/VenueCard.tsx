@@ -34,15 +34,15 @@ export function VenueCard({ venue, onClick }: Props) {
   return (
     <article
       onClick={onClick}
-      className="group cursor-pointer overflow-hidden rounded-2xl bg-white shadow-[0_1px_4px_rgba(0,0,0,0.08)] transition-all duration-200 hover:shadow-[0_6px_24px_rgba(0,0,0,0.12)] hover:-translate-y-0.5"
+      className="group cursor-pointer overflow-hidden"
     >
       {/* ── Image ── */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
+      <div className="relative aspect-[8/5] overflow-hidden rounded-2xl bg-zinc-100">
         {venue.cover_photo_url ? (
           <img
             src={venue.cover_photo_url}
             alt={venue.name}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-500rounded-2xl"
             loading="lazy"
           />
         ) : (
@@ -67,12 +67,12 @@ export function VenueCard({ venue, onClick }: Props) {
       </div>
 
       {/* ── Info ── */}
-      <div className="p-4">
-        <h3 className="truncate font-bold text-zinc-900 leading-snug transition-colors group-hover:text-brand">
+      <div className="py-3 px-1">
+        <h5 className="truncate font-medium text-zinc-900 leading-snug transition-colors group-hover:text-brand">
           {venue.name}
-        </h3>
+        </h5>
 
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="text-[.8rem] text-zinc-500">
           {venue.city}
           {venue.capacity != null && (
             <> &middot; Up to {venue.capacity.toLocaleString()} guests</>
@@ -83,7 +83,7 @@ export function VenueCard({ venue, onClick }: Props) {
           <p className="mt-1.5 text-sm font-semibold text-zinc-900">{priceLabel}</p>
         )}
 
-        <p className="mt-1.5 text-sm text-zinc-400 line-clamp-2">
+        <p className="mt-1.5 text-[.8rem] text-zinc-400 line-clamp-2">
           A {typeLabel.toLowerCase()} venue in {venue.city}. Available for events, conferences, and private hire.
         </p>
       </div>
