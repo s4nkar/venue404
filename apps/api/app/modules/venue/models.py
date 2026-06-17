@@ -77,10 +77,27 @@ class Venue(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     # Relationships
-    photos: Mapped[list["VenuePhoto"]] = relationship(back_populates="venue", cascade="all, delete-orphan")
-    amenities: Mapped[list["Amenity"]] = relationship(secondary="venue_amenities", back_populates="venues")
-    availability: Mapped[list["VenueAvailability"]] = relationship(back_populates="venue", cascade="all, delete-orphan")
-    blocked_dates: Mapped[list["VenueBlockedDate"]] = relationship(back_populates="venue", cascade="all, delete-orphan")
+    photos: Mapped[list["VenuePhoto"]] = relationship(
+        back_populates="venue", 
+        cascade="all, delete-orphan",
+        primaryjoin="and_(Venue.id==VenuePhoto.venue_id, VenuePhoto.deleted_at.is_(None))",
+        order_by="VenuePhoto.sort_order"
+    )
+    amenities: Mapped[list["Amenity"]] = relationship(
+        secondary="venue_amenities", 
+        back_populates="venues",
+        secondaryjoin="and_(VenueAmenity.amenity_id==Amenity.id, Amenity.deleted_at.is_(None))"
+    )
+    availability: Mapped[list["VenueAvailability"]] = relationship(
+        back_populates="venue", 
+        cascade="all, delete-orphan",
+        primaryjoin="and_(Venue.id==VenueAvailability.venue_id, VenueAvailability.deleted_at.is_(None))"
+    )
+    blocked_dates: Mapped[list["VenueBlockedDate"]] = relationship(
+        back_populates="venue", 
+        cascade="all, delete-orphan",
+        primaryjoin="and_(Venue.id==VenueBlockedDate.venue_id, VenueBlockedDate.deleted_at.is_(None))"
+    )
     cancellation_policy: Mapped["VenueCancellationPolicy"] = relationship(back_populates="venue", uselist=False, cascade="all, delete-orphan")
 
     __table_args__ = (
