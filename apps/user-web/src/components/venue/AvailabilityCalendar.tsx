@@ -15,8 +15,8 @@ const STATUS_DOT: Record<string, string | null> = {
 }
 
 function getDaysInMonthGrid(year: number, month: number): (string | null)[] {
-  const firstDay  = new Date(year, month, 1)
-  const startPad  = (firstDay.getDay() + 6) % 7
+  const firstDay    = new Date(year, month, 1)
+  const startPad    = (firstDay.getDay() + 6) % 7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const grid: (string | null)[] = []
   for (let i = 0; i < startPad; i++) grid.push(null)
@@ -25,17 +25,20 @@ function getDaysInMonthGrid(year: number, month: number): (string | null)[] {
   return grid
 }
 
-// ─── Single-month grid ────────────────────────────────────────────────────────
+// ─── Month grid ───────────────────────────────────────────────────────────────
 
 type MonthGridProps = {
-  year: number
-  month: number
-  dayMap: Map<string, CalendarDay>
-  isLoading: boolean
-  isError: boolean
-  selectedDate: string | null
-  onDateSelect: (date: string) => void
-  compact?: boolean
+  year:         number
+  month:        number
+  dayMap:       Map<string, CalendarDay>
+  isLoading:    boolean
+  isError:      boolean
+  rangeStart:   string | null
+  rangeEnd:     string | null
+  hoverDate:    string | null
+  compact?:     boolean
+  onDayClick:   (date: string) => void
+  onDayHover:   (date: string | null) => void
 }
 
 function DaySkeleton({ compact }: { compact?: boolean }) {
@@ -43,22 +46,23 @@ function DaySkeleton({ compact }: { compact?: boolean }) {
   return <div className={`${sz} rounded-full bg-zinc-100 animate-pulse`} />
 }
 
-function MonthGrid({ year, month, dayMap, isLoading, isError, selectedDate, onDateSelect, compact }: MonthGridProps) {
+function MonthGrid({
+  year, month, dayMap, isLoading, isError,
+  rangeStart, rangeEnd, hoverDate,
+  compact, onDayClick, onDayHover,
+}: MonthGridProps) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const grid = getDaysInMonthGrid(year, month)
 
-  const cellBase = compact
-    ? 'relative flex flex-col items-center justify-center h-8 w-8 rounded-full text-xs font-medium transition-all mx-auto '
-    : 'relative flex flex-col items-center justify-center h-10 w-10 rounded-full text-sm font-medium transition-all mx-auto '
+  const btnSize = compact ? 'h-8 w-8 text-xs' : 'h-10 w-10 text-sm'
 
   if (isError) {
-    return <p className="text-xs text-red-500 text-center py-4">Failed to load.</p>
+    return <p className="text-xs text-red-500 text-center py-4">Failed to load availability.</p>
   }
 
   return (
     <>
-      {/* Day-of-week headers */}
       <div className="grid grid-cols-7 mb-1">
         {DAY_LABELS.map((label) => (
           <div key={label} className={`text-center ${compact ? 'text-[10px]' : 'text-xs'} font-medium text-zinc-400 py-1`}>
@@ -67,12 +71,11 @@ function MonthGrid({ year, month, dayMap, isLoading, isError, selectedDate, onDa
         ))}
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-7 gap-y-0.5">
+      <div className="grid grid-cols-7">
         {grid.map((dateStr, i) => {
-          if (!dateStr) return <div key={`pad-${i}`} />
+          if (!dateStr) return <div key={`pad-${i}`} className="h-10" />
 
-          if (isLoading || !dayMap.size) {
+          if (isLoading) {
             return (
               <div key={dateStr} className="flex items-center justify-center py-0.5">
                 <DaySkeleton compact={compact} />
@@ -80,42 +83,65 @@ function MonthGrid({ year, month, dayMap, isLoading, isError, selectedDate, onDa
             )
           }
 
-          const calDay   = dayMap.get(dateStr)
-          const dateObj  = new Date(dateStr + 'T00:00:00')
-          const isPast   = dateObj < today
-          const isSelected = dateStr === selectedDate
+          const calDay    = dayMap.get(dateStr)
+          const dateObj   = new Date(dateStr + 'T00:00:00')
+          const isPast    = dateObj < today
+          const isDisabled = isPast || !calDay || !calDay.is_bookable ||
+            calDay.status === 'fully_booked' || calDay.status === 'blocked' || calDay.status === 'closed'
 
-          const isDisabled =
-            isPast || !calDay || !calDay.is_bookable ||
-            calDay.status === 'fully_booked' ||
-            calDay.status === 'blocked' ||
-            calDay.status === 'closed'
+          const isStart      = dateStr === rangeStart
+          const isEnd        = dateStr === rangeEnd
+          const isSingleDay  = rangeStart !== null && rangeStart === rangeEnd
+          const effectiveEnd = rangeEnd ?? (hoverDate && rangeStart && hoverDate > rangeStart ? hoverDate : null)
+          const isInRange    = !!(rangeStart && effectiveEnd && dateStr > rangeStart && dateStr < effectiveEnd)
+          const isHovering   = !rangeEnd && hoverDate === dateStr && rangeStart && dateStr > rangeStart
+          const hasRange     = !!(rangeStart && effectiveEnd && rangeStart !== effectiveEnd)
 
           const dot = calDay ? STATUS_DOT[calDay.status] : null
 
-          let cls = cellBase
-          if (isSelected) {
-            cls += 'bg-zinc-900 text-white shadow-sm'
+          // Range background strip (behind the circle)
+          let stripClass = 'absolute inset-y-0 hidden '
+          if (!isSingleDay) {
+            if (isInRange)                       stripClass = 'absolute inset-y-0 inset-x-0 bg-brand-light '
+            else if (isStart && hasRange)        stripClass = 'absolute inset-y-0 left-1/2 right-0 bg-brand-light '
+            else if ((isEnd || isHovering) && hasRange) stripClass = 'absolute inset-y-0 left-0 right-1/2 bg-brand-light '
+          }
+
+          // Circle button
+          let btnClass = `relative z-10 flex flex-col items-center justify-center ${btnSize} rounded-full font-medium transition-colors `
+          if (isStart || isEnd) {
+            btnClass += 'bg-zinc-900 text-white shadow-sm'
+          } else if (isInRange || isHovering) {
+            btnClass += 'text-zinc-800 font-semibold'
           } else if (isDisabled) {
-            cls += 'text-zinc-300 cursor-not-allowed line-through'
+            btnClass += 'text-zinc-300 cursor-not-allowed line-through'
           } else {
-            cls += calDay?.status === 'partially_booked'
+            btnClass += calDay?.status === 'partially_booked'
               ? 'text-zinc-700 hover:bg-amber-50 cursor-pointer'
               : 'text-zinc-700 hover:bg-brand-light cursor-pointer'
           }
 
           return (
-            <div key={dateStr} className="flex items-center justify-center py-0.5">
+            <div
+              key={dateStr}
+              className="relative flex items-center justify-center py-0.5"
+              onMouseEnter={() => !isDisabled && onDayHover(dateStr)}
+              onMouseLeave={() => onDayHover(null)}
+            >
+              {/* Range background strip */}
+              <div className={stripClass} />
+
+              {/* Day button */}
               <button
-                onClick={() => !isDisabled && onDateSelect(dateStr)}
+                onClick={() => !isDisabled && onDayClick(dateStr)}
                 disabled={isDisabled}
-                className={cls}
+                className={btnClass}
                 aria-label={dateStr}
-                aria-pressed={isSelected}
+                aria-pressed={isStart || isEnd}
               >
                 {new Date(dateStr + 'T00:00:00').getDate()}
-                {dot && !isSelected && (
-                  <span className={`absolute bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full ${dot}`} />
+                {dot && !isStart && !isEnd && (
+                  <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full ${dot}`} />
                 )}
               </button>
             </div>
@@ -130,9 +156,10 @@ function MonthGrid({ year, month, dayMap, isLoading, isError, selectedDate, onDa
 
 function Legend() {
   return (
-    <div className="flex items-center gap-4 mt-2 pt-3 border-t border-zinc-100">
+    <div className="flex items-center gap-4">
       <LegendItem color="bg-zinc-900" label="Selected" />
-      <LegendItem dot="bg-amber-400"  label="Partial" />
+      <LegendItem color="bg-brand-light" label="Range" />
+      <LegendItem dot="bg-amber-400" label="Partial" />
       <LegendItem color="bg-zinc-200" label="Unavailable" />
     </div>
   )
@@ -153,73 +180,70 @@ function LegendItem({ color, dot, label }: { color?: string; dot?: string; label
   )
 }
 
-// ─── Single-month calendar (used inside BookingPanel compact) ─────────────────
+// ─── Single-month calendar (used as compact fallback) ─────────────────────────
 
-type Props = {
-  venueId: string
+type SingleProps = {
+  venueId:      string
   selectedDate: string | null
   onDateSelect: (date: string) => void
 }
 
-export function AvailabilityCalendar({ venueId, selectedDate, onDateSelect }: Props) {
+export function AvailabilityCalendar({ venueId, selectedDate, onDateSelect }: SingleProps) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
   const [viewDate, setViewDate] = useState(() => {
     const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d
   })
-
-  const year  = viewDate.getFullYear()
-  const month = viewDate.getMonth()
-
-  const startDate = toDateString(viewDate)
-  const endDate   = toDateString(new Date(year, month + 1, 0))
+  const year = viewDate.getFullYear(), month = viewDate.getMonth()
 
   const { data, isLoading, isError } = useQuery({
     queryKey:  ['calendar', venueId, year, month],
-    queryFn:   () => venueEndpoints(createClient()).getCalendar(venueId, { start_date: startDate, end_date: endDate }),
+    queryFn:   () => venueEndpoints(createClient()).getCalendar(venueId, {
+      start_date: toDateString(viewDate),
+      end_date:   toDateString(new Date(year, month + 1, 0)),
+    }),
     staleTime: 5 * 60 * 1000,
   })
 
   const dayMap = new Map<string, CalendarDay>()
   data?.days.forEach((d: CalendarDay) => dayMap.set(d.date, d))
 
-  const canGoPrev =
-    year > today.getFullYear() || (year === today.getFullYear() && month > today.getMonth())
-
-  const monthLabel = viewDate.toLocaleString('en-IN', { month: 'long', year: 'numeric' })
+  const canGoPrev = year > today.getFullYear() || (year === today.getFullYear() && month > today.getMonth())
 
   return (
     <div className="select-none">
       <div className="flex items-center justify-between mb-3">
         <button onClick={() => setViewDate(addMonths(viewDate, -1))} disabled={!canGoPrev}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </button>
-        <span className="text-sm font-semibold text-zinc-800">{monthLabel}</span>
+        <span className="text-sm font-semibold">{viewDate.toLocaleString('en-IN', { month: 'long', year: 'numeric' })}</span>
         <button onClick={() => setViewDate(addMonths(viewDate, 1))}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors">
+          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
         </button>
       </div>
       <MonthGrid
-        year={year} month={month} dayMap={dayMap}
-        isLoading={isLoading} isError={isError}
-        selectedDate={selectedDate} onDateSelect={onDateSelect}
-        compact
+        year={year} month={month} dayMap={dayMap} isLoading={isLoading} isError={isError}
+        rangeStart={selectedDate} rangeEnd={selectedDate} hoverDate={null}
+        compact onDayClick={onDateSelect} onDayHover={() => {}}
       />
-      <Legend />
+      <div className="mt-3 pt-3 border-t border-zinc-100">
+        <Legend />
+      </div>
     </div>
   )
 }
 
-// ─── Double-month calendar (inline section on venue detail page) ──────────────
+// ─── Double-month calendar with range selection ───────────────────────────────
 
 type DoubleProps = {
-  venueId: string
-  selectedDate: string | null
-  onDateSelect: (date: string) => void
-  onClear: () => void
+  venueId:       string
+  startDate:     string | null
+  endDate:       string | null
+  onRangeChange: (start: string | null, end: string | null) => void
+  onClear:       () => void
 }
 
 function fetchMonth(venueId: string, year: number, month: number) {
@@ -228,78 +252,87 @@ function fetchMonth(venueId: string, year: number, month: number) {
   return venueEndpoints(createClient()).getCalendar(venueId, { start_date: start, end_date: end })
 }
 
-export function AvailabilityCalendarDouble({ venueId, selectedDate, onDateSelect, onClear }: DoubleProps) {
+export function AvailabilityCalendarDouble({ venueId, startDate, endDate, onRangeChange, onClear }: DoubleProps) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
   const [viewDate, setViewDate] = useState(() => {
     const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d
   })
+  const [hoverDate, setHoverDate] = useState<string | null>(null)
 
-  const year1  = viewDate.getFullYear()
-  const month1 = viewDate.getMonth()
-  const next   = addMonths(viewDate, 1)
-  const year2  = next.getFullYear()
-  const month2 = next.getMonth()
+  const year1 = viewDate.getFullYear(), month1 = viewDate.getMonth()
+  const next  = addMonths(viewDate, 1)
+  const year2 = next.getFullYear(),   month2 = next.getMonth()
 
-  const q1 = useQuery({
-    queryKey:  ['calendar', venueId, year1, month1],
-    queryFn:   () => fetchMonth(venueId, year1, month1),
-    staleTime: 5 * 60 * 1000,
-  })
-  const q2 = useQuery({
-    queryKey:  ['calendar', venueId, year2, month2],
-    queryFn:   () => fetchMonth(venueId, year2, month2),
-    staleTime: 5 * 60 * 1000,
-  })
+  const q1 = useQuery({ queryKey: ['calendar', venueId, year1, month1], queryFn: () => fetchMonth(venueId, year1, month1), staleTime: 5 * 60 * 1000 })
+  const q2 = useQuery({ queryKey: ['calendar', venueId, year2, month2], queryFn: () => fetchMonth(venueId, year2, month2), staleTime: 5 * 60 * 1000 })
 
   const map1 = new Map<string, CalendarDay>()
   q1.data?.days.forEach((d: CalendarDay) => map1.set(d.date, d))
   const map2 = new Map<string, CalendarDay>()
   q2.data?.days.forEach((d: CalendarDay) => map2.set(d.date, d))
 
-  const canGoPrev =
-    year1 > today.getFullYear() || (year1 === today.getFullYear() && month1 > today.getMonth())
+  const canGoPrev = year1 > today.getFullYear() || (year1 === today.getFullYear() && month1 > today.getMonth())
+
+  // Click logic: first click = start, second click = end (if ≥ start), both set = reset
+  function handleDayClick(date: string) {
+    if (!startDate || (startDate && endDate)) {
+      // No start yet OR both already set → set new start, clear end
+      onRangeChange(date, null)
+    } else {
+      // Have start, no end
+      if (date === startDate) {
+        onRangeChange(null, null)          // clicking start again → clear
+      } else if (date < startDate) {
+        onRangeChange(date, null)          // clicked before start → new start
+      } else {
+        onRangeChange(startDate, date)     // clicked after start → set end
+      }
+    }
+  }
 
   const label1 = viewDate.toLocaleString('en-IN', { month: 'long', year: 'numeric' })
-  const label2 = next.toLocaleString('en-IN', { month: 'long', year: 'numeric' })
+  const label2 = next.toLocaleString('en-IN',     { month: 'long', year: 'numeric' })
+
+  const sharedGridProps = { rangeStart: startDate, rangeEnd: endDate, hoverDate, onDayHover: setHoverDate }
 
   return (
     <div className="select-none">
-      {/* Two-month grid */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+      {/* ── Two months side by side ──────────────────────────── */}
+      <div className="grid grid-cols-1 gap-10 sm:grid-cols-2">
+
         {/* Month 1 */}
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-5 flex items-center justify-between">
             <button
               onClick={() => setViewDate(addMonths(viewDate, -1))}
               disabled={!canGoPrev}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              aria-label="Previous month"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <span className="text-sm font-semibold text-zinc-900">{label1}</span>
-            <div className="w-8" /> {/* spacer */}
+            <div className="h-8 w-8" />
           </div>
           <MonthGrid
             year={year1} month={month1} dayMap={map1}
             isLoading={q1.isLoading} isError={q1.isError}
-            selectedDate={selectedDate} onDateSelect={onDateSelect}
+            onDayClick={handleDayClick}
+            {...sharedGridProps}
           />
         </div>
 
         {/* Month 2 */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-8" /> {/* spacer */}
+          <div className="mb-5 flex items-center justify-between">
+            <div className="h-8 w-8" />
             <span className="text-sm font-semibold text-zinc-900">{label2}</span>
             <button
               onClick={() => setViewDate(addMonths(viewDate, 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
-              aria-label="Next month"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 transition-colors"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -309,20 +342,21 @@ export function AvailabilityCalendarDouble({ venueId, selectedDate, onDateSelect
           <MonthGrid
             year={year2} month={month2} dayMap={map2}
             isLoading={q2.isLoading} isError={q2.isError}
-            selectedDate={selectedDate} onDateSelect={onDateSelect}
+            onDayClick={handleDayClick}
+            {...sharedGridProps}
           />
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-4">
+      {/* ── Footer ───────────────────────────────────────────── */}
+      <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-4">
         <Legend />
-        {selectedDate && (
+        {(startDate || endDate) && (
           <button
             onClick={onClear}
             className="text-sm font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-900 transition-colors"
           >
-            Clear date
+            Clear dates
           </button>
         )}
       </div>

@@ -6,67 +6,96 @@ import { formatDate } from '../../utils'
 type Props = {
   venue:         VenueResponse
   bookingType:   BookingType
-  selectedDate:  string | null
+  startDate:     string | null
+  endDate:       string | null
   selectedStart: string | null
   selectedEnd:   string | null
   availability:  AvailabilityResponse | undefined
   availLoading:  boolean
   availError:    boolean
-  onDateSelect:  (date: string) => void
+  onRangeChange: (start: string | null, end: string | null) => void
   onSlotSelect:  (start: string, end: string | null) => void
-  onClearDate:   () => void
+  onClear:       () => void
   onClearSlot:   () => void
+}
+
+function daysBetween(a: string, b: string): number {
+  const ms = new Date(b + 'T00:00:00').getTime() - new Date(a + 'T00:00:00').getTime()
+  return Math.round(ms / (1000 * 60 * 60 * 24))
 }
 
 export function VenueAvailabilitySection({
   venue,
   bookingType,
-  selectedDate,
+  startDate,
+  endDate,
   selectedStart,
   selectedEnd,
   availability,
   availLoading,
   availError,
-  onDateSelect,
+  onRangeChange,
   onSlotSelect,
-  onClearDate,
+  onClear,
   onClearSlot,
 }: Props) {
-  const dateLabel = selectedDate ? formatDate(selectedDate + 'T00:00:00') : null
+  const startLabel = startDate ? formatDate(startDate + 'T00:00:00') : null
+  const endLabel   = endDate   ? formatDate(endDate   + 'T00:00:00') : null
+  const days       = startDate && endDate ? daysBetween(startDate, endDate) + 1 : null
+
+  const headerText =
+    startDate && endDate && bookingType === 'full_day'
+      ? days === 1
+        ? `1 day in ${venue.city}`
+        : `${days} days in ${venue.city}`
+      : startDate && bookingType === 'full_day'
+      ? 'Select end date'
+      : startDate && bookingType === 'time_slot'
+      ? `1 day in ${venue.city}`
+      : bookingType === 'full_day'
+      ? 'Select event dates'
+      : 'Select event date'
+
+  const subText =
+    startDate && endDate && bookingType === 'full_day'
+      ? `${startLabel} — ${endLabel}`
+      : startDate
+      ? startLabel ?? undefined
+      : undefined
 
   return (
     <div>
-      {/* ── Section header ──────────────────────────────────── */}
+      {/* ── Header ───────────────────────────────────────── */}
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-zinc-900">
-          {selectedDate ? `1 day in ${venue.city}` : 'Select event date'}
-        </h2>
-        {dateLabel && (
-          <p className="mt-1 text-sm text-zinc-500">{dateLabel}</p>
+        <h2 className="text-xl font-semibold text-zinc-900">{headerText}</h2>
+        {subText && <p className="mt-1 text-sm text-zinc-500">{subText}</p>}
+        {!startDate && bookingType === 'full_day' && (
+          <p className="mt-1 text-sm text-zinc-400">Click a start date, then click an end date</p>
+        )}
+        {startDate && !endDate && bookingType === 'full_day' && (
+          <p className="mt-1 text-sm text-zinc-400">Now click an end date, or click the same day for a 1-day event</p>
         )}
       </div>
 
-      {/* ── Double-month calendar ────────────────────────────── */}
+      {/* ── Double-month calendar ─────────────────────────── */}
       <AvailabilityCalendarDouble
         venueId={venue.id}
-        selectedDate={selectedDate}
-        onDateSelect={onDateSelect}
-        onClear={onClearDate}
+        startDate={startDate}
+        endDate={endDate}
+        onRangeChange={onRangeChange}
+        onClear={onClear}
       />
 
-      {/* ── Time slot picker (only for time_slot type) ──────── */}
-      {bookingType === 'time_slot' && selectedDate && (
+      {/* ── Time slot picker (time_slot only) ────────────── */}
+      {bookingType === 'time_slot' && startDate && (
         <div className="mt-8 border-t border-zinc-100 pt-8">
-          <h3 className="mb-4 text-base font-semibold text-zinc-900">Select time slot</h3>
+          <h3 className="mb-4 text-base font-semibold text-zinc-900">Select your time</h3>
 
           {availLoading && (
-            <div className="space-y-2.5">
-              <div className="h-4 w-28 bg-zinc-100 rounded animate-pulse" />
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className="h-10 bg-zinc-100 rounded-xl animate-pulse" />
-                ))}
-              </div>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="h-10 bg-zinc-100 rounded-xl animate-pulse" />
+              ))}
             </div>
           )}
 
@@ -78,7 +107,7 @@ export function VenueAvailabilitySection({
 
           {availability && !availLoading && (
             <TimeSlotPicker
-              date={selectedDate}
+              date={startDate}
               availability={availability}
               venueConfig={venue}
               selectedStart={selectedStart}
