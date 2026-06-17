@@ -156,7 +156,7 @@ export default function VenueEdit() {
       if (!allowFullDay && allowTimeSlot) calculatedPricingMode = 'hourly'
 
       updates.pricing_mode = calculatedPricingMode
-      updates.base_price_paise = parseInt(formData.get('base_price') as string || '0', 10) * 100
+      updates.starting_price_paise = parseInt(formData.get('base_price') as string || '0', 10) * 100
       updates.hourly_rate_paise = parseInt(formData.get('hourly_rate') as string || '0', 10) * 100
       updates.advance_pct = parseFloat(formData.get('advance_pct') as string)
       updates.balance_due_days_before_event = parseInt(formData.get('balance_due') as string, 10)
@@ -268,8 +268,8 @@ export default function VenueEdit() {
               <Input label="Venue Name" name="name" defaultValue={venue.name} required />
               
               <div className="space-y-1">
-                <label className="text-sm font-medium text-zinc-700">Venue Type</label>
-                <select name="venue_type" defaultValue={venue.venue_type} className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200">
+                <label className="text-sm font-medium text-zinc-700">Venue Type<span className="text-red-500 ml-1">*</span></label>
+                <select name="venue_type" defaultValue={venue.venue_type} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200">
                   <option value="banquet_hall">Banquet Hall</option>
                   <option value="conference_room">Conference Room</option>
                   <option value="rooftop">Rooftop</option>
@@ -348,7 +348,7 @@ export default function VenueEdit() {
               <div className="space-y-4 pt-6 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Pricing</h4>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-zinc-700">Pricing Mode</label>
+                  <label className="text-sm font-medium text-zinc-700">Pricing Mode<span className="text-red-500 ml-1">*</span></label>
                   <select name="pricing_mode" defaultValue={venue.pricing_mode} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
                     <option value="flat">Flat Rate (Per Day)</option>
                     <option value="hourly">Hourly Rate</option>

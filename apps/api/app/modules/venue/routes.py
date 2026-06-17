@@ -46,7 +46,7 @@ def list_my_venues(
 
 @router.get("/my/venues/{venue_id}", response_model=VenueResponse)
 def get_my_venue(
-    venue_id: str,
+    venue_id: UUID,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
 ):
@@ -65,7 +65,7 @@ def create_venue(
 
 @router.patch("/{venue_id}", response_model=VenueResponse)
 def update_venue(
-    venue_id: str,
+    venue_id: UUID,
     body: UpdateVenueRequest,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
@@ -76,7 +76,7 @@ def update_venue(
 
 @router.delete("/{venue_id}", response_model=DeleteResponse, status_code=200)
 def delete_venue(
-    venue_id: str,
+    venue_id: UUID,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
 ):
@@ -87,7 +87,7 @@ def delete_venue(
 
 @router.post("/{venue_id}/submit", response_model=VenueResponse)
 def submit_venue(
-    venue_id: str,
+    venue_id: UUID,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
 ):
@@ -96,7 +96,7 @@ def submit_venue(
 
 @router.put("/{venue_id}/availability", response_model=list[VenueAvailabilityResponse])
 def bulk_update_availability(
-    venue_id: str,
+    venue_id: UUID,
     body: BulkUpdateAvailabilityRequest,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
@@ -106,7 +106,7 @@ def bulk_update_availability(
 
 @router.post("/{venue_id}/blocked-dates", response_model=VenueBlockedDateResponse, status_code=201)
 def create_blocked_date(
-    venue_id: str,
+    venue_id: UUID,
     body: CreateBlockedDateRequest,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
@@ -116,7 +116,7 @@ def create_blocked_date(
 
 @router.delete("/{venue_id}/blocked-dates/{blocked_id}", response_model=DeleteResponse, status_code=200)
 def delete_blocked_date(
-    venue_id: str,
+    venue_id: UUID,
     blocked_id: UUID,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
@@ -127,7 +127,7 @@ def delete_blocked_date(
 
 @router.put("/{venue_id}/cancellation-policy", response_model=CancellationPolicyResponse)
 def put_venue_cancellation_policy(
-    venue_id: str,
+    venue_id: UUID,
     body: UpdateCancellationPolicyRequest,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
@@ -137,7 +137,7 @@ def put_venue_cancellation_policy(
 
 @router.put("/{venue_id}/amenities", response_model=list[AmenityResponse])
 def update_venue_amenities(
-    venue_id: str,
+    venue_id: UUID,
     body: UpdateVenueAmenitiesRequest,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
@@ -147,7 +147,7 @@ def update_venue_amenities(
 
 @router.post("/{venue_id}/photos", response_model=VenuePhotoResponse, status_code=201)
 async def add_venue_photo(
-    venue_id: str,
+    venue_id: UUID,
     file: UploadFile = File(...),
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
@@ -161,7 +161,7 @@ async def add_venue_photo(
 
 @router.put("/{venue_id}/photos/bulk-update", response_model=list[VenuePhotoResponse])
 def bulk_update_venue_photos(
-    venue_id: str,
+    venue_id: UUID,
     body: BulkUpdateVenuePhotosRequest,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
@@ -171,7 +171,7 @@ def bulk_update_venue_photos(
 
 @router.delete("/{venue_id}/photos/{photo_id}", response_model=DeleteResponse, status_code=200)
 def delete_venue_photo(
-    venue_id: str,
+    venue_id: UUID,
     photo_id: UUID,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
@@ -182,7 +182,7 @@ def delete_venue_photo(
 
 @router.get("/{venue_id}/bookings", response_model=list[BookingOut])
 def list_venue_bookings(
-    venue_id: str,
+    venue_id: UUID,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
 ):
@@ -191,7 +191,7 @@ def list_venue_bookings(
 
 @router.get("/{venue_id}/bookings/pending", response_model=list[BookingOut])
 def list_pending_venue_bookings(
-    venue_id: str,
+    venue_id: UUID,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
 ):
@@ -226,7 +226,7 @@ def get_venue(
 
 @router.get("/{venue_id}/pricing", response_model=PricingPreviewResponse)
 def get_pricing_preview(
-    venue_id: str,
+    venue_id: UUID,
     starts_at: str = Query(..., description="ISO 8601 datetime with timezone offset"),
     ends_at: str = Query(..., description="ISO 8601 datetime with timezone offset"),
     booking_type: BookingType = Query(..., description="full_day or time_slot"),
@@ -239,7 +239,7 @@ def get_pricing_preview(
 
 @router.get("/{venue_id}/availability", response_model=list[VenueAvailabilityResponse])
 def get_venue_availability(
-    venue_id: str,
+    venue_id: UUID,
     db: Session = Depends(get_db),
 ):
     return service.get_venue_availability(db, venue_id)
@@ -247,7 +247,7 @@ def get_venue_availability(
 
 @router.get("/{venue_id}/blocked-dates", response_model=list[PublicVenueBlockedDateResponse])
 def get_venue_blocked_dates(
-    venue_id: str,
+    venue_id: UUID,
     db: Session = Depends(get_db),
 ):
     return service.get_venue_blocked_dates(db, venue_id)
@@ -255,7 +255,7 @@ def get_venue_blocked_dates(
 
 @router.get("/{venue_id}/cancellation-policy", response_model=CancellationPolicyResponse)
 def get_venue_cancellation_policy(
-    venue_id: str,
+    venue_id: UUID,
     db: Session = Depends(get_db),
 ):
     return service.get_venue_cancellation_policy(db, venue_id)

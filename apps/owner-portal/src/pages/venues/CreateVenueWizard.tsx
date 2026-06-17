@@ -160,7 +160,7 @@ export default function CreateVenueWizard() {
       pre_buffer_minutes: parseInt(formData.pre_buffer_minutes.toString(), 10),
       post_buffer_minutes: parseInt(formData.post_buffer_minutes.toString(), 10),
       pricing_mode: formData.pricing_mode,
-      base_price_paise: (formData.pricing_mode === 'flat' || formData.pricing_mode === 'mixed') ? parseInt(formData.base_price.toString() || '0', 10) * 100 : null,
+      starting_price_paise: (formData.pricing_mode === 'flat' || formData.pricing_mode === 'mixed') ? parseInt(formData.base_price.toString() || '0', 10) * 100 : null,
       hourly_rate_paise: (formData.pricing_mode === 'hourly' || formData.pricing_mode === 'mixed') ? parseInt(formData.hourly_rate.toString() || '0', 10) * 100 : null,
       advance_pct: parseFloat(formData.advance_pct.toString()),
       balance_due_days_before_event: parseInt(formData.balance_due.toString(), 10),
@@ -219,7 +219,7 @@ export default function CreateVenueWizard() {
         }
       }
 
-      navigate(`/venues/${newVenue.slug || newVenue.id}/overview`)
+      navigate(`/venues/${newVenue.id}/overview`)
     } catch (err: any) {
       console.error('Failed to create venue', err)
       setError(err.message || 'Failed to create venue. Check your inputs.')
@@ -286,7 +286,7 @@ export default function CreateVenueWizard() {
             <div className="space-y-6">
               <Input label="Venue Name" name="name" value={formData.name} onChange={handleChange} placeholder="e.g. Skyline Rooftop" required />
               <div className="space-y-1">
-                <label className="text-sm font-medium text-zinc-700">Venue Type</label>
+                <label className="text-sm font-medium text-zinc-700">Venue Type<span className="text-red-500 ml-1">*</span></label>
                 <select name="venue_type" value={formData.venue_type} onChange={handleChange} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
                 <option value="">Select a type...</option>
                 <option value="banquet_hall">Banquet Hall</option>
@@ -422,7 +422,7 @@ export default function CreateVenueWizard() {
         {currentStep === 4 && (
           <div className="space-y-6">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-700">Pricing Mode</label>
+              <label className="text-sm font-medium text-zinc-700">Pricing Mode<span className="text-red-500 ml-1">*</span></label>
               <select name="pricing_mode" value={formData.pricing_mode} onChange={handleChange} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
                 <option value="flat">Flat Rate (Per Day)</option>
                 <option value="hourly">Hourly Rate</option>

@@ -49,18 +49,27 @@ export default function VenueCalendarManagement() {
           venueEndpoints(client).getBlockedDates(venueId)
         ])
         
-        // Initialize 7 days if empty
-        if (availData && availData.length > 0) {
-          setAvailabilities(availData)
-        } else {
-          setAvailabilities(DAYS_OF_WEEK.map((_, idx) => ({
-            day_of_week: idx,
-            is_available: true,
-            opens_at: '09:00:00',
-            closes_at: '18:00:00',
-            spans_next_day: false
-          })))
-        }
+        // Always show all 7 days; merge backend data over defaults
+        const defaults: Availability[] = DAYS_OF_WEEK.map((_, idx) => ({
+          day_of_week: idx,
+          is_available: true,
+          opens_at: '09:00:00',
+          closes_at: '18:00:00',
+          spans_next_day: false,
+        }))
+
+        const merged = defaults.map(def => {
+          const existing = availData?.find((a: any) => a.day_of_week === def.day_of_week)
+          return existing ? {
+            day_of_week: existing.day_of_week,
+            is_available: existing.is_available,
+            opens_at: existing.opens_at,
+            closes_at: existing.closes_at,
+            spans_next_day: existing.spans_next_day,
+          } : def
+        })
+
+        setAvailabilities(merged)
         
         if (blockedData) {
           setBlockedDates(blockedData)
@@ -92,7 +101,25 @@ export default function VenueCalendarManagement() {
       const data = await venueEndpoints(client).bulkUpdateVenueAvailability(venueId, {
         availabilities
       })
-      setAvailabilities(data)
+      // Re-merge returned data so all 7 days remain visible
+      const defaults: Availability[] = DAYS_OF_WEEK.map((_, idx) => ({
+        day_of_week: idx,
+        is_available: true,
+        opens_at: '09:00:00',
+        closes_at: '18:00:00',
+        spans_next_day: false,
+      }))
+      const merged = defaults.map(def => {
+        const saved = data?.find((a: any) => a.day_of_week === def.day_of_week)
+        return saved ? {
+          day_of_week: saved.day_of_week,
+          is_available: saved.is_available,
+          opens_at: saved.opens_at,
+          closes_at: saved.closes_at,
+          spans_next_day: saved.spans_next_day,
+        } : def
+      })
+      setAvailabilities(merged)
       alert("Weekly schedule saved successfully.")
     } catch (err: any) {
       setError(err.message || "Failed to save schedule")

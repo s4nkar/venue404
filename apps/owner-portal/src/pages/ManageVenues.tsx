@@ -85,7 +85,7 @@ export default function ManageVenues() {
           {filteredVenues.map(venue => {
             const coverPhoto = venue.photos?.find((p: any) => p.is_cover)?.image_url || venue.photos?.[0]?.image_url
             return (
-            <Link key={venue.id} to={`/venues/${venue.slug || venue.id}/overview`} className="block group">
+            <Link key={venue.id} to={`/venues/${venue.id}/overview`} className="block group">
               <Card className="overflow-hidden flex flex-col h-full transition-all group-hover:shadow-md group-hover:border-zinc-300">
                 {/* Image Header */}
                 <div className="h-48 bg-zinc-100 relative border-b border-zinc-200 flex items-center justify-center">

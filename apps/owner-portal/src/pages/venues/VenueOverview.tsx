@@ -114,20 +114,22 @@ export default function VenueOverview() {
       </div>
 
       {/* Calendar & Availability */}
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-medium text-zinc-900">Calendar & Availability</h3>
-            <p className="text-sm text-zinc-500 mt-1">Manage your regular weekly hours and block off dates for maintenance or private events.</p>
+      {venue.status === 'approved' && (
+        <Card className="p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-medium text-zinc-900">Calendar & Availability</h3>
+              <p className="text-sm text-zinc-500 mt-1">Manage your regular weekly hours and block off dates for maintenance or private events.</p>
+            </div>
+            <Link to={`/venues/${venueId}/calendar`}>
+              <Button variant="primary">
+                <CalendarDays className="h-4 w-4 mr-2" />
+                Manage Calendar
+              </Button>
+            </Link>
           </div>
-          <Link to={`/venues/${venueId}/calendar`}>
-            <Button variant="primary">
-              <CalendarDays className="h-4 w-4 mr-2" />
-              Manage Calendar
-            </Button>
-          </Link>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       {/* Quick Edit Links */}
       <Card className="p-6">
