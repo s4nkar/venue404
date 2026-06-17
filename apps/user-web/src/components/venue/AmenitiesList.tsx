@@ -16,7 +16,7 @@ export function AmenitiesList({ amenities }: Props) {
             {a.icon ? (
               <span className="text-base leading-none">{a.icon}</span>
             ) : (
-              <svg className="h-3.5 w-3.5 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="h-3.5 w-3.5 shrink-0 text-brand-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
             )}

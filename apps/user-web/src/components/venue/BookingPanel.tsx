@@ -45,7 +45,7 @@ function StepDots({ step, bookingType }: { step: Step; bookingType: BookingType 
         <div
           key={s}
           className={`h-1.5 rounded-full transition-all duration-300 ${
-            i <= idx ? 'w-4 bg-blue-600' : 'w-1.5 bg-zinc-200'
+            i <= idx ? 'w-4 bg-brand' : 'w-1.5 bg-zinc-200'
           }`}
         />
       ))}
@@ -276,7 +276,7 @@ export function BookingPanel({ venue }: Props) {
                 onClick={() => handleBookingTypeChange('full_day')}
                 className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
                   bookingType === 'full_day'
-                    ? 'border-blue-600 bg-blue-600 text-white'
+                    ? 'border-brand bg-brand text-white'
                     : 'border-zinc-200 bg-white hover:border-zinc-300'
                 }`}
               >
@@ -288,7 +288,7 @@ export function BookingPanel({ venue }: Props) {
                 onClick={() => handleBookingTypeChange('time_slot')}
                 className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
                   bookingType === 'time_slot'
-                    ? 'border-blue-600 bg-blue-600 text-white'
+                    ? 'border-brand bg-brand text-white'
                     : 'border-zinc-200 bg-white hover:border-zinc-300'
                 }`}
               >
@@ -336,7 +336,7 @@ export function BookingPanel({ venue }: Props) {
 
             <button
               onClick={resetDate}
-              className="mt-3 text-xs font-medium text-blue-500 hover:text-blue-700"
+              className="mt-3 text-xs font-medium text-brand hover:text-brand-hover"
             >
               Change
             </button>
@@ -459,7 +459,7 @@ export function BookingPanel({ venue }: Props) {
               validateMutation.mutate()
             }}
             disabled={!readyToBook || validateMutation.isPending}
-            className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full rounded-xl bg-brand py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {validateMutation.isPending ? (
               <span className="flex items-center justify-center gap-2">

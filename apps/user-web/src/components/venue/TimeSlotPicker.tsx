@@ -155,7 +155,7 @@ export function TimeSlotPicker({
         {selectedStartMin != null && (
           <button
             onClick={onClear}
-            className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+            className="text-xs text-brand hover:text-brand-hover transition-colors"
           >
             Clear
           </button>
@@ -163,16 +163,16 @@ export function TimeSlotPicker({
       </div>
 
       {selectedStartMin != null && selectedEndMin == null && (
-        <div className="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+        <div className="mb-3 rounded-lg bg-brand-light px-3 py-2 text-xs text-brand">
           Start selected: <strong>{formatTime(selectedStart!)}</strong> · Select an end time
         </div>
       )}
 
       {/* Duration hint */}
       {selectedStartMin != null && selectedEndMin != null && (
-        <div className="mb-3 flex items-center gap-2 text-xs text-zinc-500 bg-blue-50 rounded-lg px-3 py-2">
+        <div className="mb-3 flex items-center gap-2 text-xs text-zinc-500 bg-brand-light rounded-lg px-3 py-2">
           <svg
-            className="h-3.5 w-3.5 text-blue-400"
+            className="h-3.5 w-3.5 text-brand-secondary"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -186,7 +186,7 @@ export function TimeSlotPicker({
           </svg>
           <span>
             {formatTime(selectedStart!)} – {formatTime(selectedEnd!)} ·{' '}
-            <strong className="text-blue-700">
+            <strong className="text-brand">
               {durationLabel(selectedStartMin, selectedEndMin)}
             </strong>
           </span>
@@ -218,14 +218,14 @@ export function TimeSlotPicker({
           let cls = 'px-2 py-2 rounded-lg text-xs font-medium text-center transition-all border '
 
           if (isStart || isEnd) {
-            cls += 'bg-blue-600 text-white border-blue-600'
+            cls += 'bg-brand text-white border-brand'
           } else if (isInRange) {
-            cls += 'bg-blue-50 text-blue-700 border-blue-200'
+            cls += 'bg-brand-light text-brand border-brand-muted'
           } else if (isDisabled) {
             cls += 'bg-zinc-50 text-zinc-300 border-zinc-100 cursor-not-allowed'
           } else {
             cls +=
-              'bg-white text-zinc-700 border-zinc-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
+              'bg-white text-zinc-700 border-zinc-200 hover:border-brand-muted hover:bg-brand-light cursor-pointer'
           }
 
           return (

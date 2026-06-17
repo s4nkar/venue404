@@ -9,7 +9,7 @@ export function VenueInfo({ venue }: Props) {
   return (
     <div className="space-y-3">
       {/* Type badge */}
-      <span className="inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 border border-blue-100">
+      <span className="inline-block rounded-full bg-brand-light px-3 py-1 text-xs font-semibold text-brand border border-brand-light-strong">
         {VENUE_TYPE_LABELS[venue.venue_type] ?? venue.venue_type}
       </span>
 

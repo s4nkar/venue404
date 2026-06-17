@@ -161,14 +161,14 @@ export function AvailabilityCalendar({ venueId, selectedDate, onDateSelect }: Pr
               'relative flex flex-col items-center justify-center h-9 w-9 rounded-full text-sm font-medium transition-all mx-auto '
 
             if (isSelected) {
-              cellClass += 'bg-blue-600 text-white shadow-sm'
+              cellClass += 'bg-brand text-white shadow-sm'
             } else if (isDisabled) {
               cellClass += 'text-zinc-300 cursor-not-allowed'
             } else {
               cellClass +=
                 calDay?.status === 'partially_booked'
                   ? 'text-zinc-700 hover:bg-amber-50 cursor-pointer'
-                  : 'text-zinc-700 hover:bg-blue-50 cursor-pointer'
+                  : 'text-zinc-700 hover:bg-brand-light cursor-pointer'
             }
 
             return (
@@ -195,7 +195,7 @@ export function AvailabilityCalendar({ venueId, selectedDate, onDateSelect }: Pr
 
       {/* Legend */}
       <div className="flex items-center gap-4 mt-3 pt-3 border-t border-zinc-100">
-        <LegendItem color="bg-blue-600" label="Selected" />
+        <LegendItem color="bg-brand" label="Selected" />
         <LegendItem dot="bg-amber-400" label="Partial" />
         <LegendItem color="bg-zinc-200" label="Unavailable" />
       </div>

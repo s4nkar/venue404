@@ -103,11 +103,11 @@ function BookingSummaryCard({
         <QuoteBreakdown source="quote" quote={quote} />
 
         {/* Advance callout */}
-        <div className="mt-4 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
-          <p className="text-sm font-semibold text-blue-800">
+        <div className="mt-4 rounded-xl bg-brand-light border border-brand-light-strong px-4 py-3">
+          <p className="text-sm font-semibold text-brand">
             {formatPrice(quote.advance_due_paise)} due now
           </p>
-          <p className="text-xs text-blue-600 mt-0.5">
+          <p className="text-xs text-brand-secondary mt-0.5">
             After owner accepts · remaining {formatPrice(quote.balance_due_paise)} paid later
           </p>
         </div>
@@ -304,7 +304,7 @@ export default function Checkout() {
                   },
                 ].map((item) => (
                   <li key={item.n} className="flex gap-3.5">
-                    <div className="h-6 w-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="h-6 w-6 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                       {item.n}
                     </div>
                     <div>
@@ -331,7 +331,7 @@ export default function Checkout() {
               <button
                 onClick={() => createBooking.mutate()}
                 disabled={createBooking.isPending}
-                className="w-full rounded-xl bg-blue-600 py-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                className="w-full rounded-xl bg-brand py-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
               >
                 {createBooking.isPending ? (
                   <span className="flex items-center justify-center gap-2"><Spinner /> Sending request…</span>
@@ -352,7 +352,7 @@ export default function Checkout() {
               <button
                 onClick={() => createBooking.mutate()}
                 disabled={createBooking.isPending}
-                className="w-full rounded-xl bg-blue-600 py-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                className="w-full rounded-xl bg-brand py-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
               >
                 {createBooking.isPending ? (
                   <span className="flex items-center justify-center gap-2"><Spinner /> Sending request…</span>
