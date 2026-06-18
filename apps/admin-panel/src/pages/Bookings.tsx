@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  CalendarDays, Building2, User, Search,
-  CheckCircle2, Clock, CalendarCheck,
+  CalendarDays, Building2, Search,
+  CheckCircle2, Clock, CalendarCheck, X,
+  Phone, Mail, CreditCard,
 } from 'lucide-react'
 import { createClient, adminBookingEndpoints } from '@venue404/api-client'
 import type { AdminBookingSummary } from '@venue404/api-client'
@@ -27,6 +29,8 @@ const TABS: { label: string; value: TabValue; statsKey?: 'requested' | 'confirme
   { label: 'Cancelled', value: 'cancelled', statsKey: 'cancelled' },
 ]
 
+// ── Status helpers ─────────────────────────────────────────────────────────────
+
 function statusVariant(status: string): 'success' | 'warning' | 'danger' | 'pending' | 'neutral' {
   if (status === 'confirmed')      return 'success'
   if (status === 'completed')      return 'neutral'
@@ -46,6 +50,24 @@ function statusLabel(status: string): string {
   if (status === 'balance_overdue_cancelled') return 'Balance Overdue'
   return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
+
+function paymentVariant(ps: string): 'success' | 'warning' | 'danger' | 'neutral' {
+  if (ps === 'fully_paid')           return 'success'
+  if (ps === 'advance_paid')         return 'warning'
+  if (ps === 'refunded' || ps === 'partially_refunded') return 'neutral'
+  return 'danger'
+}
+
+function paymentLabel(ps: string): string {
+  if (ps === 'unpaid')               return 'Unpaid'
+  if (ps === 'advance_paid')         return 'Advance Paid'
+  if (ps === 'fully_paid')           return 'Fully Paid'
+  if (ps === 'refunded')             return 'Refunded'
+  if (ps === 'partially_refunded')   return 'Part Refunded'
+  return ps.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+// ── Date helpers ───────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string): string {
   if (!iso) return '—'
@@ -76,10 +98,11 @@ function timeAgo(iso: string): string {
 export default function Bookings() {
   const qc = useQueryClient()
 
-  const [activeTab, setActiveTab] = useState<TabValue>('')
+  const [activeTab, setActiveTab]     = useState<TabValue>('')
   const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [search, setSearch]           = useState('')
+  const [page, setPage]               = useState(1)
+  const [detailBooking, setDetailBooking] = useState<AdminBookingSummary | null>(null)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   function handleSearchChange(value: string) {
@@ -99,10 +122,10 @@ export default function Bookings() {
     }),
   })
 
-  const items = data?.items ?? []
-  const total = data?.total ?? 0
+  const items    = data?.items ?? []
+  const total    = data?.total ?? 0
   const totalPages = data?.total_pages ?? 1
-  const stats = data?.stats ?? null
+  const stats    = data?.stats ?? null
   const hasFilters = !!(searchInput || activeTab)
 
   const invalidateBookings = () => qc.invalidateQueries({ queryKey: ['admin', 'bookings'] })
@@ -234,14 +257,16 @@ export default function Bookings() {
                     <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-400">Venue</th>
                     <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-400">Customer</th>
                     <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-400">Event date</th>
-                    <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-400">Status</th>
+                    <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-400">Booking status</th>
+                    <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-400">Payment</th>
                     <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-400">Guests</th>
                     <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-400">Requested</th>
+                    <th className="px-5 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-50">
                   {items.map((b) => (
-                    <BookingRow key={b.id} booking={b} />
+                    <BookingRow key={b.id} booking={b} onViewDetails={() => setDetailBooking(b)} />
                   ))}
                 </tbody>
               </table>
@@ -277,13 +302,19 @@ export default function Bookings() {
           </>
         )}
       </div>
+
+      {/* Detail modal */}
+      {detailBooking && (
+        <BookingDetailModal booking={detailBooking} onClose={() => setDetailBooking(null)} />
+      )}
+
     </AdminLayout>
   )
 }
 
 // ── Row ───────────────────────────────────────────────────────────────────────
 
-function BookingRow({ booking: b }: { booking: AdminBookingSummary }) {
+function BookingRow({ booking: b, onViewDetails }: { booking: AdminBookingSummary; onViewDetails: () => void }) {
   return (
     <tr className="transition-colors hover:bg-zinc-50/70">
       <td className="px-5 py-3.5">
@@ -293,19 +324,19 @@ function BookingRow({ booking: b }: { booking: AdminBookingSummary }) {
         </div>
       </td>
       <td className="px-5 py-3.5">
-        <div className="flex items-center gap-2.5">
-          <User className="h-3.5 w-3.5 shrink-0 text-zinc-300" />
-          <div className="min-w-0">
-            <div className="truncate text-zinc-800">{b.customer_name ?? '—'}</div>
-            {b.customer_email && (
-              <div className="truncate text-xs text-zinc-400">{b.customer_email}</div>
-            )}
-          </div>
+        <div className="min-w-0">
+          <div className="truncate text-zinc-800">{b.customer_name ?? '—'}</div>
+          {b.customer_email && (
+            <div className="truncate text-xs text-zinc-400">{b.customer_email}</div>
+          )}
         </div>
       </td>
       <td className="px-5 py-3.5 text-zinc-600">{fmtDate(b.event_date)}</td>
       <td className="px-5 py-3.5">
         <StatusBadge label={statusLabel(b.status)} variant={statusVariant(b.status)} dot={false} />
+      </td>
+      <td className="px-5 py-3.5">
+        <StatusBadge label={paymentLabel(b.payment_status)} variant={paymentVariant(b.payment_status)} dot={false} />
       </td>
       <td className="px-5 py-3.5 tabular-nums text-zinc-600">{b.guest_count}</td>
       <td className="px-5 py-3.5">
@@ -313,6 +344,128 @@ function BookingRow({ booking: b }: { booking: AdminBookingSummary }) {
           {timeAgo(b.created_at)}
         </span>
       </td>
+      <td className="px-5 py-3.5 text-right">
+        <button
+          type="button"
+          onClick={onViewDetails}
+          className="press text-xs text-zinc-400 underline underline-offset-2 hover:text-zinc-700 transition-colors"
+        >
+          Details
+        </button>
+      </td>
     </tr>
+  )
+}
+
+// ── Detail modal ──────────────────────────────────────────────────────────────
+
+function ContactRow({ icon, value }: { icon: React.ReactNode; value: string | null }) {
+  if (!value) return null
+  return (
+    <div className="flex items-center gap-2 text-sm text-zinc-600">
+      <span className="text-zinc-300">{icon}</span>
+      {value}
+    </div>
+  )
+}
+
+function PersonCard({
+  role, name, email, phone,
+}: {
+  role: string
+  name: string | null
+  email: string | null
+  phone: string | null
+}) {
+  return (
+    <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+      <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">{role}</p>
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-sm font-semibold text-zinc-600">
+          {name?.[0]?.toUpperCase() ?? '?'}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate font-medium text-zinc-900">{name ?? '—'}</p>
+        </div>
+      </div>
+      <div className="mt-3 space-y-1.5">
+        <ContactRow icon={<Mail className="h-3.5 w-3.5" />} value={email} />
+        <ContactRow icon={<Phone className="h-3.5 w-3.5" />} value={phone} />
+      </div>
+    </div>
+  )
+}
+
+function BookingDetailModal({ booking: b, onClose }: { booking: AdminBookingSummary; onClose: () => void }) {
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+
+      <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-zinc-900/5">
+
+        {/* Header */}
+        <div className="flex items-start justify-between border-b border-zinc-100 px-6 py-5">
+          <div>
+            <h3 className="text-base font-semibold text-zinc-900">Booking details</h3>
+            <p className="mt-0.5 font-mono text-xs text-zinc-400 select-all">{b.id}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="press -mr-1 flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-5 px-6 py-5">
+
+          {/* Venue */}
+          <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Venue</p>
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 shrink-0 text-zinc-400" />
+              <span className="font-medium text-zinc-900">{b.venue_name}</span>
+            </div>
+          </div>
+
+          {/* People */}
+          <div className="grid grid-cols-2 gap-3">
+            <PersonCard role="Customer" name={b.customer_name} email={b.customer_email} phone={b.customer_phone} />
+            <PersonCard role="Venue Owner" name={b.owner_name} email={b.owner_email} phone={b.owner_phone} />
+          </div>
+
+          {/* Booking info grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-zinc-100 px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Event date</p>
+              <p className="mt-1 text-sm font-medium text-zinc-900">{fmtDate(b.event_date)}</p>
+            </div>
+            <div className="rounded-xl border border-zinc-100 px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Guests</p>
+              <p className="mt-1 text-sm font-medium text-zinc-900">{b.guest_count}</p>
+            </div>
+            <div className="rounded-xl border border-zinc-100 px-4 py-3">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Booking status</p>
+              <StatusBadge label={statusLabel(b.status)} variant={statusVariant(b.status)} dot={false} />
+            </div>
+            <div className="rounded-xl border border-zinc-100 px-4 py-3">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Payment</p>
+              <div className="flex items-center gap-1.5">
+                <CreditCard className="h-3.5 w-3.5 text-zinc-300" />
+                <StatusBadge label={paymentLabel(b.payment_status)} variant={paymentVariant(b.payment_status)} dot={false} />
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <p className="text-center text-xs text-zinc-300">
+            Requested {fmtDateTime(b.created_at)}
+          </p>
+
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }

@@ -26,11 +26,20 @@ from app.modules.admin.schemas import (
     CategoryBannerResponse,
     BookingStatsResponse,
     AdminBookingListResponse,
+    VenueStatsResponse,
 )
 from app.modules.auth.dependencies import require_admin, AuthContext
 from app.modules.admin import service
 
 router = APIRouter()
+
+
+@router.get("/venues/stats", response_model=VenueStatsResponse)
+def get_venue_stats(
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.get_venue_stats(db)
 
 
 @router.get("/venues", response_model=AdminVenueListResponse)

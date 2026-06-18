@@ -14,7 +14,13 @@ export type AdminBookingSummary = {
   venue_name: string
   customer_name: string | null
   customer_email: string | null
+  customer_phone: string | null
+  owner_id: string
+  owner_name: string | null
+  owner_email: string | null
+  owner_phone: string | null
   status: string
+  payment_status: string
   event_date: string
   guest_count: number
   created_at: string

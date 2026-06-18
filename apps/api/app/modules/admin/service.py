@@ -23,6 +23,25 @@ from app.core.storage import upload_image_to_cloudinary, delete_image_from_cloud
 
 logger = logging.getLogger(__name__)
 
+def get_venue_stats(db: Session) -> dict:
+    row = db.query(Venue).filter(Venue.deleted_at.is_(None)).with_entities(
+        func.count(Venue.id).label("total"),
+        func.count(case((Venue.status == VenueStatus.pending_approval, 1))).label("pending_approval"),
+        func.count(case((Venue.status == VenueStatus.approved, 1))).label("approved"),
+        func.count(case((Venue.status == VenueStatus.rejected, 1))).label("rejected"),
+        func.count(case((Venue.status == VenueStatus.suspended, 1))).label("suspended"),
+        func.count(case((Venue.status == VenueStatus.draft, 1))).label("draft"),
+    ).one()
+    return {
+        "total": row.total,
+        "pending_approval": row.pending_approval,
+        "approved": row.approved,
+        "rejected": row.rejected,
+        "suspended": row.suspended,
+        "draft": row.draft,
+    }
+
+
 def list_admin_venues(
     db: Session,
     *,
@@ -1043,22 +1062,34 @@ def list_admin_bookings(
     )
 
     slot_map: dict = {}
+    owner_map: dict = {}
     if rows:
         booking_ids = [b.id for b in rows]
         slots = db.query(BookingSlot).filter(BookingSlot.booking_id.in_(booking_ids)).all()
         slot_map = {s.booking_id: s for s in slots}
 
+        owner_ids = list({b.venue.owner_id for b in rows})
+        owners = db.query(Profile).filter(Profile.id.in_(owner_ids)).all()
+        owner_map = {o.id: o for o in owners}
+
     items: list[dict] = []
     for b in rows:
         slot = slot_map.get(b.id)
         event_date = slot.starts_at.date().isoformat() if slot else ""
+        owner = owner_map.get(b.venue.owner_id)
         items.append({
             "id": b.id,
             "venue_id": b.venue_id,
             "venue_name": b.venue.name,
             "customer_name": b.user.full_name,
             "customer_email": b.user.email,
+            "customer_phone": b.user.phone,
+            "owner_id": b.venue.owner_id,
+            "owner_name": owner.full_name if owner else None,
+            "owner_email": owner.email if owner else None,
+            "owner_phone": owner.phone if owner else None,
             "status": b.status.value,
+            "payment_status": b.payment_status.value,
             "event_date": event_date,
             "guest_count": b.guest_count,
             "created_at": b.created_at,

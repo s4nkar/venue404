@@ -169,11 +169,17 @@ class BookingStatsResponse(BaseModel):
 
 class AdminBookingSummary(BaseModel):
     id: uuid.UUID
-    venue_name: str
     venue_id: uuid.UUID
+    venue_name: str
     customer_name: str | None
     customer_email: str | None
+    customer_phone: str | None
+    owner_id: uuid.UUID
+    owner_name: str | None
+    owner_email: str | None
+    owner_phone: str | None
     status: str
+    payment_status: str
     event_date: str
     guest_count: int
     created_at: datetime
@@ -191,6 +197,15 @@ class AdminBookingListResponse(BaseModel):
 
 
 # ─── Venue admin schemas ───────────────────────────────────────────────────────
+
+class VenueStatsResponse(BaseModel):
+    total: int
+    pending_approval: int
+    approved: int
+    rejected: int
+    suspended: int
+    draft: int
+
 
 class VenueActionRequest(BaseModel):
     reason: str = ""

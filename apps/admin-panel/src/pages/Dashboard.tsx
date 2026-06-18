@@ -14,17 +14,18 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout } from '../components/AdminLayout'
 import { createClient, ApiError } from '@venue404/api-client'
-import { adminActionEndpoints, adminUserEndpoints, adminBookingEndpoints } from '@venue404/api-client'
+import { adminActionEndpoints, adminUserEndpoints, adminBookingEndpoints, adminVenueEndpoints } from '@venue404/api-client'
 
 const actionsApi = adminActionEndpoints(createClient())
 const usersApi = adminUserEndpoints(createClient())
 const bookingsApi = adminBookingEndpoints(createClient())
+const venuesApi = adminVenueEndpoints(createClient())
 
 const METRIC_TEMPLATES: DashboardMetric[] = [
   {
     label: 'Pending Approvals',
     value: '—',
-    description: 'Venue owners awaiting review',
+    description: 'Venues awaiting approval',
     icon: <Building2 className="h-4 w-4" />,
     accent: 'amber',
   },
@@ -109,6 +110,11 @@ export default function Dashboard() {
     queryFn: () => bookingsApi.getStats().catch(suppressAuthErrors),
   })
 
+  const { data: venueStats } = useQuery({
+    queryKey: ['admin', 'dashboard', 'venue-stats'],
+    queryFn: () => venuesApi.getVenueStats().catch(suppressAuthErrors),
+  })
+
   const { data: pendingOwnersData, isLoading: pendingLoading } = useQuery({
     queryKey: ['admin', 'dashboard', 'pending-owners'],
     queryFn: () =>
@@ -120,7 +126,7 @@ export default function Dashboard() {
   const pendingOwners = pendingOwnersData?.items ?? []
 
   const metrics = METRIC_TEMPLATES.map((m) => {
-    if (m.label === 'Pending Approvals') return { ...m, value: ownerStats ? String(ownerStats.pending) : '—' }
+    if (m.label === 'Pending Approvals') return { ...m, value: venueStats ? String(venueStats.pending_approval) : '—' }
     if (m.label === 'Active Bookings') return { ...m, value: bookingStats ? String(bookingStats.confirmed) : '—' }
     if (m.label === 'Venue Owners') return { ...m, value: ownerStats ? String(ownerStats.total) : '—' }
     if (m.label === 'Open Actions') return { ...m, value: actionsTotal !== null ? String(actionsTotal) : '—' }
