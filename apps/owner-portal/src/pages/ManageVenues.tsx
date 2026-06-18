@@ -95,9 +95,11 @@ export default function ManageVenues() {
                   <ImageIcon className="h-10 w-10 text-zinc-300" />
                 )}
                 <div className="absolute top-3 left-3 flex gap-2">
-                  <span className="bg-black/60 backdrop-blur-md text-white text-[10px] font-semibold px-2 py-1 rounded-md uppercase tracking-wider">
-                    {venue.venue_type.replace('_', ' ')}
-                  </span>
+                  {venue.venue_type && (
+                    <span className="bg-black/60 backdrop-blur-md text-white text-[10px] font-semibold px-2 py-1 rounded-md uppercase tracking-wider">
+                      {venue.venue_type.replace('_', ' ')}
+                    </span>
+                  )}
                 </div>
                 <div className="absolute top-3 right-3">
                   <StatusBadge 

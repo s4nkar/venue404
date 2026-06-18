@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Building2, MapPin, Users, Clock, IndianRupee,
+  Building2, MapPin, Clock, Users, IndianRupee,
   CheckCircle2, XCircle, ShieldOff, ShieldCheck,
   ImageOff, Search,
 } from 'lucide-react'
@@ -38,30 +39,6 @@ function statusLabel(s: AdminVenueItem['status']): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-function venueTypeLabel(t: string): string {
-  return t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
-function pricingLabel(v: AdminVenueItem): string {
-  const fmt = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN')}`
-  if (v.pricing_mode === 'flat' && v.starting_price_paise != null)
-    return `${fmt(v.starting_price_paise)} flat`
-  if (v.pricing_mode === 'hourly' && v.hourly_rate_paise != null)
-    return `${fmt(v.hourly_rate_paise)}/hr`
-  if (v.pricing_mode === 'mixed')
-    return [
-      v.starting_price_paise != null ? fmt(v.starting_price_paise) : null,
-      v.hourly_rate_paise != null ? `${fmt(v.hourly_rate_paise)}/hr` : null,
-    ].filter(Boolean).join(' + ')
-  return '—'
-}
-
-function formatTime(t: string): string {
-  const [h, m] = t.split(':').map(Number)
-  const ampm = h >= 12 ? 'PM' : 'AM'
-  const hr = h % 12 || 12
-  return `${hr}:${String(m).padStart(2, '0')} ${ampm}`
-}
 
 const PAGE_SIZE = 10
 
@@ -274,7 +251,7 @@ export default function VenueApprovals() {
         )}
 
         {!isLoading && !error && items.length > 0 && (
-          <div className="divide-y divide-zinc-100">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {items.map((venue) => (
               <VenueCard
                 key={venue.id}
@@ -489,14 +466,143 @@ type VenueCardProps = {
   onReactivate: () => void
 }
 
+function formatTime(t: string): string {
+  const [h, m] = t.split(':').map(Number)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const hr = h % 12 || 12
+  return `${hr}:${String(m).padStart(2, '0')} ${ampm}`
+}
+
+function pricingLabel(v: AdminVenueItem): string {
+  const fmt = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN')}`
+  if (v.pricing_mode === 'flat' && v.starting_price_paise != null) return `${fmt(v.starting_price_paise)} flat`
+  if (v.pricing_mode === 'hourly' && v.hourly_rate_paise != null) return `${fmt(v.hourly_rate_paise)}/hr`
+  if (v.pricing_mode === 'mixed')
+    return [
+      v.starting_price_paise != null ? fmt(v.starting_price_paise) : null,
+      v.hourly_rate_paise != null ? `${fmt(v.hourly_rate_paise)}/hr` : null,
+    ].filter(Boolean).join(' + ')
+  return '—'
+}
+
+function VenueDetailsModal({ venue, onClose }: { venue: AdminVenueItem; onClose: () => void }) {
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Sheet */}
+      <div className="relative w-full sm:max-w-xl max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+
+        {/* Hero image */}
+        <div className="relative h-56 w-full overflow-hidden bg-zinc-100 rounded-t-3xl sm:rounded-t-2xl">
+          {venue.cover_photo_url ? (
+            <img src={venue.cover_photo_url} alt={venue.name} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <ImageOff className="h-10 w-10 text-zinc-300" />
+            </div>
+          )}
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-md hover:bg-black/50 transition-colors"
+          >
+            <XCircle className="h-4 w-4" />
+          </button>
+
+          {/* Title over image */}
+          <div className="absolute bottom-4 left-5 right-14">
+            <h2 className="text-lg font-bold text-white leading-tight">{venue.name}</h2>
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-white/70">
+              <MapPin className="h-3 w-3 shrink-0" />
+              {venue.address_line1}, {venue.city}, {venue.state}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-6">
+
+          {/* Owner */}
+          <div className="flex items-center gap-3 rounded-xl bg-zinc-50 px-4 py-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-sm font-semibold text-zinc-600">
+              {venue.owner.full_name?.[0]?.toUpperCase() ?? '?'}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-zinc-900">{venue.owner.full_name ?? '—'}</p>
+              <p className="truncate text-xs text-zinc-400">{venue.owner.email ?? '—'}</p>
+            </div>
+            <span className="ml-auto shrink-0 text-xs text-zinc-400">Owner</span>
+          </div>
+
+          {/* Description */}
+          {venue.description && (
+            <p className="text-sm leading-relaxed text-zinc-500">{venue.description}</p>
+          )}
+
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Capacity', value: venue.min_capacity ? `${venue.min_capacity}–${venue.max_capacity}` : `Up to ${venue.max_capacity}`, icon: <Users className="h-4 w-4" /> },
+              { label: 'Hours', value: `${formatTime(venue.open_time)} – ${formatTime(venue.close_time)}`, icon: <Clock className="h-4 w-4" /> },
+              { label: 'Pricing', value: pricingLabel(venue), icon: <IndianRupee className="h-4 w-4" /> },
+            ].map(({ label, value, icon }) => (
+              <div key={label} className="rounded-xl bg-zinc-50 px-3 py-3">
+                <div className="flex items-center gap-1.5 text-zinc-400">{icon}<span className="text-[10px] font-medium uppercase tracking-wide">{label}</span></div>
+                <p className="mt-1.5 text-sm font-semibold text-zinc-800 leading-tight">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Financial */}
+          <div className="flex gap-3">
+            <div className="flex-1 rounded-xl border border-zinc-100 px-4 py-3">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">Advance Required</p>
+              <p className="mt-1 text-xl font-bold text-zinc-900">{venue.advance_pct}<span className="text-sm font-medium text-zinc-400">%</span></p>
+            </div>
+            <div className="flex-1 rounded-xl border border-zinc-100 px-4 py-3">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">Platform Commission</p>
+              <p className="mt-1 text-xl font-bold text-zinc-900">{venue.platform_commission_pct}<span className="text-sm font-medium text-zinc-400">%</span></p>
+            </div>
+          </div>
+
+          {/* Amenities */}
+          {venue.amenities.length > 0 && (
+            <div>
+              <p className="mb-2.5 text-xs font-medium uppercase tracking-wide text-zinc-400">Amenities</p>
+              <div className="flex flex-wrap gap-2">
+                {venue.amenities.map((a) => (
+                  <span key={a} className="inline-flex items-center rounded-full bg-zinc-900 px-3 py-1 text-xs font-medium text-white">{a}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <p className="text-center text-xs text-zinc-300">
+            Submitted {new Date(venue.created_at).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 function VenueCard({ venue, onApprove, onReject, onSuspend, onReactivate }: VenueCardProps) {
   const [imgError, setImgError] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
 
   useEffect(() => { setImgError(false) }, [venue.id])
 
   return (
-    <div className="p-5">
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+    <>
+    {showDetails && <VenueDetailsModal venue={venue} onClose={() => setShowDetails(false)} />}
+    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md">
 
         {/* Cover photo */}
         <div className="relative h-44 w-full overflow-hidden bg-zinc-100">
@@ -526,65 +632,25 @@ function VenueCard({ venue, onApprove, onReject, onSuspend, onReactivate }: Venu
         </div>
 
         {/* Body */}
-        <div className="p-5">
+        <div className="p-4">
 
-          {/* Title row */}
-          <div className="flex items-start justify-between gap-4">
+          {/* Title + owner */}
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="truncate text-base font-semibold text-zinc-900">{venue.name}</h3>
-              <p className="mt-0.5 text-xs font-medium text-zinc-400">{venueTypeLabel(venue.venue_type)}</p>
+              <h3 className="truncate text-sm font-semibold text-zinc-900">{venue.name}</h3>
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-zinc-400">
+                <MapPin className="h-3 w-3 shrink-0" />
+                {venue.city}, {venue.state}
+              </p>
             </div>
-            <div className="shrink-0 text-right">
-              <p className="text-xs font-medium text-zinc-700">{venue.owner.full_name ?? '—'}</p>
-              <p className="mt-0.5 text-xs text-zinc-400">{venue.owner.email ?? '—'}</p>
+            <div className="min-w-0 shrink text-right">
+              <p className="truncate text-xs font-medium text-zinc-700">{venue.owner.full_name ?? '—'}</p>
+              <p className="mt-0.5 truncate text-xs text-zinc-400">{venue.owner.email ?? '—'}</p>
             </div>
           </div>
-
-          {/* Description */}
-          {venue.description && (
-            <p className="mt-3 text-sm text-zinc-500 line-clamp-2">{venue.description}</p>
-          )}
-
-          {/* Details grid */}
-          <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2.5 sm:grid-cols-4">
-            <DetailItem icon={<MapPin className="h-3.5 w-3.5" />}>
-              {venue.city}, {venue.state}
-            </DetailItem>
-            <DetailItem icon={<Users className="h-3.5 w-3.5" />}>
-              {venue.min_capacity ? `${venue.min_capacity}–` : 'Up to '}{venue.max_capacity} guests
-            </DetailItem>
-            <DetailItem icon={<IndianRupee className="h-3.5 w-3.5" />}>
-              {pricingLabel(venue)}
-            </DetailItem>
-            <DetailItem icon={<Clock className="h-3.5 w-3.5" />}>
-              {formatTime(venue.open_time)} – {formatTime(venue.close_time)}
-            </DetailItem>
-          </div>
-
-          {/* Address */}
-          <p className="mt-3 text-xs text-zinc-400">{venue.address_line1}, {venue.city}</p>
-
-          {/* Amenities */}
-          {venue.amenities.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {venue.amenities.map((a) => (
-                <span
-                  key={a}
-                  className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600"
-                >
-                  {a}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Advance / commission note */}
-          <p className="mt-3 text-xs text-zinc-400">
-            {venue.advance_pct}% advance · {venue.platform_commission_pct}% platform commission
-          </p>
 
           {/* Actions */}
-          <div className="mt-4 flex items-center gap-2 border-t border-zinc-100 pt-4">
+          <div className="mt-4 flex items-center gap-2 border-t border-zinc-100 pt-3">
             {venue.status === 'pending_approval' && (
               <>
                 <button
@@ -628,23 +694,17 @@ function VenueCard({ venue, onApprove, onReject, onSuspend, onReactivate }: Venu
               </button>
             )}
 
-            <span className="ml-auto text-xs text-zinc-300">
-              Submitted {new Date(venue.updated_at).toLocaleDateString('en-IN', {
-                year: 'numeric', month: 'short', day: 'numeric',
-              })}
-            </span>
+            <button
+              type="button"
+              onClick={() => setShowDetails(true)}
+              className="ml-auto text-xs text-zinc-400 hover:text-zinc-700 underline underline-offset-2"
+            >
+              More details
+            </button>
           </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 
-function DetailItem({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-1.5 text-xs text-zinc-600">
-      <span className="mt-0.5 shrink-0 text-zinc-400">{icon}</span>
-      <span>{children}</span>
-    </div>
-  )
-}
