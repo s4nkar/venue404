@@ -14,10 +14,11 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout } from '../components/AdminLayout'
 import { createClient, ApiError } from '@venue404/api-client'
-import { adminActionEndpoints, adminUserEndpoints } from '@venue404/api-client'
+import { adminActionEndpoints, adminUserEndpoints, adminBookingEndpoints } from '@venue404/api-client'
 
 const actionsApi = adminActionEndpoints(createClient())
 const usersApi = adminUserEndpoints(createClient())
+const bookingsApi = adminBookingEndpoints(createClient())
 
 const METRIC_TEMPLATES: DashboardMetric[] = [
   {
@@ -103,6 +104,11 @@ export default function Dashboard() {
     queryFn: () => usersApi.getOwnerStats().catch(suppressAuthErrors),
   })
 
+  const { data: bookingStats } = useQuery({
+    queryKey: ['admin', 'dashboard', 'booking-stats'],
+    queryFn: () => bookingsApi.getStats().catch(suppressAuthErrors),
+  })
+
   const { data: pendingOwnersData, isLoading: pendingLoading } = useQuery({
     queryKey: ['admin', 'dashboard', 'pending-owners'],
     queryFn: () =>
@@ -115,6 +121,7 @@ export default function Dashboard() {
 
   const metrics = METRIC_TEMPLATES.map((m) => {
     if (m.label === 'Pending Approvals') return { ...m, value: ownerStats ? String(ownerStats.pending) : '—' }
+    if (m.label === 'Active Bookings') return { ...m, value: bookingStats ? String(bookingStats.confirmed) : '—' }
     if (m.label === 'Venue Owners') return { ...m, value: ownerStats ? String(ownerStats.total) : '—' }
     if (m.label === 'Open Actions') return { ...m, value: actionsTotal !== null ? String(actionsTotal) : '—' }
     return m

@@ -24,6 +24,8 @@ from app.modules.admin.schemas import (
     CategoryListResponse,
     CategoryDeleteResponse,
     CategoryBannerResponse,
+    BookingStatsResponse,
+    AdminBookingListResponse,
 )
 from app.modules.auth.dependencies import require_admin, AuthContext
 from app.modules.admin import service
@@ -280,3 +282,25 @@ def delete_category(
     db: Session = Depends(get_db),
 ):
     return service.delete_category(db, admin_id=auth.user_id, category_id=category_id)
+
+
+# ─── Booking routes ────────────────────────────────────────────────────────────
+
+@router.get("/bookings/stats", response_model=BookingStatsResponse)
+def get_booking_stats(
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.get_booking_stats(db)
+
+
+@router.get("/bookings", response_model=AdminBookingListResponse)
+def list_bookings(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    status: str | None = Query(None),
+    search: str | None = Query(None),
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.list_admin_bookings(db, status=status, search=search, page=page, page_size=page_size)

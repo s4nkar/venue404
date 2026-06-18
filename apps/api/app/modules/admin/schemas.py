@@ -157,6 +157,39 @@ class CategoryBannerResponse(BaseModel):
     banner_image: str
 
 
+# ─── Booking admin schemas ─────────────────────────────────────────────────────
+
+class BookingStatsResponse(BaseModel):
+    total: int
+    requested: int
+    confirmed: int
+    completed: int
+    cancelled: int
+
+
+class AdminBookingSummary(BaseModel):
+    id: uuid.UUID
+    venue_name: str
+    venue_id: uuid.UUID
+    customer_name: str | None
+    customer_email: str | None
+    status: str
+    event_date: str
+    guest_count: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminBookingListResponse(BaseModel):
+    items: list[AdminBookingSummary]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    stats: BookingStatsResponse
+
+
 # ─── Venue admin schemas ───────────────────────────────────────────────────────
 
 class VenueActionRequest(BaseModel):

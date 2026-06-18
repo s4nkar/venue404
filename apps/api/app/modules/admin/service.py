@@ -16,6 +16,7 @@ from app.modules.admin.models import AdminAction
 from app.modules.admin.schemas import AmenityUpdateRequest, CategoryUpdateRequest
 from app.modules.profile.models import Profile, UserRoleAssignment, UserRole, ProfileStatus
 from app.modules.venue.models import Amenity, VenueAmenity, Venue, VenueCategory, VenueStatus
+from app.modules.booking.models import Booking, BookingSlot, BookingStatus
 from app.core.storage import upload_image_to_cloudinary, delete_image_from_cloudinary
 
 
@@ -972,3 +973,102 @@ def _resolve_supabase_user(email: str, password: str, name: str = "") -> uuid.UU
     })
     logger.info("Created Supabase auth user for super admin: %s", email)
     return uuid.UUID(result["id"])
+
+
+# ─── Booking admin service ─────────────────────────────────────────────────────
+
+_CANCELLED_STATUSES = (
+    BookingStatus.hold_expired,
+    BookingStatus.request_expired,
+    BookingStatus.conflict_cancelled,
+    BookingStatus.user_cancelled,
+    BookingStatus.admin_cancelled,
+    BookingStatus.owner_rejected,
+    BookingStatus.balance_overdue_cancelled,
+)
+
+
+def get_booking_stats(db: Session) -> dict:
+    row = db.query(
+        func.count(Booking.id).label("total"),
+        func.count(case((Booking.status == BookingStatus.requested, 1))).label("requested"),
+        func.count(case((Booking.status == BookingStatus.confirmed, 1))).label("confirmed"),
+        func.count(case((Booking.status == BookingStatus.completed, 1))).label("completed"),
+        func.count(case((Booking.status.in_(_CANCELLED_STATUSES), 1))).label("cancelled"),
+    ).filter(Booking.deleted_at.is_(None)).one()
+    return {
+        "total": row.total,
+        "requested": row.requested,
+        "confirmed": row.confirmed,
+        "completed": row.completed,
+        "cancelled": row.cancelled,
+    }
+
+
+def list_admin_bookings(
+    db: Session,
+    *,
+    status: str | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 25,
+) -> dict:
+    stats = get_booking_stats(db)
+
+    base = (
+        db.query(Booking)
+        .join(Venue, Venue.id == Booking.venue_id)
+        .join(Profile, Profile.id == Booking.user_id)
+        .filter(Booking.deleted_at.is_(None))
+    )
+
+    if status:
+        if status == "cancelled":
+            base = base.filter(Booking.status.in_(_CANCELLED_STATUSES))
+        else:
+            base = base.filter(Booking.status == BookingStatus(status))
+
+    if search:
+        safe = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        base = base.filter(Venue.name.ilike(f"%{safe}%") | Profile.full_name.ilike(f"%{safe}%"))
+
+    total = base.count()
+    total_pages = max(1, math.ceil(total / page_size))
+    rows = (
+        base
+        .order_by(Booking.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    slot_map: dict = {}
+    if rows:
+        booking_ids = [b.id for b in rows]
+        slots = db.query(BookingSlot).filter(BookingSlot.booking_id.in_(booking_ids)).all()
+        slot_map = {s.booking_id: s for s in slots}
+
+    items: list[dict] = []
+    for b in rows:
+        slot = slot_map.get(b.id)
+        event_date = slot.starts_at.date().isoformat() if slot else ""
+        items.append({
+            "id": b.id,
+            "venue_id": b.venue_id,
+            "venue_name": b.venue.name,
+            "customer_name": b.user.full_name,
+            "customer_email": b.user.email,
+            "status": b.status.value,
+            "event_date": event_date,
+            "guest_count": b.guest_count,
+            "created_at": b.created_at,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "stats": stats,
+    }
