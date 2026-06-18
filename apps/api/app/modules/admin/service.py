@@ -13,9 +13,10 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.exceptions import NotFoundError, ForbiddenError, ConflictError
 from app.modules.admin.models import AdminAction
-from app.modules.admin.schemas import AmenityUpdateRequest
+from app.modules.admin.schemas import AmenityUpdateRequest, CategoryUpdateRequest
 from app.modules.profile.models import Profile, UserRoleAssignment, UserRole, ProfileStatus
-from app.modules.venue.models import Amenity, VenueAmenity, Venue, VenueStatus
+from app.modules.venue.models import Amenity, VenueAmenity, Venue, VenueCategory, VenueStatus
+from app.core.storage import upload_image_to_cloudinary, delete_image_from_cloudinary
 
 
 
@@ -50,7 +51,7 @@ def list_admin_venues(
     total = filtered.with_entities(func.count(Venue.id)).scalar()
     venues = (
         filtered
-        .options(joinedload(Venue.photos), joinedload(Venue.amenities))
+        .options(joinedload(Venue.photos), joinedload(Venue.amenities), joinedload(Venue.category))
         .order_by(Venue.updated_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
@@ -70,7 +71,7 @@ def list_admin_venues(
             "name": v.name,
             "slug": v.slug,
             "description": v.description,
-            "venue_type": v.venue_type,
+            "category_slug": v.category.slug,
             "address_line1": v.address_line1,
             "city": v.city,
             "state": v.state,
@@ -610,6 +611,191 @@ def delete_amenity(
     ))
     db.commit()
     return {"deleted": True, "active_venue_count": active_count}
+
+
+def _get_category_or_404(db: Session, category_id: uuid.UUID) -> VenueCategory:
+    cat = db.query(VenueCategory).filter(VenueCategory.id == category_id).first()
+    if not cat:
+        raise NotFoundError("Category not found")
+    return cat
+
+
+def _count_category_venues(db: Session, category_id: uuid.UUID) -> int:
+    return db.query(Venue).filter(Venue.category_id == category_id, Venue.deleted_at.is_(None)).count()
+
+
+def _category_to_dict(cat: VenueCategory, venue_count: int) -> dict:
+    return {
+        "id": cat.id,
+        "slug": cat.slug,
+        "label": cat.label,
+        "icon": cat.icon,
+        "banner_image": cat.banner_image,
+        "is_active": cat.is_active,
+        "sort_order": cat.sort_order,
+        "created_at": cat.created_at,
+        "deleted_at": cat.deleted_at,
+        "venue_count": venue_count,
+    }
+
+
+def list_categories(db: Session, *, include_deleted: bool = False) -> dict:
+    query = db.query(VenueCategory)
+    if not include_deleted:
+        query = query.filter(VenueCategory.deleted_at.is_(None))
+    cats = query.order_by(VenueCategory.sort_order.asc(), VenueCategory.label.asc()).all()
+
+    cat_ids = [c.id for c in cats]
+    count_rows = (
+        db.query(Venue.category_id, func.count(Venue.id).label("cnt"))
+        .filter(Venue.category_id.in_(cat_ids), Venue.deleted_at.is_(None))
+        .group_by(Venue.category_id)
+        .all()
+    ) if cat_ids else []
+    counts = {row.category_id: row.cnt for row in count_rows}
+
+    items = [_category_to_dict(c, counts.get(c.id, 0)) for c in cats]
+    return {"items": items, "total": len(items)}
+
+
+def create_category(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    slug: str,
+    label: str,
+    icon: str | None,
+    sort_order: int,
+) -> dict:
+    normalized_slug = slug.strip().lower()
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:s))"), {"s": normalized_slug})
+    cat = VenueCategory(slug=normalized_slug, label=label.strip(), icon=icon, sort_order=sort_order)
+    db.add(cat)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise ConflictError("A category with this slug already exists")
+
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="category_created",
+        target_type="category",
+        target_id=cat.id,
+    ))
+    db.commit()
+    db.refresh(cat)
+    return _category_to_dict(cat, 0)
+
+
+def update_category(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    category_id: uuid.UUID,
+    body: CategoryUpdateRequest,
+) -> dict:
+    cat = _get_category_or_404(db, category_id)
+    if cat.deleted_at is not None:
+        raise ConflictError("Cannot update a deleted category")
+
+    if "label" in body.model_fields_set and body.label is not None:
+        cat.label = body.label.strip()
+    if "icon" in body.model_fields_set:
+        cat.icon = body.icon
+    if "sort_order" in body.model_fields_set and body.sort_order is not None:
+        cat.sort_order = body.sort_order
+    if "is_active" in body.model_fields_set and body.is_active is not None:
+        cat.is_active = body.is_active
+
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="category_updated",
+        target_type="category",
+        target_id=cat.id,
+    ))
+    db.commit()
+    db.refresh(cat)
+    venue_count = _count_category_venues(db, cat.id)
+    return _category_to_dict(cat, venue_count)
+
+
+def upload_category_banner(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    category_id: uuid.UUID,
+    file_bytes: bytes,
+) -> dict:
+    cat = _get_category_or_404(db, category_id)
+    if cat.deleted_at is not None:
+        raise ConflictError("Cannot update a deleted category")
+
+    if cat.banner_image:
+        try:
+            delete_image_from_cloudinary(cat.banner_image)
+        except Exception:
+            pass
+
+    banner_url = upload_image_to_cloudinary(file_bytes, folder=f"categories/{category_id}")
+    cat.banner_image = banner_url
+
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="category_banner_updated",
+        target_type="category",
+        target_id=cat.id,
+    ))
+    db.commit()
+    db.refresh(cat)
+    return {"banner_image": cat.banner_image}
+
+
+def delete_category_banner(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    category_id: uuid.UUID,
+) -> dict:
+    cat = _get_category_or_404(db, category_id)
+    if cat.banner_image:
+        try:
+            delete_image_from_cloudinary(cat.banner_image)
+        except Exception:
+            pass
+        cat.banner_image = None
+        db.add(AdminAction(
+            admin_id=admin_id,
+            action_type="category_banner_deleted",
+            target_type="category",
+            target_id=cat.id,
+        ))
+        db.commit()
+    return {"banner_image": None}
+
+
+def delete_category(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    category_id: uuid.UUID,
+) -> dict:
+    cat = _get_category_or_404(db, category_id)
+    if cat.deleted_at is not None:
+        raise ConflictError("Category is already deleted")
+
+    venue_count = _count_category_venues(db, cat.id)
+    cat.deleted_at = datetime.now(timezone.utc)
+    cat.is_active = False
+
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="category_deleted",
+        target_type="category",
+        target_id=cat.id,
+    ))
+    db.commit()
+    return {"deleted": True, "venue_count": venue_count}
 
 
 def list_actions(

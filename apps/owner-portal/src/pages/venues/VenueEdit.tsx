@@ -21,6 +21,7 @@ export default function VenueEdit() {
 
   const [platformAmenities, setPlatformAmenities] = useState<any[]>([])
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([])
+  const [venueCategories, setVenueCategories] = useState<any[]>([])
 
   // E.g. /venues/123/edit/pricing -> 'pricing'
   const editSection = location.pathname.split('/').pop() || 'details'
@@ -106,6 +107,20 @@ export default function VenueEdit() {
     loadVenue()
   }, [venueId])
 
+  useEffect(() => {
+    async function loadCategories() {
+      if (editSection !== 'details') return
+      try {
+        const client = createClient()
+        const data = await venueEndpoints(client).getVenueCategories()
+        setVenueCategories(data)
+      } catch (err) {
+        console.error('Failed to load categories', err)
+      }
+    }
+    loadCategories()
+  }, [editSection])
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!venueId || !venue) return
@@ -118,7 +133,7 @@ export default function VenueEdit() {
     if (editSection === 'details') {
       updates.name = formData.get('name')
       updates.description = formData.get('description')
-      updates.venue_type = formData.get('venue_type')
+      updates.category_id = formData.get('category_id')
       const minCap = formData.get('min_capacity')
       updates.min_capacity = minCap ? parseInt(minCap as string, 10) : null
       updates.max_capacity = parseInt(formData.get('max_capacity') as string, 10)
@@ -268,12 +283,16 @@ export default function VenueEdit() {
               <Input label="Venue Name" name="name" defaultValue={venue.name} required />
               
               <div className="space-y-1">
-                <label className="text-sm font-medium text-zinc-700">Venue Type<span className="text-red-500 ml-1">*</span></label>
-                <select name="venue_type" defaultValue={venue.venue_type} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200">
-                  <option value="banquet_hall">Banquet Hall</option>
-                  <option value="conference_room">Conference Room</option>
-                  <option value="rooftop">Rooftop</option>
-                  <option value="wedding_hall">Wedding Hall</option>
+                <label className="text-sm font-medium text-zinc-700">Venue Category<span className="text-red-500 ml-1">*</span></label>
+                <select name="category_id" defaultValue={venue.category?.id} required
+                  disabled={venueCategories.length === 0}
+                  className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:opacity-50">
+                  <option value="">{venueCategories.length === 0 ? 'Loading categories…' : 'Select a category…'}</option>
+                  {venueCategories.map((cat: any) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon ? `${cat.icon} ` : ''}{cat.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 

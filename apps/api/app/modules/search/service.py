@@ -1,14 +1,18 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from app.modules.search.schemas import SearchParams, SearchResult
-from app.modules.venue.models import Venue, VenueStatus, VenuePhoto
+from app.modules.venue.models import Venue, VenueCategory, VenueStatus, VenuePhoto
 from app.shared.pagination import Page
 
 def search(db: Session, params: SearchParams) -> Page[SearchResult]:
-    query = db.query(Venue).filter(
-        Venue.status == VenueStatus.approved,
-        Venue.is_active == True,
-        Venue.deleted_at.is_(None)
+    query = (
+        db.query(Venue)
+        .options(joinedload(Venue.category))
+        .filter(
+            Venue.status == VenueStatus.approved,
+            Venue.is_active == True,
+            Venue.deleted_at.is_(None),
+        )
     )
 
     if params.q:
@@ -18,7 +22,7 @@ def search(db: Session, params: SearchParams) -> Page[SearchResult]:
                 Venue.name.ilike(search_term),
                 Venue.description.ilike(search_term),
                 Venue.city.ilike(search_term),
-                Venue.state.ilike(search_term)
+                Venue.state.ilike(search_term),
             )
         )
 
@@ -26,7 +30,9 @@ def search(db: Session, params: SearchParams) -> Page[SearchResult]:
         query = query.filter(Venue.city.ilike(f"%{params.city}%"))
 
     if params.venue_type:
-        query = query.filter(Venue.venue_type == params.venue_type)
+        query = query.join(VenueCategory, Venue.category_id == VenueCategory.id).filter(
+            VenueCategory.slug == params.venue_type
+        )
 
     if params.capacity > 0:
         query = query.filter(Venue.max_capacity >= params.capacity)
@@ -42,28 +48,27 @@ def search(db: Session, params: SearchParams) -> Page[SearchResult]:
         photos = db.query(VenuePhoto).filter(
             VenuePhoto.venue_id.in_(venue_ids),
             VenuePhoto.is_cover == True,
-            VenuePhoto.deleted_at.is_(None)
+            VenuePhoto.deleted_at.is_(None),
         ).all()
         cover_photos = {p.venue_id: p.image_url for p in photos}
 
     results = []
     for v in venues:
         starting_price = v.starting_price_paise if v.pricing_mode in ('flat', 'mixed') else v.hourly_rate_paise
-        
         results.append(SearchResult(
             id=v.id,
             name=v.name,
             city=v.city,
-            venue_type=v.venue_type,
+            category=v.category,
             capacity=v.max_capacity,
             pricing_mode=v.pricing_mode,
             starting_price_paise=starting_price,
-            cover_photo_url=cover_photos.get(v.id)
+            cover_photo_url=cover_photos.get(v.id),
         ))
 
     return Page(
         items=results,
         total=total_count,
         page=params.page,
-        page_size=params.page_size
+        page_size=params.page_size,
     )

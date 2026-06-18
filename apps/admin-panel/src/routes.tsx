@@ -10,6 +10,7 @@ import Users from './pages/Users'
 import VenueOwners from './pages/VenueOwners'
 import VenueApprovals from './pages/VenueApprovals'
 import Amenities from './pages/Amenities'
+import Categories from './pages/Categories'
 import AuditLog from './pages/AuditLog'
 
 export const router = createBrowserRouter([
@@ -51,6 +52,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Amenities />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/categories',
+    element: (
+      <ProtectedRoute>
+        <Categories />
       </ProtectedRoute>
     ),
   },

@@ -112,6 +112,51 @@ class AmenityDeleteResponse(BaseModel):
     active_venue_count: int
 
 
+# ─── Venue category admin schemas ─────────────────────────────────────────────
+
+class CategoryCreateRequest(BaseModel):
+    slug: str = Field(..., min_length=1, max_length=100, pattern=r'^[a-z0-9_]+$')
+    label: str = Field(..., min_length=1, max_length=100)
+    icon: Optional[str] = None
+    sort_order: int = Field(default=0, ge=0)
+
+
+class CategoryUpdateRequest(BaseModel):
+    label: Optional[str] = Field(None, min_length=1, max_length=100)
+    icon: Optional[str] = None
+    sort_order: Optional[int] = Field(None, ge=0)
+    is_active: Optional[bool] = None
+
+
+class AdminCategoryResponse(BaseModel):
+    id: uuid.UUID
+    slug: str
+    label: str
+    icon: Optional[str]
+    banner_image: Optional[str]
+    is_active: bool
+    sort_order: int
+    created_at: datetime
+    deleted_at: Optional[datetime]
+    venue_count: int
+
+    model_config = {"from_attributes": True}
+
+
+class CategoryListResponse(BaseModel):
+    items: list[AdminCategoryResponse]
+    total: int
+
+
+class CategoryDeleteResponse(BaseModel):
+    deleted: bool
+    venue_count: int
+
+
+class CategoryBannerResponse(BaseModel):
+    banner_image: str
+
+
 # ─── Venue admin schemas ───────────────────────────────────────────────────────
 
 class VenueActionRequest(BaseModel):
@@ -129,7 +174,7 @@ class AdminVenueItem(BaseModel):
     name: str
     slug: str | None
     description: str | None
-    venue_type: str
+    category_slug: str
     address_line1: str
     city: str
     state: str
