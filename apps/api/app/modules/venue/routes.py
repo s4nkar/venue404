@@ -44,6 +44,15 @@ def list_my_venues(
     return service.list_owner_venues(db, owner_id=auth.user_id)
 
 
+@router.get("/my/venues/{venue_id}", response_model=VenueResponse)
+def get_my_venue(
+    venue_id: UUID,
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    return service.get_owner_venue(db, venue_id=venue_id, owner_id=auth.user_id)
+
+
 @router.post("/", response_model=VenueResponse, status_code=201)
 def create_venue(
     body: CreateVenueRequest,
@@ -206,13 +215,13 @@ def get_platform_amenities(db: Session = Depends(get_db)):
     return service.get_platform_amenities(db)
 
 
-@router.get("/{venue_id}", response_model=VenueResponse)
+@router.get("/{identifier}", response_model=VenueResponse)
 def get_venue(
-    venue_id: UUID,
+    identifier: str,
     db: Session = Depends(get_db),
 ):
 
-    return service.get_venue(db, venue_id)
+    return service.get_venue(db, identifier)
 
 
 @router.get("/{venue_id}/pricing", response_model=PricingPreviewResponse)

@@ -14,7 +14,7 @@ import {
   LoadingScreen,
 } from '@venue404/ui'
 
-import { Navbar } from '../components/Navbar'
+import { AppNavbar } from '../components/shared/AppNavbar'
 
 import type { BookingOut } from '../types'
 
@@ -38,8 +38,6 @@ const CANCELLED_STATUSES = [
   'request_expired',
   'balance_overdue_cancelled',
 ]
-
-
 
 function FeaturedBookingHero({
   booking,
@@ -111,7 +109,7 @@ function FeaturedBookingHero({
                 'advance_paid' &&
               booking.balance_due_paise >
                 0)) && (
-            <div className="mt-6 inline-flex w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+            <div className="mt-6 inline-flex w-fit rounded-full bg-brand-light px-3 py-1 text-xs font-semibold text-brand">
               Action Required
             </div>
           )}
@@ -258,7 +256,7 @@ export default function MyBookings() {
   if (isError) {
     return (
       <div className="min-h-screen bg-white">
-        <Navbar />
+        <AppNavbar />
 
         <div className="mx-auto max-w-6xl px-4 py-8">
           <ErrorState
@@ -281,7 +279,7 @@ export default function MyBookings() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <Navbar />
+      <AppNavbar />
 
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-10">

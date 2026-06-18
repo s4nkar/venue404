@@ -1,6 +1,7 @@
 import { cn } from '../../lib/utils'
 import { NavItem, type NavItemConfig } from './NavItem'
 import { UserMenu } from './UserMenu'
+import { X } from 'lucide-react'
 
 type AppSidebarProps = {
   navItems: NavItemConfig[]
@@ -34,8 +35,15 @@ export function AppSidebar({
     >
       {/* Brand */}
       {brand && (
-        <div className="flex h-[60px] shrink-0 items-center border-b border-zinc-800/60 px-4">
+        <div className="flex h-[60px] shrink-0 items-center justify-between border-b border-zinc-800/60 px-4">
           {brand}
+          <button 
+            type="button" 
+            onClick={onMobileClose} 
+            className="lg:hidden text-zinc-400 hover:text-white transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
       )}
 

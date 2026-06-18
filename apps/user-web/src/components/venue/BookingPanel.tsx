@@ -45,7 +45,7 @@ function StepDots({ step, bookingType }: { step: Step; bookingType: BookingType 
         <div
           key={s}
           className={`h-1.5 rounded-full transition-all duration-300 ${
-            i <= idx ? 'w-4 bg-blue-600' : 'w-1.5 bg-zinc-200'
+            i <= idx ? 'w-4 bg-brand' : 'w-1.5 bg-zinc-200'
           }`}
         />
       ))}
@@ -226,39 +226,42 @@ export function BookingPanel({ venue }: Props) {
   const advanceLabel = quote ? formatPrice(quote.advance_due_paise) : null
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white shadow-md overflow-hidden">
-      {/* ── Panel header: pricing anchor ─────────────────────────────── */}
+    <div className="rounded-2xl border border-zinc-200 bg-white shadow-lg overflow-hidden">
+      {/* ── Panel header: price + rating ─────────────────────────────── */}
       <div className="px-6 pt-6 pb-5 border-b border-zinc-100">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            {venue.pricing_mode === 'flat' && venue.base_price_paise != null ? (
-              <>
-                <p className="text-[28px] font-bold tracking-tight text-zinc-900 leading-none">
-                  {formatPrice(venue.base_price_paise)}
+            {venue.pricing_mode === 'flat' && venue.starting_price_paise != null ? (
+              <div className="flex items-baseline gap-2">
+                <p className="text-[26px] font-bold tracking-tight text-zinc-900 leading-none">
+                  {formatPrice(venue.starting_price_paise)}
                 </p>
-                <p className="text-sm text-zinc-400 mt-1">per day</p>
-              </>
+                <p className="text-sm text-zinc-400">/ day</p>
+              </div>
             ) : venue.pricing_mode === 'hourly' && venue.hourly_rate_paise != null ? (
-              <>
-                <p className="text-[28px] font-bold tracking-tight text-zinc-900 leading-none">
+              <div className="flex items-baseline gap-2">
+                <p className="text-[26px] font-bold tracking-tight text-zinc-900 leading-none">
                   {formatPrice(venue.hourly_rate_paise)}
                 </p>
-                <p className="text-sm text-zinc-400 mt-1">per hour</p>
-              </>
+                <p className="text-sm text-zinc-400">/ hr</p>
+              </div>
             ) : (
-              <p className="text-base font-medium text-zinc-500">Price on request</p>
+              <p className="text-base font-semibold text-zinc-900">Price on request</p>
             )}
+            {/* Rating placeholder */}
+            <div className="mt-2 flex items-center gap-1.5">
+              <svg className="h-3.5 w-3.5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+              <span className="text-xs text-zinc-400">New · No reviews yet</span>
+            </div>
           </div>
           {/* Step dots — show only after date is picked */}
           {step !== 'date' && (
             <div className="flex flex-col items-end gap-1">
               <StepDots step={step} bookingType={bookingType} />
               <p className="text-[11px] text-zinc-400">
-                {step === 'time'
-                  ? 'Pick a time'
-                  : step === 'quote'
-                    ? 'Review price'
-                    : 'Select date'}
+                {step === 'time' ? 'Pick a time' : step === 'quote' ? 'Review price' : 'Select date'}
               </p>
             </div>
           )}
@@ -266,30 +269,26 @@ export function BookingPanel({ venue }: Props) {
 
         {showBookingTypeSelector && (
           <div className="mt-5">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              Booking Type
-            </p>
-
-            <div className="grid grid-cols-2 gap-2">
+            {/* Tab-style booking type selector */}
+            <div className="flex rounded-xl border border-zinc-200 overflow-hidden">
               <button
                 type="button"
                 onClick={() => handleBookingTypeChange('full_day')}
-                className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
+                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
                   bookingType === 'full_day'
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-zinc-200 bg-white hover:border-zinc-300'
+                    ? 'bg-zinc-900 text-white'
+                    : 'bg-white text-zinc-500 hover:bg-zinc-50'
                 }`}
               >
                 Full Day
               </button>
-
               <button
                 type="button"
                 onClick={() => handleBookingTypeChange('time_slot')}
-                className={`rounded-xl border px-4 py-3 text-sm font-medium transition ${
+                className={`flex-1 py-2.5 text-sm font-medium transition-colors border-l border-zinc-200 ${
                   bookingType === 'time_slot'
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-zinc-200 bg-white hover:border-zinc-300'
+                    ? 'bg-zinc-900 text-white'
+                    : 'bg-white text-zinc-500 hover:bg-zinc-50'
                 }`}
               >
                 Time Slot
@@ -336,7 +335,7 @@ export function BookingPanel({ venue }: Props) {
 
             <button
               onClick={resetDate}
-              className="mt-3 text-xs font-medium text-blue-500 hover:text-blue-700"
+              className="mt-3 text-xs font-medium text-brand hover:text-brand-hover"
             >
               Change
             </button>
@@ -459,7 +458,7 @@ export function BookingPanel({ venue }: Props) {
               validateMutation.mutate()
             }}
             disabled={!readyToBook || validateMutation.isPending}
-            className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full rounded-xl bg-brand py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {validateMutation.isPending ? (
               <span className="flex items-center justify-center gap-2">

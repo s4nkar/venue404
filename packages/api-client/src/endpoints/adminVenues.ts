@@ -21,7 +21,7 @@ export type AdminVenueItem = {
   open_time: string
   close_time: string
   pricing_mode: 'flat' | 'hourly' | 'mixed'
-  base_price_paise: number | null
+  starting_price_paise: number | null
   hourly_rate_paise: number | null
   advance_pct: number
   platform_commission_pct: number

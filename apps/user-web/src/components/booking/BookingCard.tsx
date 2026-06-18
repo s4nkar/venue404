@@ -64,7 +64,7 @@ export default function MyBookingCard({
           )}
 
           {actionRequired && (
-            <div className="absolute left-4 top-4 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow">
+            <div className="absolute left-4 top-4 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white shadow">
               Action Required
             </div>
           )}
@@ -162,12 +162,12 @@ export default function MyBookingCard({
 
           {(requiresAdvance ||
             requiresBalance) && (
-            <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-              <div className="text-sm font-semibold text-blue-900">
+            <div className="mt-6 rounded-2xl border border-brand-light-strong bg-brand-light p-4">
+              <div className="text-sm font-semibold text-brand">
                 Payment Required
               </div>
 
-              <div className="mt-1 text-sm text-blue-700">
+              <div className="mt-1 text-sm text-brand">
                 {requiresAdvance
                   ? `Advance payment of ${booking.display.advance_due} is required to confirm this booking.`
                   : `Balance payment of ${booking.display.balance_due} is pending.`}

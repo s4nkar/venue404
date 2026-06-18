@@ -45,3 +45,7 @@ app.include_router(availability_router, prefix="/api/availability", tags=["avail
 app.include_router(notification_router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
 app.include_router(payment_router, prefix="/api/payments", tags=["payments"])
+
+@app.get("/health", tags=["health"])
+async def health_check():
+    return {"status": "ok"}

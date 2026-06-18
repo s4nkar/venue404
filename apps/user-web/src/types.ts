@@ -66,7 +66,7 @@ export type VenueResponse = {
   pre_buffer_minutes: number
   post_buffer_minutes: number
   pricing_mode: 'flat' | 'hourly' | 'mixed'
-  base_price_paise?: number | null
+  starting_price_paise?: number | null
   hourly_rate_paise?: number | null
   platform_commission_pct: string
   advance_pct: string

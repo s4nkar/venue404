@@ -7,7 +7,7 @@ import {
   venueEndpoints,
 } from '@venue404/api-client'
 
-import { Navbar } from '../components/Navbar'
+import { AppNavbar } from '../components/shared/AppNavbar'
 
 import { CancellationPolicyCard } from '../components/venue/CancellationPolicyCard'
 
@@ -17,8 +17,6 @@ import { BookingInformationCard } from '../components/booking/BookingInformation
 import { BookingTimelineCard } from '../components/booking/BookingTimelineCard'
 import { PaymentSummaryCard } from '../components/booking/PaymentSummaryCard'
 import { BookingActionsCard } from '../components/booking/BookingActionsCard'
-
-
 
 function BookingDetailSkeleton() {
   return (
@@ -73,7 +71,7 @@ export default function BookingDetail() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white">
-        <Navbar />
+        <AppNavbar />
         <BookingDetailSkeleton />
       </div>
     )
@@ -87,7 +85,7 @@ export default function BookingDetail() {
   ) {
     return (
       <div className="min-h-screen bg-white">
-        <Navbar />
+        <AppNavbar />
 
         <div className="max-w-6xl mx-auto px-4 py-24 text-center">
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 mb-6">
@@ -127,7 +125,7 @@ export default function BookingDetail() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Navbar />
+      <AppNavbar />
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <button

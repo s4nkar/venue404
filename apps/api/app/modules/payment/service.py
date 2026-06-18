@@ -58,7 +58,7 @@ def create_payment_intent(db: Session, current_user_id, booking_id: str) -> Paym
 
     amount_paise = booking.amount_paise
     if amount_paise <= 0:
-        amount_paise = round(venue.base_price_paise * settings.token_advance_pct / 100)
+        amount_paise = round(venue.starting_price_paise * settings.token_advance_pct / 100)
         booking.amount_paise = amount_paise
 
     stripe = get_stripe()

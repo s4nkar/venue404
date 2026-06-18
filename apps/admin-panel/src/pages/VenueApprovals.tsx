@@ -44,13 +44,13 @@ function venueTypeLabel(t: string): string {
 
 function pricingLabel(v: AdminVenueItem): string {
   const fmt = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN')}`
-  if (v.pricing_mode === 'flat' && v.base_price_paise != null)
-    return `${fmt(v.base_price_paise)} flat`
+  if (v.pricing_mode === 'flat' && v.starting_price_paise != null)
+    return `${fmt(v.starting_price_paise)} flat`
   if (v.pricing_mode === 'hourly' && v.hourly_rate_paise != null)
     return `${fmt(v.hourly_rate_paise)}/hr`
   if (v.pricing_mode === 'mixed')
     return [
-      v.base_price_paise != null ? fmt(v.base_price_paise) : null,
+      v.starting_price_paise != null ? fmt(v.starting_price_paise) : null,
       v.hourly_rate_paise != null ? `${fmt(v.hourly_rate_paise)}/hr` : null,
     ].filter(Boolean).join(' + ')
   return '—'

@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_EVEN
@@ -30,11 +31,19 @@ DEFAULT_PLATFORM_COMMISSION_PCT = Decimal("10.00")
 
 # Internal helpers
 
-def _get_venue_or_404(db: Session, venue_id: UUID) -> Venue:
-    venue = db.query(Venue).filter(
-        Venue.id == venue_id,
-        Venue.deleted_at.is_(None),
-    ).first()
+def _get_venue_or_404(db: Session, venue_id: str | UUID) -> Venue:
+    try:
+        vid = UUID(str(venue_id))
+        venue = db.query(Venue).filter(
+            Venue.id == vid,
+            Venue.deleted_at.is_(None),
+        ).first()
+    except ValueError:
+        venue = db.query(Venue).filter(
+            Venue.slug == str(venue_id),
+            Venue.deleted_at.is_(None),
+        ).first()
+
     if not venue:
         raise NotFoundError("Venue not found")
     return venue
@@ -42,16 +51,21 @@ def _get_venue_or_404(db: Session, venue_id: UUID) -> Venue:
 # Acquire exclusive write lock on Venue to serialize slot check and creation
 def _get_active_venue_or_404(
     db: Session,
-    venue_id: UUID,
+    venue_id: str | UUID,
     *,
     for_update: bool = False,
 ) -> Venue:
     query = db.query(Venue).filter(
-        Venue.id == venue_id,
         Venue.status == VenueStatus.approved,
         Venue.is_active.is_(True),
         Venue.deleted_at.is_(None),
     )
+
+    try:
+        vid = UUID(str(venue_id))
+        query = query.filter(Venue.id == vid)
+    except ValueError:
+        query = query.filter(Venue.slug == str(venue_id))
 
     if for_update:
         query = query.with_for_update()
@@ -79,13 +93,38 @@ def _format_inr(paise: int) -> str:
     return f"₹{rupees:,.0f}"
 
 
+def _generate_slug(db: Session, name: str) -> str:
+    base_slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+    if not base_slug:
+        base_slug = "venue"
+    
+    slug = base_slug
+    counter = 1
+    while db.query(Venue).filter(Venue.slug == slug).first():
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+    return slug
+
+
 # Public service functions
 
 def get_platform_amenities(db: Session) -> list[Amenity]:
     return db.query(Amenity).filter(Amenity.deleted_at.is_(None)).order_by(Amenity.name.asc()).all()
 
-def get_venue(db: Session, venue_id: UUID) -> Venue:
-    return _get_active_venue_or_404(db, venue_id)
+def get_venue(db: Session, identifier: str) -> Venue:
+    try:
+        venue_id = UUID(identifier)
+        return _get_active_venue_or_404(db, venue_id)
+    except ValueError:
+        venue = db.query(Venue).filter(
+            Venue.slug == identifier,
+            Venue.status == VenueStatus.approved,
+            Venue.is_active.is_(True),
+            Venue.deleted_at.is_(None),
+        ).first()
+        if not venue:
+            raise NotFoundError("Venue not found")
+        return venue
 
 
 def get_pricing_preview(
@@ -99,7 +138,7 @@ def get_pricing_preview(
     venue = _get_active_venue_or_404(db, venue_id)
 
     if venue.pricing_mode == "flat" or (venue.pricing_mode == "mixed" and booking_type == BookingType.full_day):
-        quoted_price_paise = venue.base_price_paise
+        quoted_price_paise = venue.starting_price_paise
 
     elif venue.pricing_mode == "hourly" or (venue.pricing_mode == "mixed" and booking_type == BookingType.time_slot):
         if ends_at <= starts_at:
@@ -168,6 +207,12 @@ def list_owner_venues(db: Session, owner_id: UUID) -> list[Venue]:
     )
 
 
+def get_owner_venue(db: Session, venue_id: UUID, owner_id: UUID) -> Venue:
+    venue = _get_venue_or_404(db, venue_id)
+    _assert_owner(venue, owner_id)
+    return venue
+
+
 def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue:
     
     venue = Venue(
@@ -176,6 +221,7 @@ def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue
 
        
         name=body.name,
+        slug=_generate_slug(db, body.name),
         description=body.description,
         venue_type=body.venue_type.value,
 
@@ -211,7 +257,7 @@ def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue
 
         
         pricing_mode=body.pricing_mode.value,
-        base_price_paise=body.base_price_paise,
+        starting_price_paise=body.starting_price_paise,
         hourly_rate_paise=body.hourly_rate_paise,
 
         
@@ -258,18 +304,18 @@ def update_venue(
         setattr(venue, field, value)
 
     if venue.pricing_mode == "flat":
-        if venue.base_price_paise is None:
-            raise ConflictError("base_price_paise is required when pricing_mode is 'flat'")
+        if venue.starting_price_paise is None:
+            raise ConflictError("starting_price_paise is required when pricing_mode is 'flat'")
         if venue.hourly_rate_paise is not None:
             raise ConflictError("hourly_rate_paise must be null when pricing_mode is 'flat'")
     elif venue.pricing_mode == "hourly":
         if venue.hourly_rate_paise is None:
             raise ConflictError("hourly_rate_paise is required when pricing_mode is 'hourly'")
-        if venue.base_price_paise is not None:
-            raise ConflictError("base_price_paise must be null when pricing_mode is 'hourly'")
+        if venue.starting_price_paise is not None:
+            raise ConflictError("starting_price_paise must be null when pricing_mode is 'hourly'")
     elif venue.pricing_mode == "mixed":
-        if venue.base_price_paise is None or venue.hourly_rate_paise is None:
-            raise ConflictError("Both base_price_paise and hourly_rate_paise are required when pricing_mode is 'mixed'")
+        if venue.starting_price_paise is None or venue.hourly_rate_paise is None:
+            raise ConflictError("Both starting_price_paise and hourly_rate_paise are required when pricing_mode is 'mixed'")
 
     if venue.min_capacity is not None and venue.min_capacity > venue.max_capacity:
         raise ConflictError("min_capacity cannot exceed max_capacity")
