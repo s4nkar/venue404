@@ -47,7 +47,7 @@ class Venue(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("venue_categories.id"), nullable=True)
+    category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("venue_categories.id"), nullable=False)
 
     address_line1: Mapped[str] = mapped_column(Text, nullable=False)
     address_line2: Mapped[str | None] = mapped_column(Text, nullable=True)
