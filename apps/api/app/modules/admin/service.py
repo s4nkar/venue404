@@ -696,6 +696,7 @@ def seed_super_admin() -> None:
     """
     email = settings.super_admin_email
     password = settings.super_admin_password
+    name = settings.super_admin_name
 
     if not email or not password:
         logger.info("SUPER_ADMIN_EMAIL/PASSWORD not set, skipping super admin seed")
@@ -703,24 +704,28 @@ def seed_super_admin() -> None:
 
     db: Session = SessionLocal()
     try:
-        _seed(db, email, password)
+        _seed(db, email, password, name)
     finally:
         db.close()
 
 
-def _seed(db: Session, email: str, password: str) -> None:
-    auth_user_id = _resolve_supabase_user(email, password)
+def _seed(db: Session, email: str, password: str, name: str) -> None:
+    auth_user_id = _resolve_supabase_user(email, password, name)
 
     profile = db.query(Profile).filter(Profile.id == auth_user_id).first()
     if not profile:
         profile = Profile(
             id=auth_user_id,
-            full_name="Super Admin",
+            full_name=name or "Super Admin",
             status=ProfileStatus.active,
         )
         db.add(profile)
         db.flush()
         logger.info("Created profile for super admin %s", email)
+    elif name and profile.full_name != name:
+        profile.full_name = name
+        db.flush()
+        logger.info("Updated full_name for super admin %s", email)
 
     role_exists = db.query(UserRoleAssignment).filter(
         UserRoleAssignment.user_id == auth_user_id,
@@ -753,7 +758,7 @@ def _supabase_admin_request(method: str, path: str, body: dict | None = None) ->
         return json.loads(resp.read())
 
 
-def _resolve_supabase_user(email: str, password: str) -> uuid.UUID:
+def _resolve_supabase_user(email: str, password: str, name: str = "") -> uuid.UUID:
     """
     Returns the UUID of the Supabase auth user, creating them if they
     don't exist. Uses the Admin API so no confirmation email is triggered.
@@ -777,6 +782,7 @@ def _resolve_supabase_user(email: str, password: str) -> uuid.UUID:
         "email": email,
         "password": password,
         "email_confirm": True,
+        "user_metadata": {"full_name": name or "Super Admin"},
     })
     logger.info("Created Supabase auth user for super admin: %s", email)
     return uuid.UUID(result["id"])

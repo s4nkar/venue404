@@ -10,7 +10,7 @@ const STATUS_CONFIG = {
 
   owner_accepted: {
     label: 'Accepted',
-    className: 'bg-blue-50 text-blue-700 border-blue-200',
+    className: 'bg-brand-light text-brand border-brand-muted',
   },
 
   confirmed: {

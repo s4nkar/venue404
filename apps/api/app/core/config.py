@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # Only the process that owns scheduling should flip this on
     enable_jobs: bool = False
 
+    super_admin_name: str = ""
     super_admin_email: str = ""
     super_admin_password: str = ""
     

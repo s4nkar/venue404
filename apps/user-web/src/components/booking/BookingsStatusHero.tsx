@@ -14,7 +14,7 @@ const STATUS_META = {
 
   owner_accepted: {
     label: 'Accepted',
-    color: 'bg-blue-50 text-blue-700',
+    color: 'bg-brand-light text-brand',
     description:
       'The venue owner has accepted your booking. Complete payment to secure your reservation.',
   },

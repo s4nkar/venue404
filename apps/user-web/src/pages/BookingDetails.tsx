@@ -7,11 +7,7 @@ import {
   venueEndpoints,
 } from '@venue404/api-client'
 
-import { Logo } from '@venue404/ui'
-
-import { Link } from 'react-router-dom'
-
-import { useAuth } from '../lib/AuthContext'
+import { AppNavbar } from '../components/shared/AppNavbar'
 
 import { CancellationPolicyCard } from '../components/venue/CancellationPolicyCard'
 
@@ -21,63 +17,6 @@ import { BookingInformationCard } from '../components/booking/BookingInformation
 import { BookingTimelineCard } from '../components/booking/BookingTimelineCard'
 import { PaymentSummaryCard } from '../components/booking/PaymentSummaryCard'
 import { BookingActionsCard } from '../components/booking/BookingActionsCard'
-
-function DetailNavbar() {
-  const { user, signOut } = useAuth()
-
-  return (
-    <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-3">
-        <Link to="/">
-          <Logo />
-        </Link>
-
-        <nav className="flex items-center gap-1">
-          {user ? (
-            <>
-              <Link
-                to="/my-bookings"
-                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
-              >
-                My Bookings
-              </Link>
-
-              <Link
-                to="/profile"
-                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
-              >
-                Profile
-              </Link>
-
-              <button
-                onClick={signOut}
-                className="ml-1 rounded-lg px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
-              >
-                Sign out
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                to="/login"
-                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
-              >
-                Sign in
-              </Link>
-
-              <Link
-                to="/register"
-                className="ml-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover transition-colors"
-              >
-                Get started
-              </Link>
-            </>
-          )}
-        </nav>
-      </div>
-    </header>
-  )
-}
 
 function BookingDetailSkeleton() {
   return (
@@ -132,7 +71,7 @@ export default function BookingDetail() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white">
-        <DetailNavbar />
+        <AppNavbar />
         <BookingDetailSkeleton />
       </div>
     )
@@ -146,7 +85,7 @@ export default function BookingDetail() {
   ) {
     return (
       <div className="min-h-screen bg-white">
-        <DetailNavbar />
+        <AppNavbar />
 
         <div className="max-w-6xl mx-auto px-4 py-24 text-center">
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 mb-6">
@@ -186,7 +125,7 @@ export default function BookingDetail() {
 
   return (
     <div className="min-h-screen bg-white">
-      <DetailNavbar />
+      <AppNavbar />
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <button

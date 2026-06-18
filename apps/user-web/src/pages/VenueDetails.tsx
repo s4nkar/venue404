@@ -1,74 +1,227 @@
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { createClient, venueEndpoints } from '@venue404/api-client'
-import { useAuth } from '../lib/AuthContext'
-import { Link } from 'react-router-dom'
-import { Logo } from '@venue404/ui'
-import { VenueGallery }           from '../components/venue/VenueGallery'
-import { VenueInfo }              from '../components/venue/VenueInfo'
-import { AmenitiesList }          from '../components/venue/AmenitiesList'
-import { CancellationPolicyCard } from '../components/venue/CancellationPolicyCard'
-import { BookingPanel }           from '../components/venue/BookingPanel'
+import { toUtcIso } from '../utils'
 
-// ─── Page-level skeleton ──────────────────────────────────────────────────────
+import { AppNavbar }                from '../components/shared/AppNavbar'
+import { VenueGallery }             from '../components/venue/VenueGallery'
+import { VenueInfo }                from '../components/venue/VenueInfo'
+import { AmenitiesList }            from '../components/venue/AmenitiesList'
+import { VenueAvailabilitySection } from '../components/venue/VenueAvailabilitySection'
+import { VenueReserveCard }         from '../components/venue/VenueReserveCard'
+import { VenueReviews }             from '../components/venue/VenueReviews'
+import { VenueWhereYoullBe }        from '../components/venue/VenueWhereYoullBe'
+import { VenueMeetHost }            from '../components/venue/VenueMeetHost'
+import { VenueThingsToKnow }        from '../components/venue/VenueThingsToKnow'
+
+import type { VenueResponse, AvailabilityResponse, PricingQuote, BookingType } from '../types'
+
+function Divider() {
+  return <div className="my-10 border-t border-zinc-100" />
+}
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function VenueDetailSkeleton() {
   return (
-    <div className="animate-pulse">
-      {/* Gallery */}
-      <div className="w-full h-[480px] bg-zinc-100" />
-      {/* Body */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
-        <div className="flex flex-col lg:flex-row gap-12">
-          <div className="flex-1 space-y-5">
-            <div className="h-5 w-20 bg-zinc-100 rounded-full" />
-            <div className="h-10 w-2/3 bg-zinc-100 rounded-lg" />
-            <div className="h-4 w-1/3 bg-zinc-100 rounded" />
-            <div className="h-4 w-1/4 bg-zinc-100 rounded" />
-            <div className="mt-6 h-32 bg-zinc-100 rounded-xl" />
-          </div>
-          <div className="w-full lg:w-[400px] shrink-0">
-            <div className="h-[480px] bg-zinc-100 rounded-2xl" />
-          </div>
+    <div className="animate-pulse space-y-8">
+      <div className="h-[500px] w-full rounded-2xl bg-zinc-100" />
+      <div className="flex flex-col gap-10 lg:flex-row lg:gap-16">
+        <div className="flex-1 space-y-6">
+          <div className="h-9 w-2/3 rounded-xl bg-zinc-100" />
+          <div className="h-4 w-1/3 rounded bg-zinc-100" />
+          <div className="h-px w-full bg-zinc-100" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-start gap-4 py-4 border-b border-zinc-50">
+              <div className="h-6 w-6 rounded bg-zinc-100" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3.5 w-2/3 rounded bg-zinc-100" />
+                <div className="h-3 w-1/2 rounded bg-zinc-100" />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="w-full lg:w-[400px] shrink-0">
+          <div className="h-[480px] rounded-2xl bg-zinc-100" />
         </div>
       </div>
     </div>
   )
 }
 
-// ─── Minimal navbar (used on detail pages — no hero, just nav) ────────────────
+// ─── Not found ────────────────────────────────────────────────────────────────
 
-function DetailNavbar() {
-  const { user, signOut } = useAuth()
+function VenueNotFound({ onBack }: { onBack: () => void }) {
   return (
-    <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-3">
-        <Link to="/">
-          <Logo />
-        </Link>
-        <nav className="flex items-center gap-1">
-          {user ? (
-            <>
-              <Link to="/my-bookings" className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
-                My Bookings
-              </Link>
-              <Link to="/profile" className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
-                Profile
-              </Link>
-              <button onClick={signOut} className="ml-1 rounded-lg px-3 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
-                Sign out
-              </button>
-            </>
-          ) : (
-            <>
-              <Link to="/login" className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">Sign in</Link>
-              <Link to="/register" className="ml-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover transition-colors">Get started</Link>
-            </>
-          )}
-        </nav>
+    <div className="flex flex-col items-center justify-center py-32 text-center">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-zinc-100">
+        <svg className="h-9 w-9 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
       </div>
-    </header>
+      <h2 className="text-xl font-semibold text-zinc-900">Venue not found</h2>
+      <p className="mt-2 max-w-sm text-sm text-zinc-500">This venue may have been removed or is not yet published.</p>
+      <button onClick={onBack} className="mt-8 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-6 py-3 text-sm font-semibold text-white hover:bg-zinc-800 transition-colors">
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Browse venues
+      </button>
+    </div>
   )
+}
+
+// ─── Booking state hook ───────────────────────────────────────────────────────
+
+function useVenueBooking(venue: VenueResponse) {
+  const navigate = useNavigate()
+  const client   = createClient()
+
+  const isTimeSlotVenue = venue.allowed_booking_types.includes('time_slot')
+  const isFullDayVenue  = venue.allowed_booking_types.includes('full_day')
+  const showTypeToggle  = isTimeSlotVenue && isFullDayVenue
+
+  const [bookingType,   setBookingType]   = useState<BookingType>(
+    isTimeSlotVenue && !isFullDayVenue ? 'time_slot' : 'full_day'
+  )
+  const [startDate,     setStartDate]     = useState<string | null>(null)
+  const [endDate,       setEndDate]       = useState<string | null>(null)
+  const [selectedStart, setSelectedStart] = useState<string | null>(null) // datetimes for quote
+  const [selectedEnd,   setSelectedEnd]   = useState<string | null>(null)
+  const [slotError,     setSlotError]     = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isTimeSlotVenue && !isFullDayVenue)  setBookingType('time_slot')
+    else if (isFullDayVenue && !isTimeSlotVenue) setBookingType('full_day')
+  }, [isTimeSlotVenue, isFullDayVenue])
+
+  // When a full_day range is complete, auto-set the start/end datetimes using venue hours
+  useEffect(() => {
+    if (bookingType === 'full_day' && startDate && endDate) {
+      const openH  = venue.open_time.slice(0, 5)   // "HH:MM"
+      const closeH = venue.close_time.slice(0, 5)
+      setSelectedStart(`${startDate}T${openH}:00`)
+      setSelectedEnd(`${endDate}T${closeH}:00`)
+    } else if (bookingType === 'full_day') {
+      // Range not complete yet — clear datetimes so quote doesn't fire prematurely
+      setSelectedStart(null)
+      setSelectedEnd(null)
+    }
+  }, [bookingType, startDate, endDate, venue.open_time, venue.close_time])
+
+  // Availability query (only needed for time_slot picker)
+  const availQuery = useQuery<AvailabilityResponse>({
+    queryKey:  ['availability-date', venue.id, startDate],
+    queryFn:   () => venueEndpoints(client).getDateAvailability(venue.id, toUtcIso(startDate)!),
+    enabled:   bookingType === 'time_slot' && !!startDate,
+    staleTime: 2 * 60 * 1000,
+  })
+
+  // Pricing quote
+  const quoteEnabled = !!selectedStart && !!selectedEnd && selectedStart !== selectedEnd
+
+  const quoteQuery = useQuery<PricingQuote>({
+    queryKey:  ['quote', venue.id, selectedStart, selectedEnd, bookingType],
+    queryFn:   () => venueEndpoints(client).getQuote(venue.id, {
+      starts_at:    toUtcIso(selectedStart)!,
+      ends_at:      toUtcIso(selectedEnd)!,
+      booking_type: bookingType,
+    }),
+    enabled:   quoteEnabled,
+    staleTime: 60 * 1000,
+  })
+
+  // Validate and navigate to checkout
+  const validateMutation = useMutation({
+    mutationFn: () =>
+      venueEndpoints(client).validateSlot(venue.id, {
+        booking_type: bookingType,
+        starts_at:    toUtcIso(selectedStart) ?? undefined,
+        ends_at:      toUtcIso(selectedEnd)   ?? undefined,
+        booking_date: bookingType === 'full_day' ? (toUtcIso(startDate) ?? undefined) : undefined,
+      }),
+    onSuccess: (validation) => {
+      if (!validation.valid) {
+        setSlotError('This slot is no longer available. Please choose different dates.')
+        return
+      }
+      navigate('/checkout', {
+        state: {
+          venueId:         venue.id,
+          venueName:       venue.name,
+          venueCoverImage: venue.photos?.find((p) => p.is_cover)?.image_url ?? null,
+          bookingType,
+          startsAt:        validation.effective_starts_at,
+          endsAt:          validation.effective_ends_at,
+          bookingDate:     toUtcIso(startDate),
+          quote:           quoteQuery.data,
+        },
+      })
+    },
+    onError: (err: any) => setSlotError(err?.message ?? 'Unable to book. Please try again.'),
+  })
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  function handleBookingTypeChange(next: BookingType) {
+    if (next === bookingType) return
+    setBookingType(next)
+    setStartDate(null); setEndDate(null)
+    setSelectedStart(null); setSelectedEnd(null); setSlotError(null)
+  }
+
+  function handleRangeChange(start: string | null, end: string | null) {
+    setStartDate(start)
+    setEndDate(end)
+    setSlotError(null)
+    // For time_slot, treat as single-day — endDate always = startDate
+    if (bookingType === 'time_slot') {
+      setEndDate(start)
+      setSelectedStart(null)
+      setSelectedEnd(null)
+    }
+  }
+
+  function handleSlotSelect(start: string, end: string | null) {
+    setSelectedStart(start)
+    setSelectedEnd(end)
+    setSlotError(null)
+  }
+
+  function resetAll() {
+    setStartDate(null); setEndDate(null)
+    setSelectedStart(null); setSelectedEnd(null); setSlotError(null)
+  }
+
+  function resetSlot() {
+    setSelectedStart(null); setSelectedEnd(null); setSlotError(null)
+  }
+
+  function handleBook() {
+    setSlotError(null)
+    validateMutation.mutate()
+  }
+
+  return {
+    bookingType, showTypeToggle,
+    startDate, endDate,
+    selectedStart, selectedEnd,
+    slotError,
+    availability:  availQuery.data,
+    availLoading:  availQuery.isLoading,
+    availError:    availQuery.isError,
+    quote:         quoteQuery.data,
+    quoteLoading:  quoteQuery.isLoading,
+    quoteError:    quoteQuery.isError,
+    isPending:     validateMutation.isPending,
+    handleBookingTypeChange,
+    handleRangeChange,
+    handleSlotSelect,
+    resetAll,
+    resetSlot,
+    handleBook,
+  }
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -84,56 +237,13 @@ export default function VenueDetails() {
     enabled:  !!id,
   })
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-white">
-        <DetailNavbar />
-        <VenueDetailSkeleton />
-      </div>
-    )
-  }
-
-  if (isError || !venue) {
-    return (
-      <div className="min-h-screen bg-white">
-        <DetailNavbar />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-32 text-center">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 mb-6">
-            <svg className="h-7 w-7 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-zinc-900 mb-2">Venue not found</h2>
-          <p className="text-sm text-zinc-500 mb-8 max-w-sm mx-auto">
-            This venue may have been removed or is not yet published.
-          </p>
-          <button
-            onClick={() => navigate('/')}
-            className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-6 py-3 text-sm font-semibold text-white hover:bg-zinc-800 transition-colors"
-          >
-            Browse venues
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-white">
-      <DetailNavbar />
-
-      {/* ── Gallery — edge-to-edge, full bleed ───────────────────── */}
-      <div className="w-full">
-        <VenueGallery photos={venue.photos ?? []} venueName={venue.name} />
-      </div>
-
-      {/* ── Body ────────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
-
-        {/* Breadcrumb / back */}
+      <AppNavbar />
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 pb-24 pt-6">
         <button
           onClick={() => navigate(-1)}
-          className="mb-8 inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-700 transition-colors"
+          className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -141,43 +251,112 @@ export default function VenueDetails() {
           Back to results
         </button>
 
-        <div className="flex flex-col lg:flex-row gap-12 xl:gap-16">
+        {isLoading && <VenueDetailSkeleton />}
+        {(isError || (!isLoading && !venue)) && <VenueNotFound onBack={() => navigate('/')} />}
+        {venue && <VenueContent venue={venue} />}
+      </main>
+    </div>
+  )
+}
 
-          {/* ── Left column ───────────────────────────────────────── */}
-          <div className="flex-1 min-w-0">
-            {/* Venue info header */}
-            <VenueInfo venue={venue} />
+// ─── Content (hooks run after venue is available) ─────────────────────────────
 
-            {/* Divider */}
-            <div className="my-10 border-t border-zinc-100" />
+function VenueContent({ venue }: { venue: VenueResponse }) {
+  const b = useVenueBooking(venue)
 
-            {/* Amenities */}
-            {(venue.amenities ?? []).length > 0 && (
-              <>
-                <AmenitiesList amenities={venue.amenities ?? []} />
-                <div className="my-10 border-t border-zinc-100" />
-              </>
-            )}
+  return (
+    <>
+      {/* Gallery */}
+      <VenueGallery photos={venue.photos ?? []} venueName={venue.name} />
 
-            {/* Cancellation */}
-            <CancellationPolicyCard policy={venue.cancellation_policy} />
+      {/* ── Two-column body
+          KEY: NO `items-start` here. Default flex is `items-stretch`, which
+          makes the right column div as tall as the left column. That lets
+          the inner `sticky` element scroll properly through the full page. ── */}
+      <div className="mt-10 flex flex-col gap-10 lg:flex-row lg:gap-16 xl:gap-20">
 
-            {/* Extra bottom padding so mobile booking panel doesn't overlap */}
-            <div className="h-32 lg:hidden" />
-          </div>
+        {/* ════ LEFT ══════════════════════════════════════════ */}
+        <div className="flex-1 min-w-0">
 
-          {/* ── Right column — sticky booking panel ───────────────── */}
-          <div className="w-full lg:w-[400px] xl:w-[420px] shrink-0">
-            <div className="lg:sticky lg:top-[80px]">
-              <BookingPanel venue={venue} />
+          <VenueInfo venue={venue} />
+          <Divider />
+
+          <AmenitiesList amenities={venue.amenities ?? []} />
+          <Divider />
+
+          {/* Two-month date range calendar */}
+          <VenueAvailabilitySection
+            venue={venue}
+            bookingType={b.bookingType}
+            startDate={b.startDate}
+            endDate={b.endDate}
+            selectedStart={b.selectedStart}
+            selectedEnd={b.selectedEnd}
+            availability={b.availability}
+            availLoading={b.availLoading}
+            availError={b.availError}
+            onRangeChange={b.handleRangeChange}
+            onSlotSelect={b.handleSlotSelect}
+            onClear={b.resetAll}
+            onClearSlot={b.resetSlot}
+          />
+          <Divider />
+
+          <VenueReviews />
+          <Divider />
+
+          <VenueWhereYoullBe venue={venue} />
+          <Divider />
+
+          <VenueMeetHost venue={venue} />
+          <Divider />
+
+          <VenueThingsToKnow venue={venue} />
+
+          {/* Mobile padding so card doesn't overlap */}
+          <div className="h-36 lg:hidden" />
+        </div>
+
+        {/* ════ RIGHT — sticky card ═══════════════════════════ */}
+        {/* self-stretch (default) makes this div as tall as the left column
+            so the inner sticky element can scroll through the whole page. */}
+        <div className="w-full lg:w-[400px] xl:w-[420px] shrink-0">
+          <div className="lg:sticky lg:top-[82px]">
+            <VenueReserveCard
+              venue={venue}
+              bookingType={b.bookingType}
+              showTypeToggle={b.showTypeToggle}
+              startDate={b.startDate}
+              endDate={b.endDate}
+              selectedStart={b.selectedStart}
+              selectedEnd={b.selectedEnd}
+              quote={b.quote}
+              quoteLoading={b.quoteLoading}
+              quoteError={b.quoteError}
+              slotError={b.slotError}
+              isPending={b.isPending}
+              onBookingTypeChange={b.handleBookingTypeChange}
+              onReset={b.resetAll}
+              onBook={b.handleBook}
+            />
+
+            {/* Trust micro-copy */}
+            <div className="mt-4 space-y-2.5 px-1">
+              {[
+                { icon: '🛡️', text: 'No charge until the owner accepts' },
+                { icon: '✓',  text: 'Verified venue on Venue404' },
+                { icon: '↩',  text: 'Cancellation terms per policy below' },
+              ].map(({ icon, text }) => (
+                <div key={text} className="flex items-start gap-2.5 text-xs text-zinc-400">
+                  <span>{icon}</span>
+                  <span>{text}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
 
-      {/* ── Mobile bottom CTA bar ───────────────────────────────── */}
-      {/* BookingPanel renders inline on mobile and scrolls naturally.
-          The sticky panel is lg-only via the class above. */}
-    </div>
+      </div>
+    </>
   )
 }

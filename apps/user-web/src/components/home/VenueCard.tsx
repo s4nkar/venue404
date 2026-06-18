@@ -2,16 +2,20 @@ import { VENUE_TYPE_LABELS } from '../../constants'
 import { formatPrice } from '../../utils'
 import type { SearchResult } from '../../types'
 
-// ─── Skeleton ────────────────────────────────────────────────────────────────
+type Props = { venue: SearchResult; onClick: () => void }
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 export function VenueCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden animate-pulse">
-      <div className="h-44 bg-zinc-100" />
-      <div className="p-4 space-y-3">
-        <div className="h-4 bg-zinc-100 rounded w-2/3" />
-        <div className="h-3 bg-zinc-100 rounded w-1/2" />
-        <div className="h-5 bg-zinc-100 rounded w-1/3 mt-4" />
+    <div className="overflow-hidden rounded-2xl bg-white shadow-[0_1px_4px_rgba(0,0,0,0.08)] animate-pulse">
+      <div className="aspect-[4/3] bg-zinc-100" />
+      <div className="p-4 space-y-2.5">
+        <div className="h-4 w-3/4 rounded bg-zinc-100" />
+        <div className="h-3 w-1/2 rounded bg-zinc-100" />
+        <div className="h-3 w-2/5 rounded bg-zinc-100" />
+        <div className="h-3 w-full rounded bg-zinc-100" />
+        <div className="h-3 w-4/5 rounded bg-zinc-100" />
       </div>
     </div>
   )
@@ -19,73 +23,70 @@ export function VenueCardSkeleton() {
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
-type Props = {
-  venue: SearchResult
-  onClick: () => void
-}
-
 export function VenueCard({ venue, onClick }: Props) {
+  const typeLabel = VENUE_TYPE_LABELS[venue.venue_type] ?? venue.venue_type
+
+  const priceLabel =
+    venue.starting_price_paise != null
+      ? `From ${formatPrice(venue.starting_price_paise)} min spend`
+      : null
+
   return (
-    <div
+    <article
       onClick={onClick}
-      className="group cursor-pointer rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+      className="group cursor-pointer overflow-hidden"
     >
-      {/* Photo */}
-      <div className="relative h-44 bg-zinc-100 overflow-hidden">
+      {/* ── Image ── */}
+      <div className="relative aspect-[8/5] overflow-hidden rounded-2xl bg-zinc-100">
         {venue.cover_photo_url ? (
           <img
             src={venue.cover_photo_url}
             alt={venue.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="h-full w-full object-cover transition-transform duration-500rounded-2xl"
+            loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <svg
-              className="h-8 w-8 text-zinc-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-zinc-100 to-zinc-50">
+            <svg className="h-9 w-9 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
+            <p className="px-4 text-center text-xs leading-tight text-zinc-400 line-clamp-2">{venue.name}</p>
           </div>
         )}
-        <span className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2.5 py-0.5 rounded-full text-[11px] font-medium text-zinc-700 border border-zinc-200/50">
-          {VENUE_TYPE_LABELS[venue.venue_type] ?? venue.venue_type}
-        </span>
-      </div>
 
-      {/* Info */}
-      <div className="p-4">
-        <p className="text-sm font-semibold text-zinc-900 leading-tight truncate group-hover:text-blue-600 transition-colors">
-          {venue.name}
-        </p>
-        <p className="mt-1 flex items-center gap-1 text-xs text-zinc-400">
-          <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+        {/* Heart / save button */}
+        <button
+          onClick={(e) => e.stopPropagation()}
+          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-md backdrop-blur-sm transition-all hover:bg-white hover:scale-110"
+          aria-label="Save venue"
+        >
+          <svg className="h-4 w-4 text-zinc-400 transition-colors hover:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
+        </button>
+      </div>
+
+      {/* ── Info ── */}
+      <div className="py-3 px-1">
+        <h5 className="truncate font-medium text-zinc-900 leading-snug transition-colors group-hover:text-brand">
+          {venue.name}
+        </h5>
+
+        <p className="text-[.8rem] text-zinc-500">
           {venue.city}
+          {venue.capacity != null && (
+            <> &middot; Up to {venue.capacity.toLocaleString()} guests</>
+          )}
         </p>
 
-        <div className="mt-3 flex items-end justify-between">
-          <div className="text-xs text-zinc-400">
-            Up to{' '}
-            <span className="font-medium text-zinc-700">{venue.capacity} guests</span>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-400 leading-none">from</p>
-            <p className="text-sm font-bold text-zinc-900 mt-0.5">
-              {formatPrice(venue.starting_price_paise)}
-            </p>
-          </div>
-        </div>
+        {priceLabel && (
+          <p className="mt-1.5 text-sm font-semibold text-zinc-900">{priceLabel}</p>
+        )}
+
+        <p className="mt-1.5 text-[.8rem] text-zinc-400 line-clamp-2">
+          A {typeLabel.toLowerCase()} venue in {venue.city}. Available for events, conferences, and private hire.
+        </p>
       </div>
-    </div>
+    </article>
   )
 }
