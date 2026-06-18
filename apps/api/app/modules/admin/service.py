@@ -23,6 +23,108 @@ from app.core.storage import upload_image_to_cloudinary, delete_image_from_cloud
 
 logger = logging.getLogger(__name__)
 
+def _month_start(year: int, month: int) -> datetime:
+    return datetime(year, month, 1, tzinfo=timezone.utc)
+
+
+def _add_months(dt: datetime, n: int) -> datetime:
+    total = dt.year * 12 + (dt.month - 1) + n
+    y, m = divmod(total, 12)
+    return _month_start(y, m + 1)
+
+
+def get_growth_stats(db: Session, period: str = "6m") -> dict:
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+
+    # Parse period → build (start, end, label) buckets + trunc unit
+    VALID = {"7d", "30d", "3m", "6m", "12m"}
+    if period not in VALID:
+        period = "6m"
+
+    use_days = period.endswith("d")
+    buckets: list[tuple[datetime, datetime, str]] = []
+
+    if use_days:
+        n_days = int(period[:-1])
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        for i in range(n_days - 1, -1, -1):
+            start = today_start - timedelta(days=i)
+            end = start + timedelta(days=1)
+            label = f"{start.day} {start.strftime('%b')}"
+            buckets.append((start, end, label))
+        trunc = "day"
+    else:
+        n_months = int(period[:-1])
+        for i in range(n_months - 1, -1, -1):
+            start = _month_start(now.year, now.month)
+            start = _add_months(start, -i)
+            end = _add_months(start, 1)
+            label = start.strftime("%b %y")
+            buckets.append((start, end, label))
+        trunc = "month"
+
+    period_start = buckets[0][0]
+
+    def baseline(model, extra_filter=None):
+        q = db.query(func.count(model.id)).filter(model.created_at < period_start)
+        if extra_filter is not None:
+            q = q.filter(extra_filter)
+        return q.scalar() or 0
+
+    def bucket_new(model, extra_filter=None):
+        q = (
+            db.query(
+                func.date_trunc(trunc, model.created_at).label("bucket"),
+                func.count(model.id).label("cnt"),
+            )
+            .filter(model.created_at >= period_start)
+        )
+        if extra_filter is not None:
+            q = q.filter(extra_filter)
+        rows = q.group_by("bucket").all()
+        return {r.bucket.replace(tzinfo=timezone.utc): r.cnt for r in rows}
+
+    base_users    = baseline(Profile)
+    base_owners   = baseline(UserRoleAssignment, UserRoleAssignment.role == UserRole.venue_owner)
+    base_venues   = baseline(Venue, Venue.deleted_at.is_(None))
+    base_bookings = baseline(Booking, Booking.deleted_at.is_(None))
+
+    new_users    = bucket_new(Profile)
+    new_owners   = bucket_new(UserRoleAssignment, UserRoleAssignment.role == UserRole.venue_owner)
+    new_venues   = bucket_new(Venue, Venue.deleted_at.is_(None))
+    new_bookings = bucket_new(Booking, Booking.deleted_at.is_(None))
+
+    labels, users_s, owners_s, venues_s, bookings_s = [], [], [], [], []
+    cum_u = base_users; cum_o = base_owners; cum_v = base_venues; cum_b = base_bookings
+
+    for start, _end, label in buckets:
+        cum_u += new_users.get(start, 0)
+        cum_o += new_owners.get(start, 0)
+        cum_v += new_venues.get(start, 0)
+        cum_b += new_bookings.get(start, 0)
+        labels.append(label)
+        users_s.append(cum_u)
+        owners_s.append(cum_o)
+        venues_s.append(cum_v)
+        bookings_s.append(cum_b)
+
+    return {
+        "labels": labels,
+        "users": users_s,
+        "owners": owners_s,
+        "venues": venues_s,
+        "bookings": bookings_s,
+        "totals": {
+            "users": users_s[-1] if users_s else 0,
+            "owners": owners_s[-1] if owners_s else 0,
+            "venues": venues_s[-1] if venues_s else 0,
+            "bookings": bookings_s[-1] if bookings_s else 0,
+        },
+    }
+
+
 def get_venue_stats(db: Session) -> dict:
     row = db.query(Venue).filter(Venue.deleted_at.is_(None)).with_entities(
         func.count(Venue.id).label("total"),

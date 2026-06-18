@@ -198,6 +198,15 @@ class AdminBookingListResponse(BaseModel):
 
 # ─── Venue admin schemas ───────────────────────────────────────────────────────
 
+class GrowthStatsResponse(BaseModel):
+    labels: list[str]
+    users: list[int]
+    owners: list[int]
+    venues: list[int]
+    bookings: list[int]
+    totals: dict[str, int]
+
+
 class VenueStatsResponse(BaseModel):
     total: int
     pending_approval: int

@@ -27,6 +27,7 @@ from app.modules.admin.schemas import (
     BookingStatsResponse,
     AdminBookingListResponse,
     VenueStatsResponse,
+    GrowthStatsResponse,
 )
 from app.modules.auth.dependencies import require_admin, AuthContext
 from app.modules.admin import service
@@ -313,3 +314,12 @@ def list_bookings(
     db: Session = Depends(get_db),
 ):
     return service.list_admin_bookings(db, status=status, search=search, page=page, page_size=page_size)
+
+
+@router.get("/growth-stats", response_model=GrowthStatsResponse)
+def get_growth_stats(
+    period: str = Query("6m", pattern="^(7d|30d|3m|6m|12m)$"),
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.get_growth_stats(db, period=period)
