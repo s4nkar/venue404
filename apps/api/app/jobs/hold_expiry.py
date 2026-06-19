@@ -16,7 +16,7 @@ def run():
         rows = (
             db.query(Booking)
             .filter(
-                Booking.status == BookingStatus.accepted,
+                Booking.status == BookingStatus.owner_accepted,
                 Booking.hold_expires_at.isnot(None),
                 Booking.hold_expires_at < now,
             )
@@ -25,9 +25,12 @@ def run():
         for b in rows:
             b.status = BookingStatus.hold_expired
             b.payment_status = PaymentStatus.unpaid
+            b.expired_at = now
+            if b.slot:
+                b.slot.is_blocking = False
             db.add(BookingStatusHistory(
-                booking_id=b.id, old_status="accepted", new_status="hold_expired",
-                reason="hold_expiry_job",
+                booking_id=b.id, old_status=BookingStatus.owner_accepted,
+                new_status=BookingStatus.hold_expired, reason="hold_expiry_job",
             ))
             venue = db.get(Venue, b.venue_id)
             venue_name = venue.name if venue else "your venue"

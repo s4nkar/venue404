@@ -13,5 +13,4 @@ export * from './endpoints/adminCategories'
 export * from './endpoints/adminVenues'
 export * from './endpoints/adminBookings'
 export * from './endpoints/profile'
-export * from './endpoints/notifications'
 
