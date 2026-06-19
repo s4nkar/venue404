@@ -22,15 +22,16 @@ def run():
         rows = (
             db.query(Booking)
             .filter(
-                Booking.status == BookingStatus.accepted,
-                Booking.event_date.isnot(None),
+                Booking.status == BookingStatus.owner_accepted,
                 Booking.hold_expires_at.isnot(None),
                 Booking.hold_expires_at > now,
             )
             .all()
         )
         for b in rows:
-            days_until = (b.event_date - today).days
+            if not b.slot:
+                continue
+            days_until = (b.slot.starts_at.date() - today).days
             if days_until in REMINDER_DAYS:
                 venue = db.get(Venue, b.venue_id)
                 venue_name = venue.name if venue else "your venue"

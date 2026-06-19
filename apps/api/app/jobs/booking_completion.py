@@ -2,7 +2,9 @@ import logging
 from datetime import datetime, timezone
 
 from app.core.database import with_session
-from app.modules.booking.models import Booking, BookingStatus, PaymentStatus, BookingStatusHistory
+from app.modules.booking.models import (
+    Booking, BookingSlot, BookingStatus, PaymentStatus, BookingStatusHistory,
+)
 from app.modules.venue.models import Venue
 from app.modules.notification import service as notifications
 
@@ -13,24 +15,28 @@ def run():
     """Mark confirmed bookings completed once the event date has passed and no
     payment is pending. (Dispute/cancellation workflow checks go here too.)
     """
-    today = datetime.now(timezone.utc).date()
+    now = datetime.now(timezone.utc)
     completed = 0
     with with_session() as db:
         rows = (
             db.query(Booking)
+            .join(BookingSlot, BookingSlot.booking_id == Booking.id)
             .filter(
                 Booking.status == BookingStatus.confirmed,
-                Booking.payment_status == PaymentStatus.paid,
-                Booking.event_date.isnot(None),
-                Booking.event_date < today,
+                Booking.payment_status == PaymentStatus.fully_paid,
+                BookingSlot.deleted_at.is_(None),
+                BookingSlot.effective_ends_at < now,
             )
             .all()
         )
         for b in rows:
             b.status = BookingStatus.completed
+            b.completed_at = now
+            if b.slot:
+                b.slot.is_blocking = False
             db.add(BookingStatusHistory(
-                booking_id=b.id, old_status="confirmed", new_status="completed",
-                reason="booking_completion_job",
+                booking_id=b.id, old_status=BookingStatus.confirmed,
+                new_status=BookingStatus.completed, reason="booking_completion_job",
             ))
             venue = db.get(Venue, b.venue_id)
             venue_name = venue.name if venue else "your venue"
