@@ -2,8 +2,8 @@ import enum
 import uuid
 from datetime import datetime, time
 from sqlalchemy import (
-    Integer, Boolean, Numeric, BigInteger, Text, Time, DateTime, 
-    ForeignKey, CheckConstraint, Index, UniqueConstraint, func, Enum, text
+    Integer, Boolean, Numeric, BigInteger, Text, Time, DateTime,
+    ForeignKey, CheckConstraint, Index, func, Enum, text
 )
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import mapped_column, Mapped, relationship
@@ -18,6 +18,26 @@ class VenueStatus(str, enum.Enum):
     suspended = "suspended"
 
 
+class VenueCategory(Base):
+    __tablename__ = "venue_categories"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    icon: Mapped[str | None] = mapped_column(Text, nullable=True)
+    banner_image: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("uq_venue_categories_slug_active", "slug", unique=True, postgresql_where=text("deleted_at IS NULL")),
+    )
+
+    venues: Mapped[list["Venue"]] = relationship(back_populates="category")
+
+
 class Venue(Base):
     __tablename__ = "venues"
 
@@ -27,7 +47,7 @@ class Venue(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    venue_type: Mapped[str] = mapped_column(Text, nullable=False)
+    category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("venue_categories.id"), nullable=False)
 
     address_line1: Mapped[str] = mapped_column(Text, nullable=False)
     address_line2: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -77,6 +97,7 @@ class Venue(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
     # Relationships
+    category: Mapped["VenueCategory"] = relationship(back_populates="venues")
     photos: Mapped[list["VenuePhoto"]] = relationship(
         back_populates="venue", 
         cascade="all, delete-orphan",
@@ -118,7 +139,7 @@ class Venue(Base):
         CheckConstraint("balance_due_days_before_event > 0", name="ck_venues_balance_days"),
         CheckConstraint("owner_action_window_hours BETWEEN 24 AND 72", name="ck_venues_action_window"),
         CheckConstraint("overdue_advance_refund_pct BETWEEN 0 AND 100", name="ck_venues_overdue_refund_pct"),
-        Index("idx_venues_search", "city", "venue_type", "status", "is_active", postgresql_where=text("deleted_at IS NULL")),
+        Index("idx_venues_search", "city", "category_id", "status", "is_active", postgresql_where=text("deleted_at IS NULL")),
     )
 
     bookings = relationship(

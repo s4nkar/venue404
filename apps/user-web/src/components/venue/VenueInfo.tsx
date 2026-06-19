@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { VENUE_TYPE_LABELS, formatPrice } from '../../utils'
+import { formatPrice } from '../../utils'
 import type { VenueResponse } from '../../types'
 
 type Props = { venue: VenueResponse }
@@ -65,7 +65,7 @@ const DESC_LIMIT = 320
 
 export function VenueInfo({ venue }: Props) {
   const [descExpanded, setDescExpanded] = useState(false)
-  const typeLabel = VENUE_TYPE_LABELS[venue.venue_type] ?? venue.venue_type
+  const typeLabel = venue.category?.label ?? venue.category?.slug ?? ''
 
   const bookingTypeLabel =
     venue.allowed_booking_types.includes('full_day') && venue.allowed_booking_types.includes('time_slot')

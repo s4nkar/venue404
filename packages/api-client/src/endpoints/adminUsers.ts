@@ -99,6 +99,15 @@ export type ListActionsParams = {
   limit?: number
 }
 
+export type GrowthStats = {
+  labels: string[]
+  users: number[]
+  owners: number[]
+  venues: number[]
+  bookings: number[]
+  totals: { users: number; owners: number; venues: number; bookings: number }
+}
+
 export const adminActionEndpoints = (client: ReturnType<typeof createClient>) => ({
   listActions: (params: ListActionsParams = {}): Promise<AdminActionListResponse> => {
     const qs = new URLSearchParams()
@@ -110,6 +119,13 @@ export const adminActionEndpoints = (client: ReturnType<typeof createClient>) =>
     const q = qs.toString()
     return client.get<AdminActionListResponse>(`/api/admin/actions${q ? `?${q}` : ''}`)
   },
+})
+
+export type GrowthPeriod = '7d' | '30d' | '3m' | '6m' | '12m'
+
+export const adminGrowthEndpoints = (client: ReturnType<typeof createClient>) => ({
+  getGrowthStats: (period: GrowthPeriod = '6m'): Promise<GrowthStats> =>
+    client.get<GrowthStats>(`/api/admin/growth-stats?period=${period}`),
 })
 
 export const adminUserEndpoints = (client: ReturnType<typeof createClient>) => ({

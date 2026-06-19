@@ -13,13 +13,136 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.exceptions import NotFoundError, ForbiddenError, ConflictError
 from app.modules.admin.models import AdminAction
-from app.modules.admin.schemas import AmenityUpdateRequest
+from app.modules.admin.schemas import AmenityUpdateRequest, CategoryUpdateRequest
 from app.modules.profile.models import Profile, UserRoleAssignment, UserRole, ProfileStatus
-from app.modules.venue.models import Amenity, VenueAmenity, Venue, VenueStatus
+from app.modules.venue.models import Amenity, VenueAmenity, Venue, VenueCategory, VenueStatus
+from app.modules.booking.models import Booking, BookingSlot, BookingStatus
+from app.core.storage import upload_image_to_cloudinary, delete_image_from_cloudinary
 
 
 
 logger = logging.getLogger(__name__)
+
+def _month_start(year: int, month: int) -> datetime:
+    return datetime(year, month, 1, tzinfo=timezone.utc)
+
+
+def _add_months(dt: datetime, n: int) -> datetime:
+    total = dt.year * 12 + (dt.month - 1) + n
+    y, m = divmod(total, 12)
+    return _month_start(y, m + 1)
+
+
+def get_growth_stats(db: Session, period: str = "6m") -> dict:
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+
+    # Parse period → build (start, end, label) buckets + trunc unit
+    VALID = {"7d", "30d", "3m", "6m", "12m"}
+    if period not in VALID:
+        period = "6m"
+
+    use_days = period.endswith("d")
+    buckets: list[tuple[datetime, datetime, str]] = []
+
+    if use_days:
+        n_days = int(period[:-1])
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        for i in range(n_days - 1, -1, -1):
+            start = today_start - timedelta(days=i)
+            end = start + timedelta(days=1)
+            label = f"{start.day} {start.strftime('%b')}"
+            buckets.append((start, end, label))
+        trunc = "day"
+    else:
+        n_months = int(period[:-1])
+        for i in range(n_months - 1, -1, -1):
+            start = _month_start(now.year, now.month)
+            start = _add_months(start, -i)
+            end = _add_months(start, 1)
+            label = start.strftime("%b %y")
+            buckets.append((start, end, label))
+        trunc = "month"
+
+    period_start = buckets[0][0]
+
+    def baseline(model, extra_filter=None):
+        q = db.query(func.count(model.id)).filter(model.created_at < period_start)
+        if extra_filter is not None:
+            q = q.filter(extra_filter)
+        return q.scalar() or 0
+
+    def bucket_new(model, extra_filter=None):
+        q = (
+            db.query(
+                func.date_trunc(trunc, model.created_at).label("bucket"),
+                func.count(model.id).label("cnt"),
+            )
+            .filter(model.created_at >= period_start)
+        )
+        if extra_filter is not None:
+            q = q.filter(extra_filter)
+        rows = q.group_by("bucket").all()
+        return {r.bucket.replace(tzinfo=timezone.utc): r.cnt for r in rows}
+
+    base_users    = baseline(Profile)
+    base_owners   = baseline(UserRoleAssignment, UserRoleAssignment.role == UserRole.venue_owner)
+    base_venues   = baseline(Venue, Venue.deleted_at.is_(None))
+    base_bookings = baseline(Booking, Booking.deleted_at.is_(None))
+
+    new_users    = bucket_new(Profile)
+    new_owners   = bucket_new(UserRoleAssignment, UserRoleAssignment.role == UserRole.venue_owner)
+    new_venues   = bucket_new(Venue, Venue.deleted_at.is_(None))
+    new_bookings = bucket_new(Booking, Booking.deleted_at.is_(None))
+
+    labels, users_s, owners_s, venues_s, bookings_s = [], [], [], [], []
+    cum_u = base_users; cum_o = base_owners; cum_v = base_venues; cum_b = base_bookings
+
+    for start, _end, label in buckets:
+        cum_u += new_users.get(start, 0)
+        cum_o += new_owners.get(start, 0)
+        cum_v += new_venues.get(start, 0)
+        cum_b += new_bookings.get(start, 0)
+        labels.append(label)
+        users_s.append(cum_u)
+        owners_s.append(cum_o)
+        venues_s.append(cum_v)
+        bookings_s.append(cum_b)
+
+    return {
+        "labels": labels,
+        "users": users_s,
+        "owners": owners_s,
+        "venues": venues_s,
+        "bookings": bookings_s,
+        "totals": {
+            "users": users_s[-1] if users_s else 0,
+            "owners": owners_s[-1] if owners_s else 0,
+            "venues": venues_s[-1] if venues_s else 0,
+            "bookings": bookings_s[-1] if bookings_s else 0,
+        },
+    }
+
+
+def get_venue_stats(db: Session) -> dict:
+    row = db.query(Venue).filter(Venue.deleted_at.is_(None)).with_entities(
+        func.count(Venue.id).label("total"),
+        func.count(case((Venue.status == VenueStatus.pending_approval, 1))).label("pending_approval"),
+        func.count(case((Venue.status == VenueStatus.approved, 1))).label("approved"),
+        func.count(case((Venue.status == VenueStatus.rejected, 1))).label("rejected"),
+        func.count(case((Venue.status == VenueStatus.suspended, 1))).label("suspended"),
+        func.count(case((Venue.status == VenueStatus.draft, 1))).label("draft"),
+    ).one()
+    return {
+        "total": row.total,
+        "pending_approval": row.pending_approval,
+        "approved": row.approved,
+        "rejected": row.rejected,
+        "suspended": row.suspended,
+        "draft": row.draft,
+    }
+
 
 def list_admin_venues(
     db: Session,
@@ -50,7 +173,7 @@ def list_admin_venues(
     total = filtered.with_entities(func.count(Venue.id)).scalar()
     venues = (
         filtered
-        .options(joinedload(Venue.photos), joinedload(Venue.amenities))
+        .options(joinedload(Venue.photos), joinedload(Venue.amenities), joinedload(Venue.category))
         .order_by(Venue.updated_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
@@ -70,7 +193,7 @@ def list_admin_venues(
             "name": v.name,
             "slug": v.slug,
             "description": v.description,
-            "venue_type": v.venue_type,
+            "category_slug": v.category.slug,
             "address_line1": v.address_line1,
             "city": v.city,
             "state": v.state,
@@ -612,6 +735,191 @@ def delete_amenity(
     return {"deleted": True, "active_venue_count": active_count}
 
 
+def _get_category_or_404(db: Session, category_id: uuid.UUID) -> VenueCategory:
+    cat = db.query(VenueCategory).filter(VenueCategory.id == category_id).first()
+    if not cat:
+        raise NotFoundError("Category not found")
+    return cat
+
+
+def _count_category_venues(db: Session, category_id: uuid.UUID) -> int:
+    return db.query(Venue).filter(Venue.category_id == category_id, Venue.deleted_at.is_(None)).count()
+
+
+def _category_to_dict(cat: VenueCategory, venue_count: int) -> dict:
+    return {
+        "id": cat.id,
+        "slug": cat.slug,
+        "label": cat.label,
+        "icon": cat.icon,
+        "banner_image": cat.banner_image,
+        "is_active": cat.is_active,
+        "sort_order": cat.sort_order,
+        "created_at": cat.created_at,
+        "deleted_at": cat.deleted_at,
+        "venue_count": venue_count,
+    }
+
+
+def list_categories(db: Session, *, include_deleted: bool = False) -> dict:
+    query = db.query(VenueCategory)
+    if not include_deleted:
+        query = query.filter(VenueCategory.deleted_at.is_(None))
+    cats = query.order_by(VenueCategory.sort_order.asc(), VenueCategory.label.asc()).all()
+
+    cat_ids = [c.id for c in cats]
+    count_rows = (
+        db.query(Venue.category_id, func.count(Venue.id).label("cnt"))
+        .filter(Venue.category_id.in_(cat_ids), Venue.deleted_at.is_(None))
+        .group_by(Venue.category_id)
+        .all()
+    ) if cat_ids else []
+    counts = {row.category_id: row.cnt for row in count_rows}
+
+    items = [_category_to_dict(c, counts.get(c.id, 0)) for c in cats]
+    return {"items": items, "total": len(items)}
+
+
+def create_category(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    slug: str,
+    label: str,
+    icon: str | None,
+    sort_order: int,
+) -> dict:
+    normalized_slug = slug.strip().lower()
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:s))"), {"s": normalized_slug})
+    cat = VenueCategory(slug=normalized_slug, label=label.strip(), icon=icon, sort_order=sort_order)
+    db.add(cat)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise ConflictError("A category with this slug already exists")
+
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="category_created",
+        target_type="category",
+        target_id=cat.id,
+    ))
+    db.commit()
+    db.refresh(cat)
+    return _category_to_dict(cat, 0)
+
+
+def update_category(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    category_id: uuid.UUID,
+    body: CategoryUpdateRequest,
+) -> dict:
+    cat = _get_category_or_404(db, category_id)
+    if cat.deleted_at is not None:
+        raise ConflictError("Cannot update a deleted category")
+
+    if "label" in body.model_fields_set and body.label is not None:
+        cat.label = body.label.strip()
+    if "icon" in body.model_fields_set:
+        cat.icon = body.icon
+    if "sort_order" in body.model_fields_set and body.sort_order is not None:
+        cat.sort_order = body.sort_order
+    if "is_active" in body.model_fields_set and body.is_active is not None:
+        cat.is_active = body.is_active
+
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="category_updated",
+        target_type="category",
+        target_id=cat.id,
+    ))
+    db.commit()
+    db.refresh(cat)
+    venue_count = _count_category_venues(db, cat.id)
+    return _category_to_dict(cat, venue_count)
+
+
+def upload_category_banner(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    category_id: uuid.UUID,
+    file_bytes: bytes,
+) -> dict:
+    cat = _get_category_or_404(db, category_id)
+    if cat.deleted_at is not None:
+        raise ConflictError("Cannot update a deleted category")
+
+    if cat.banner_image:
+        try:
+            delete_image_from_cloudinary(cat.banner_image)
+        except Exception:
+            pass
+
+    banner_url = upload_image_to_cloudinary(file_bytes, folder=f"categories/{category_id}")
+    cat.banner_image = banner_url
+
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="category_banner_updated",
+        target_type="category",
+        target_id=cat.id,
+    ))
+    db.commit()
+    db.refresh(cat)
+    return {"banner_image": cat.banner_image}
+
+
+def delete_category_banner(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    category_id: uuid.UUID,
+) -> dict:
+    cat = _get_category_or_404(db, category_id)
+    if cat.banner_image:
+        try:
+            delete_image_from_cloudinary(cat.banner_image)
+        except Exception:
+            pass
+        cat.banner_image = None
+        db.add(AdminAction(
+            admin_id=admin_id,
+            action_type="category_banner_deleted",
+            target_type="category",
+            target_id=cat.id,
+        ))
+        db.commit()
+    return {"banner_image": None}
+
+
+def delete_category(
+    db: Session,
+    *,
+    admin_id: uuid.UUID,
+    category_id: uuid.UUID,
+) -> dict:
+    cat = _get_category_or_404(db, category_id)
+    if cat.deleted_at is not None:
+        raise ConflictError("Category is already deleted")
+
+    venue_count = _count_category_venues(db, cat.id)
+    cat.deleted_at = datetime.now(timezone.utc)
+    cat.is_active = False
+
+    db.add(AdminAction(
+        admin_id=admin_id,
+        action_type="category_deleted",
+        target_type="category",
+        target_id=cat.id,
+    ))
+    db.commit()
+    return {"deleted": True, "venue_count": venue_count}
+
+
 def list_actions(
     db: Session,
     *,
@@ -786,3 +1094,114 @@ def _resolve_supabase_user(email: str, password: str, name: str = "") -> uuid.UU
     })
     logger.info("Created Supabase auth user for super admin: %s", email)
     return uuid.UUID(result["id"])
+
+
+# ─── Booking admin service ─────────────────────────────────────────────────────
+
+_CANCELLED_STATUSES = (
+    BookingStatus.hold_expired,
+    BookingStatus.request_expired,
+    BookingStatus.conflict_cancelled,
+    BookingStatus.user_cancelled,
+    BookingStatus.admin_cancelled,
+    BookingStatus.owner_rejected,
+    BookingStatus.balance_overdue_cancelled,
+)
+
+
+def get_booking_stats(db: Session) -> dict:
+    row = db.query(
+        func.count(Booking.id).label("total"),
+        func.count(case((Booking.status == BookingStatus.requested, 1))).label("requested"),
+        func.count(case((Booking.status == BookingStatus.confirmed, 1))).label("confirmed"),
+        func.count(case((Booking.status == BookingStatus.completed, 1))).label("completed"),
+        func.count(case((Booking.status.in_(_CANCELLED_STATUSES), 1))).label("cancelled"),
+    ).filter(Booking.deleted_at.is_(None)).one()
+    return {
+        "total": row.total,
+        "requested": row.requested,
+        "confirmed": row.confirmed,
+        "completed": row.completed,
+        "cancelled": row.cancelled,
+    }
+
+
+def list_admin_bookings(
+    db: Session,
+    *,
+    status: str | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 25,
+) -> dict:
+    stats = get_booking_stats(db)
+
+    base = (
+        db.query(Booking)
+        .join(Venue, Venue.id == Booking.venue_id)
+        .join(Profile, Profile.id == Booking.user_id)
+        .filter(Booking.deleted_at.is_(None))
+    )
+
+    if status:
+        if status == "cancelled":
+            base = base.filter(Booking.status.in_(_CANCELLED_STATUSES))
+        else:
+            base = base.filter(Booking.status == BookingStatus(status))
+
+    if search:
+        safe = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        base = base.filter(Venue.name.ilike(f"%{safe}%") | Profile.full_name.ilike(f"%{safe}%"))
+
+    total = base.count()
+    total_pages = max(1, math.ceil(total / page_size))
+    rows = (
+        base
+        .order_by(Booking.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    slot_map: dict = {}
+    owner_map: dict = {}
+    if rows:
+        booking_ids = [b.id for b in rows]
+        slots = db.query(BookingSlot).filter(BookingSlot.booking_id.in_(booking_ids)).all()
+        slot_map = {s.booking_id: s for s in slots}
+
+        owner_ids = list({b.venue.owner_id for b in rows})
+        owners = db.query(Profile).filter(Profile.id.in_(owner_ids)).all()
+        owner_map = {o.id: o for o in owners}
+
+    items: list[dict] = []
+    for b in rows:
+        slot = slot_map.get(b.id)
+        event_date = slot.starts_at.date().isoformat() if slot else ""
+        owner = owner_map.get(b.venue.owner_id)
+        items.append({
+            "id": b.id,
+            "venue_id": b.venue_id,
+            "venue_name": b.venue.name,
+            "customer_name": b.user.full_name,
+            "customer_email": b.user.email,
+            "customer_phone": b.user.phone,
+            "owner_id": b.venue.owner_id,
+            "owner_name": owner.full_name if owner else None,
+            "owner_email": owner.email if owner else None,
+            "owner_phone": owner.phone if owner else None,
+            "status": b.status.value,
+            "payment_status": b.payment_status.value,
+            "event_date": event_date,
+            "guest_count": b.guest_count,
+            "created_at": b.created_at,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "stats": stats,
+    }

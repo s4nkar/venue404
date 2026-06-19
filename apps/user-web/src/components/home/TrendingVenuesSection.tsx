@@ -1,4 +1,3 @@
-import { VENUE_TYPE_LABELS } from '../../constants'
 import { formatPrice } from '../../utils'
 import type { SearchResult } from '../../types'
 
@@ -32,7 +31,7 @@ function TrendingSkeleton() {
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 function TrendingCard({ venue, onClick }: { venue: SearchResult; onClick: () => void }) {
-  const typeLabel  = VENUE_TYPE_LABELS[venue.venue_type] ?? venue.venue_type
+  const typeLabel = venue.category?.label ?? venue.category?.slug ?? ''
 
   const priceLabel =
     venue.starting_price_paise != null && venue.pricing_mode === 'flat'

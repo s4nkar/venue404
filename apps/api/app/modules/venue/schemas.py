@@ -6,18 +6,6 @@ from decimal import Decimal
 from enum import Enum
 
 
-class VenueType(str, Enum):
-    banquet_hall = "banquet_hall"
-    wedding_hall = "wedding_hall"
-    auditorium = "auditorium"
-    conference_room = "conference_room"
-    club = "club"
-    rooftop = "rooftop"
-    resort = "resort"
-    lawn = "lawn"
-    event_space = "event_space"
-    meeting_room = "meeting_room"
-
 
 class BookingType(str, Enum):
     full_day = "full_day"
@@ -36,6 +24,18 @@ class VenueStatus(str, Enum):
     approved = "approved"
     rejected = "rejected"
     suspended = "suspended"
+
+
+class VenueCategoryResponse(BaseModel):
+    id: UUID
+    slug: str
+    label: str
+    icon: Optional[str] = None
+    banner_image: Optional[str] = None
+    is_active: bool
+    sort_order: int
+
+    model_config = {"from_attributes": True}
 
 
 class VenuePhotoResponse(BaseModel):
@@ -118,9 +118,9 @@ class VenueResponse(BaseModel):
     name: str
     slug: Optional[str] = None
     description: Optional[str] = None
-    venue_type: VenueType
+    category: VenueCategoryResponse
 
-    
+
     address_line1: str
     address_line2: Optional[str] = None
     city: str
@@ -187,10 +187,10 @@ class DeleteResponse(BaseModel):
 
 
 class CreateVenueRequest(BaseModel):
-   
+
     name: str
     description: Optional[str] = None
-    venue_type: VenueType
+    category_id: UUID
 
     
     address_line1: str
@@ -289,7 +289,7 @@ class CreateVenueRequest(BaseModel):
 class UpdateVenueRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    venue_type: Optional[VenueType] = None
+    category_id: Optional[UUID] = None
 
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
@@ -398,7 +398,7 @@ class VenueSearchResult(BaseModel):
     id: UUID
     name: str
     slug: Optional[str] = None
-    venue_type: VenueType
+    category: VenueCategoryResponse
     city: str
     state: str
     max_capacity: int

@@ -14,16 +14,19 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout } from '../components/AdminLayout'
 import { createClient, ApiError } from '@venue404/api-client'
-import { adminActionEndpoints, adminUserEndpoints } from '@venue404/api-client'
+import { adminActionEndpoints, adminUserEndpoints, adminBookingEndpoints, adminVenueEndpoints } from '@venue404/api-client'
+import { GrowthChart } from '../components/GrowthChart'
 
 const actionsApi = adminActionEndpoints(createClient())
 const usersApi = adminUserEndpoints(createClient())
+const bookingsApi = adminBookingEndpoints(createClient())
+const venuesApi = adminVenueEndpoints(createClient())
 
 const METRIC_TEMPLATES: DashboardMetric[] = [
   {
     label: 'Pending Approvals',
     value: '—',
-    description: 'Venue owners awaiting review',
+    description: 'Venues awaiting approval',
     icon: <Building2 className="h-4 w-4" />,
     accent: 'amber',
   },
@@ -103,18 +106,23 @@ export default function Dashboard() {
     queryFn: () => usersApi.getOwnerStats().catch(suppressAuthErrors),
   })
 
-  const { data: pendingOwnersData, isLoading: pendingLoading } = useQuery({
-    queryKey: ['admin', 'dashboard', 'pending-owners'],
-    queryFn: () =>
-      usersApi.listUsers({ role: 'venue_owner', status: 'pending', page_size: 4 }).catch(suppressAuthErrors),
+  const { data: bookingStats } = useQuery({
+    queryKey: ['admin', 'dashboard', 'booking-stats'],
+    queryFn: () => bookingsApi.getStats().catch(suppressAuthErrors),
   })
+
+  const { data: venueStats } = useQuery({
+    queryKey: ['admin', 'dashboard', 'venue-stats'],
+    queryFn: () => venuesApi.getVenueStats().catch(suppressAuthErrors),
+  })
+
 
   const recentActions = actionsData?.items ?? []
   const actionsTotal = actionsData?.total ?? null
-  const pendingOwners = pendingOwnersData?.items ?? []
 
   const metrics = METRIC_TEMPLATES.map((m) => {
-    if (m.label === 'Pending Approvals') return { ...m, value: ownerStats ? String(ownerStats.pending) : '—' }
+    if (m.label === 'Pending Approvals') return { ...m, value: venueStats ? String(venueStats.pending_approval) : '—' }
+    if (m.label === 'Active Bookings') return { ...m, value: bookingStats ? String(bookingStats.confirmed) : '—' }
     if (m.label === 'Venue Owners') return { ...m, value: ownerStats ? String(ownerStats.total) : '—' }
     if (m.label === 'Open Actions') return { ...m, value: actionsTotal !== null ? String(actionsTotal) : '—' }
     return m
@@ -146,54 +154,9 @@ export default function Dashboard() {
       {/* Content grid */}
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
 
-        {/* Pending venue owner approvals */}
-        <div className="card-enter lg:col-span-2 rounded-xl border border-zinc-200 bg-white shadow-sm">
-          <div className="border-b border-zinc-100 px-5 py-4">
-            <SectionHeader
-              title="Pending Venue Approvals"
-              description="Venue owners awaiting your review"
-              action={
-                <button
-                  type="button"
-                  onClick={() => navigate('/venues/pending')}
-                  className="press text-xs font-medium text-brand transition-colors hover:text-brand"
-                >
-                  View all
-                </button>
-              }
-            />
-          </div>
-          <div className="px-5">
-            {pendingLoading && (
-              <div className="flex items-center justify-center py-8">
-                <RefreshCw className="h-4 w-4 animate-spin text-zinc-300" />
-              </div>
-            )}
-            {!pendingLoading && pendingOwners.length === 0 && (
-              <div className="py-4">
-                <EmptyState
-                  icon={<Building2 className="h-4 w-4" />}
-                  title="No pending approvals"
-                  description="All venue owner applications have been reviewed."
-                />
-              </div>
-            )}
-            {!pendingLoading && pendingOwners.length > 0 && (
-              <ul className="divide-y divide-zinc-100">
-                {pendingOwners.map((o) => (
-                  <li key={o.id}>
-                    <ActivityItem
-                      title={o.full_name ?? 'Unknown'}
-                      description={o.email ?? ''}
-                      timestamp={timeAgo(o.created_at)}
-                      icon={<UserCheck className="h-3.5 w-3.5" />}
-                      badge={<StatusBadge label="Pending" variant="pending" />}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        {/* Platform growth chart */}
+        <div className="card-enter lg:col-span-2 rounded-xl border border-zinc-200 bg-white shadow-sm" style={{ minHeight: 320 }}>
+          <GrowthChart />
         </div>
 
         {/* Recent audit actions */}
