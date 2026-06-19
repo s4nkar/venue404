@@ -24,7 +24,7 @@ export default function CreateVenueWizard() {
   // Centralized state for the entire form
   const [formData, setFormData] = useState({
     name: '',
-    venue_type: '',
+    category_id: '',
     description: '',
     min_capacity: '',
     max_capacity: '',
@@ -65,6 +65,7 @@ export default function CreateVenueWizard() {
   const [photos, setPhotos] = useState<File[]>([])
   const [platformAmenities, setPlatformAmenities] = useState<any[]>([])
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([])
+  const [venueCategories, setVenueCategories] = useState<any[]>([])
 
   useEffect(() => {
     async function loadAmenities() {
@@ -76,7 +77,17 @@ export default function CreateVenueWizard() {
         console.error('Failed to load amenities', err)
       }
     }
+    async function loadCategories() {
+      try {
+        const client = createClient()
+        const data = await venueEndpoints(client).getVenueCategories()
+        setVenueCategories(data)
+      } catch (err) {
+        console.error('Failed to load categories', err)
+      }
+    }
     loadAmenities()
+    loadCategories()
   }, [])
 
   useEffect(() => {
@@ -138,7 +149,7 @@ export default function CreateVenueWizard() {
     const payload = {
       name: formData.name,
       description: formData.description || null,
-      venue_type: formData.venue_type || 'event_space',
+      category_id: formData.category_id,
       address_line1: formData.address_line1 || 'TBD',
       address_line2: formData.address_line2 || null,
       city: formData.city || 'TBD',
@@ -286,21 +297,18 @@ export default function CreateVenueWizard() {
             <div className="space-y-6">
               <Input label="Venue Name" name="name" value={formData.name} onChange={handleChange} placeholder="e.g. Skyline Rooftop" required />
               <div className="space-y-1">
-                <label className="text-sm font-medium text-zinc-700">Venue Type<span className="text-red-500 ml-1">*</span></label>
-                <select name="venue_type" value={formData.venue_type} onChange={handleChange} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
-                <option value="">Select a type...</option>
-                <option value="banquet_hall">Banquet Hall</option>
-                <option value="wedding_hall">Wedding Hall</option>
-                <option value="auditorium">Auditorium</option>
-                <option value="conference_room">Conference Room</option>
-                <option value="club">Club</option>
-                <option value="rooftop">Rooftop</option>
-                <option value="resort">Resort</option>
-                <option value="lawn">Lawn</option>
-                <option value="event_space">Event Space</option>
-                <option value="meeting_room">Meeting Room</option>
-              </select>
-            </div>
+                <label className="text-sm font-medium text-zinc-700">Venue Category<span className="text-red-500 ml-1">*</span></label>
+                <select name="category_id" value={formData.category_id} onChange={handleChange} required
+                  disabled={venueCategories.length === 0}
+                  className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:opacity-50">
+                  <option value="">{venueCategories.length === 0 ? 'Loading categories…' : 'Select a category…'}</option>
+                  {venueCategories.map((cat: any) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon ? `${cat.icon} ` : ''}{cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-1">Description</label>
               <textarea 

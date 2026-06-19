@@ -1,8 +1,18 @@
+export type VenueCategory = {
+  id: string
+  slug: string
+  label: string
+  icon: string | null
+  banner_image: string | null
+  is_active: boolean
+  sort_order: number
+}
+
 export type SearchResult = {
   id: string
   name: string
   city: string
-  venue_type: string
+  category: VenueCategory
   capacity: number
   pricing_mode: string
   starting_price_paise: number | null
@@ -44,7 +54,7 @@ export type VenueResponse = {
   name: string
   slug?: string | null
   description?: string | null
-  venue_type: string
+  category: VenueCategory
   address_line1: string
   address_line2?: string | null
   city: string

@@ -1,6 +1,7 @@
 import { createClient } from '../client'
 
 export const venueEndpoints = (client: ReturnType<typeof createClient>) => ({
+  getVenueCategories: () => client.get<import('./adminCategories').VenueCategory[]>('/api/venues/categories'),
   getVenue: (id: string) => client.get<any>(`/api/venues/${id}`),
   createVenue: (body: unknown) => client.post<any>('/api/venues/', body),
   updateVenue: (id: string, body: unknown) => client.patch<any>(`/api/venues/${id}`, body),

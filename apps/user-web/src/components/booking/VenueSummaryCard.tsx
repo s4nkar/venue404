@@ -1,5 +1,4 @@
 import type { VenueResponse } from '../../types'
-import { VENUE_TYPE_LABELS } from '../../constants'
 
 type Props = {
   venue: VenueResponse
@@ -15,10 +14,7 @@ export function VenueSummaryCard({
     venue.photos?.[0]?.image_url ??
     null
 
-  const venueType =
-    VENUE_TYPE_LABELS[
-      venue.venue_type
-    ] ?? venue.venue_type
+  const venueType = venue.category?.label ?? venue.category?.slug ?? ''
 
   return (
     <div className="rounded-2xl border border-zinc-200 shadow-sm overflow-hidden bg-white">

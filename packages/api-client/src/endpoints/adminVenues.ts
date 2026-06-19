@@ -74,6 +74,9 @@ function buildQS(params: ListVenuesParams = {}): string {
 }
 
 export const adminVenueEndpoints = (client: ReturnType<typeof createClient>) => ({
+  getVenueStats: (): Promise<AdminVenueStats> =>
+    client.get<AdminVenueStats>('/api/admin/venues/stats'),
+
   listVenues: (params: ListVenuesParams = {}): Promise<AdminVenueListResponse> =>
     client.get<AdminVenueListResponse>(`/api/admin/venues${buildQS(params)}`),
 

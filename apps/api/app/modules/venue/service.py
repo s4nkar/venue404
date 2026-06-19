@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError, ForbiddenError, ConflictError
-from app.modules.venue.models import Venue, VenueStatus, VenueAvailability, VenueBlockedDate, VenueCancellationPolicy, VenueAmenity, Amenity, VenuePhoto
+from app.modules.venue.models import Venue, VenueCategory, VenueStatus, VenueAvailability, VenueBlockedDate, VenueCancellationPolicy, VenueAmenity, Amenity, VenuePhoto
 from app.modules.venue.schemas import (
     CreateVenueRequest,
     UpdateVenueRequest,
@@ -107,6 +107,15 @@ def _generate_slug(db: Session, name: str) -> str:
 
 
 # Public service functions
+
+def get_venue_categories(db: Session) -> list[VenueCategory]:
+    return (
+        db.query(VenueCategory)
+        .filter(VenueCategory.is_active.is_(True), VenueCategory.deleted_at.is_(None))
+        .order_by(VenueCategory.sort_order.asc(), VenueCategory.label.asc())
+        .all()
+    )
+
 
 def get_platform_amenities(db: Session) -> list[Amenity]:
     return db.query(Amenity).filter(Amenity.deleted_at.is_(None)).order_by(Amenity.name.asc()).all()
@@ -213,17 +222,29 @@ def get_owner_venue(db: Session, venue_id: UUID, owner_id: UUID) -> Venue:
     return venue
 
 
+def _get_category_or_400(db: Session, category_id: UUID) -> VenueCategory:
+    cat = db.query(VenueCategory).filter(
+        VenueCategory.id == category_id,
+        VenueCategory.is_active.is_(True),
+        VenueCategory.deleted_at.is_(None),
+    ).first()
+    if not cat:
+        raise ConflictError("Invalid or inactive category")
+    return cat
+
+
 def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue:
-    
+
+    _get_category_or_400(db, body.category_id)
+
     venue = Venue(
         id=uuid.uuid4(),
         owner_id=owner_id,
 
-       
         name=body.name,
         slug=_generate_slug(db, body.name),
         description=body.description,
-        venue_type=body.venue_type.value,
+        category_id=body.category_id,
 
         
         address_line1=body.address_line1,
@@ -293,6 +314,9 @@ def update_venue(
     _assert_owner(venue, owner_id)
 
     update_data = body.model_dump(exclude_unset=True)
+
+    if "category_id" in update_data and update_data["category_id"] is not None:
+        _get_category_or_400(db, update_data["category_id"])
 
     for field, value in update_data.items():
         

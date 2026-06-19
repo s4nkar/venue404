@@ -13,22 +13,24 @@ STALE_AFTER = timedelta(days=7)
 
 def run():
     """Auto-expire booking requests that have been pending (requested) for 7 days."""
-    cutoff = datetime.now(timezone.utc) - STALE_AFTER
+    now = datetime.now(timezone.utc)
+    cutoff = now - STALE_AFTER
     expired = 0
     with with_session() as db:
         rows = (
             db.query(Booking)
             .filter(
                 Booking.status == BookingStatus.requested,
-                Booking.created_at < cutoff,
+                Booking.requested_at < cutoff,
             )
             .all()
         )
         for b in rows:
             b.status = BookingStatus.request_expired
+            b.expired_at = now
             db.add(BookingStatusHistory(
-                booking_id=b.id, old_status="requested", new_status="request_expired",
-                reason="stale_requests_job",
+                booking_id=b.id, old_status=BookingStatus.requested,
+                new_status=BookingStatus.request_expired, reason="stale_requests_job",
             ))
             venue = db.get(Venue, b.venue_id)
             venue_name = venue.name if venue else "the venue"

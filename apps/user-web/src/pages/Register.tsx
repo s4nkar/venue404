@@ -1,11 +1,11 @@
-﻿import { useState } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { AuthLayout, AuthCard, Logo } from '@venue404/ui'
 import { VenueFlowPanel } from '../components/VenueFlowPanel'
 
 export default function Register() {
-  const { signUp } = useAuth()
+  const { user, loading, signUp } = useAuth()
   const navigate = useNavigate()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -13,6 +13,10 @@ export default function Register() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!loading && user) navigate('/login/success', { replace: true })
+  }, [user, loading, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -32,6 +36,8 @@ export default function Register() {
       setSubmitting(false)
     }
   }
+
+  if (loading) return null
 
   return (
     <AuthLayout

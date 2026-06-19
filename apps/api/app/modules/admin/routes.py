@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -18,11 +18,29 @@ from app.modules.admin.schemas import (
     AdminAmenityResponse,
     AmenityListResponse,
     AmenityDeleteResponse,
+    CategoryCreateRequest,
+    CategoryUpdateRequest,
+    AdminCategoryResponse,
+    CategoryListResponse,
+    CategoryDeleteResponse,
+    CategoryBannerResponse,
+    BookingStatsResponse,
+    AdminBookingListResponse,
+    VenueStatsResponse,
+    GrowthStatsResponse,
 )
 from app.modules.auth.dependencies import require_admin, AuthContext
 from app.modules.admin import service
 
 router = APIRouter()
+
+
+@router.get("/venues/stats", response_model=VenueStatsResponse)
+def get_venue_stats(
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.get_venue_stats(db)
 
 
 @router.get("/venues", response_model=AdminVenueListResponse)
@@ -206,3 +224,102 @@ def delete_amenity(
     db: Session = Depends(get_db),
 ):
     return service.delete_amenity(db, admin_id=auth.user_id, amenity_id=amenity_id)
+
+
+# ── Category routes ────────────────────────────────────────────────────────────
+
+@router.get("/categories", response_model=CategoryListResponse)
+def list_categories(
+    include_deleted: bool = Query(False),
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.list_categories(db, include_deleted=include_deleted)
+
+
+@router.post("/categories", response_model=AdminCategoryResponse, status_code=201)
+def create_category(
+    body: CategoryCreateRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.create_category(
+        db,
+        admin_id=auth.user_id,
+        slug=body.slug,
+        label=body.label,
+        icon=body.icon,
+        sort_order=body.sort_order,
+    )
+
+
+@router.patch("/categories/{category_id}", response_model=AdminCategoryResponse)
+def update_category(
+    category_id: UUID,
+    body: CategoryUpdateRequest,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.update_category(db, admin_id=auth.user_id, category_id=category_id, body=body)
+
+
+@router.post("/categories/{category_id}/banner-image", response_model=CategoryBannerResponse)
+async def upload_category_banner(
+    category_id: UUID,
+    file: UploadFile = File(...),
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    file_bytes = await file.read()
+    return service.upload_category_banner(db, admin_id=auth.user_id, category_id=category_id, file_bytes=file_bytes)
+
+
+@router.delete("/categories/{category_id}/banner-image", response_model=CategoryBannerResponse)
+def delete_category_banner(
+    category_id: UUID,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.delete_category_banner(db, admin_id=auth.user_id, category_id=category_id)
+
+
+@router.delete("/categories/{category_id}", response_model=CategoryDeleteResponse)
+def delete_category(
+    category_id: UUID,
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.delete_category(db, admin_id=auth.user_id, category_id=category_id)
+
+
+# ─── Booking routes ────────────────────────────────────────────────────────────
+
+@router.get("/bookings/stats", response_model=BookingStatsResponse)
+def get_booking_stats(
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.get_booking_stats(db)
+
+
+@router.get("/bookings", response_model=AdminBookingListResponse)
+def list_bookings(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    status: str | None = Query(None),
+    search: str | None = Query(None),
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.list_admin_bookings(db, status=status, search=search, page=page, page_size=page_size)
+
+
+@router.get("/growth-stats", response_model=GrowthStatsResponse)
+def get_growth_stats(
+    period: str = Query("6m", pattern="^(7d|30d|3m|6m|12m)$"),
+    _: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return service.get_growth_stats(db, period=period)

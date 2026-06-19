@@ -46,7 +46,7 @@ def create_payment_intent(db: Session, current_user_id, booking_id: str) -> Paym
         raise NotFoundError("Booking not found")
     if str(booking.user_id) != str(current_user_id):
         raise ForbiddenError("You do not own this booking")
-    if booking.status != BookingStatus.accepted:
+    if booking.status != BookingStatus.owner_accepted:
         raise BadRequestError("Booking is not awaiting payment")
     now = datetime.now(timezone.utc)
     if not booking.hold_expires_at or booking.hold_expires_at < now:
@@ -56,10 +56,10 @@ def create_payment_intent(db: Session, current_user_id, booking_id: str) -> Paym
     if not venue:
         raise NotFoundError("Venue not found")
 
-    amount_paise = booking.amount_paise
+    # Charge the token advance snapshotted on the booking at quote time.
+    amount_paise = booking.advance_due_paise
     if amount_paise <= 0:
-        amount_paise = round(venue.starting_price_paise * settings.token_advance_pct / 100)
-        booking.amount_paise = amount_paise
+        raise BadRequestError("Booking has no advance amount due")
 
     stripe = get_stripe()
     intent = stripe.PaymentIntent.create(
@@ -78,8 +78,8 @@ def create_payment_intent(db: Session, current_user_id, booking_id: str) -> Paym
         stripe_client_secret=intent.client_secret,
     )
     db.add(payment)
-    booking.stripe_payment_intent_id = intent.id
-    booking.payment_status = PaymentStatus.pending
+    booking.stripe_advance_payment_intent_id = intent.id
+    booking.payment_status = PaymentStatus.unpaid
     db.commit()
     db.refresh(payment)
 
@@ -117,7 +117,7 @@ def confirm_payment(db: Session, payment_intent_id: str) -> None:
 
     # Booking left the payable state (hold expired / canceled) before the webhook
     # arrived — the money is owed back.
-    if booking.status != BookingStatus.accepted:
+    if booking.status != BookingStatus.owner_accepted:
         logger.warning("confirm_payment: booking %s in %s, refunding stray payment", booking.id, booking.status)
         _record_refund(db, payment, booking, payment.amount_paise, "booking_not_payable")
         return
@@ -144,7 +144,11 @@ def confirm_payment(db: Session, payment_intent_id: str) -> None:
 
     payment.status = PaymentAttemptStatus.succeeded
     booking.status = BookingStatus.confirmed
-    booking.payment_status = PaymentStatus.paid
+    booking.confirmed_at = datetime.now(timezone.utc)
+    booking.amount_paid_paise = (booking.amount_paid_paise or 0) + payment.amount_paise
+    booking.payment_status = (
+        PaymentStatus.fully_paid if booking.balance_due_paise == 0 else PaymentStatus.advance_paid
+    )
 
     owner_id = venue.owner_id if venue else booking.user_id
     db.add(LedgerEntry(
@@ -153,7 +157,7 @@ def confirm_payment(db: Session, payment_intent_id: str) -> None:
         direction="credit", stripe_pi_ref=payment_intent_id,
     ))
 
-    fee_pct = venue.platform_fee_pct if venue else settings.platform_fee_pct
+    fee_pct = float(venue.platform_commission_pct) if venue else settings.platform_fee_pct
     fee = booking.platform_fee_paise or round(payment.amount_paise * fee_pct / 100)
     booking.platform_fee_paise = fee
     if fee:
@@ -164,8 +168,8 @@ def confirm_payment(db: Session, payment_intent_id: str) -> None:
         ))
 
     db.add(BookingStatusHistory(
-        booking_id=booking.id, old_status="accepted", new_status="confirmed",
-        reason="token_payment_succeeded",
+        booking_id=booking.id, old_status=BookingStatus.owner_accepted,
+        new_status=BookingStatus.confirmed, reason="token_payment_succeeded",
     ))
 
     # Knock out competitors for the same slot and refund any who already paid.
@@ -191,8 +195,9 @@ def fail_payment(db: Session, payment_intent_id: str) -> None:
         return
     payment.status = PaymentAttemptStatus.failed
     booking = db.get(Booking, payment.booking_id)
-    if booking and booking.payment_status == PaymentStatus.pending:
-        booking.payment_status = PaymentStatus.unpaid
+    if booking and booking.payment_status == PaymentStatus.unpaid:
+        # Leave the booking unpaid; the hold-expiry job reclaims it if no retry succeeds.
+        pass
 
 
 # --------------------------------------------------------------------------- #
@@ -215,10 +220,11 @@ def refund_booking(db: Session, booking_id: str, current_user: AuthContext, reas
     refunded = _record_refund(db, payment, booking, payment.amount_paise, reason or "owner_cancellation")
 
     if booking.status == BookingStatus.confirmed:
-        booking.status = BookingStatus.canceled
+        booking.status = BookingStatus.user_cancelled
+        booking.cancelled_at = datetime.now(timezone.utc)
         db.add(BookingStatusHistory(
-            booking_id=booking.id, old_status="confirmed", new_status="canceled",
-            reason=reason or "owner_cancellation",
+            booking_id=booking.id, old_status=BookingStatus.confirmed,
+            new_status=BookingStatus.user_cancelled, reason=reason or "owner_cancellation",
         ))
         # release the slots so they can be rebooked
         for s in db.query(BookingSlot).filter(BookingSlot.booking_id == booking.id).all():
@@ -272,7 +278,7 @@ def _record_refund(db: Session, payment: Payment, booking: Booking, amount_paise
         reason=reason, status=RefundStatus.succeeded, stripe_refund_id=refund.id,
     ))
     payment.status = PaymentAttemptStatus.refunded
-    booking.refund_paise = (booking.refund_paise or 0) + amount_paise
+    booking.refund_amount_paise = (booking.refund_amount_paise or 0) + amount_paise
     booking.payment_status = PaymentStatus.refunded
 
     venue = db.get(Venue, booking.venue_id)
@@ -292,25 +298,34 @@ def _record_refund(db: Session, payment: Payment, booking: Booking, amount_paise
 def _find_competing_bookings(db: Session, booking: Booking) -> list[Booking]:
     """Other active bookings contending for the same slot.
 
-    MVP overlap rule: same venue + same event_date, still requested/accepted.
-    Once the booking module produces booking_slots, this should switch to a
-    range-overlap query against effective_starts_at/effective_ends_at.
+    Overlap rule: same venue, still requested/owner_accepted, whose effective slot
+    range intersects this booking's effective slot range.
     """
-    q = db.query(Booking).filter(
-        Booking.id != booking.id,
-        Booking.venue_id == booking.venue_id,
-        Booking.status.in_([BookingStatus.requested, BookingStatus.accepted]),
+    slot = db.query(BookingSlot).filter(BookingSlot.booking_id == booking.id).first()
+    if slot is None:
+        return []
+    return (
+        db.query(Booking)
+        .join(BookingSlot, BookingSlot.booking_id == Booking.id)
+        .filter(
+            Booking.id != booking.id,
+            Booking.venue_id == booking.venue_id,
+            Booking.status.in_([BookingStatus.requested, BookingStatus.owner_accepted]),
+            BookingSlot.deleted_at.is_(None),
+            BookingSlot.effective_starts_at < slot.effective_ends_at,
+            BookingSlot.effective_ends_at > slot.effective_starts_at,
+        )
+        .with_for_update()
+        .all()
     )
-    if booking.event_date is not None:
-        q = q.filter(Booking.event_date == booking.event_date)
-    return q.with_for_update().all()
 
 
 def _conflict_cancel(db: Session, competitor: Booking, venue: Venue | None) -> None:
-    old = competitor.status.value
-    competitor.status = BookingStatus.conflict_canceled
+    old = competitor.status
+    competitor.status = BookingStatus.conflict_cancelled
+    competitor.cancelled_at = datetime.now(timezone.utc)
     db.add(BookingStatusHistory(
-        booking_id=competitor.id, old_status=old, new_status="conflict_canceled",
+        booking_id=competitor.id, old_status=old, new_status=BookingStatus.conflict_cancelled,
         reason="slot_confirmed_by_another",
     ))
     paid = _succeeded_payment(db, competitor.id)
@@ -335,10 +350,11 @@ def _conflict_cancel_self_and_refund(db: Session, payment_intent_id: str) -> Non
     if not booking:
         return
     venue = db.get(Venue, booking.venue_id)
-    old = booking.status.value
-    booking.status = BookingStatus.conflict_canceled
+    old = booking.status
+    booking.status = BookingStatus.conflict_cancelled
+    booking.cancelled_at = datetime.now(timezone.utc)
     db.add(BookingStatusHistory(
-        booking_id=booking.id, old_status=old, new_status="conflict_canceled",
+        booking_id=booking.id, old_status=old, new_status=BookingStatus.conflict_cancelled,
         reason="lost_slot_race",
     ))
     _record_refund(db, payment, booking, payment.amount_paise, "lost_slot_race")

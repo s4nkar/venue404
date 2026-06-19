@@ -6,10 +6,12 @@ import LoginSuccess from './pages/LoginSuccess'
 import Forbidden from './pages/Forbidden'
 import NotFound from './pages/NotFound'
 import ComingSoon from './pages/ComingSoon'
+import Bookings from './pages/Bookings'
 import Users from './pages/Users'
 import VenueOwners from './pages/VenueOwners'
 import VenueApprovals from './pages/VenueApprovals'
 import Amenities from './pages/Amenities'
+import Categories from './pages/Categories'
 import AuditLog from './pages/AuditLog'
 
 export const router = createBrowserRouter([
@@ -55,13 +57,18 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/categories',
+    element: (
+      <ProtectedRoute>
+        <Categories />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: '/bookings',
     element: (
       <ProtectedRoute>
-        <ComingSoon
-          title="Bookings"
-          description="Monitor marketplace bookings, resolve conflicts, and track payment activity. Coming soon."
-        />
+        <Bookings />
       </ProtectedRoute>
     ),
   },

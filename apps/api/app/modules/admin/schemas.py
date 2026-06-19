@@ -112,7 +112,109 @@ class AmenityDeleteResponse(BaseModel):
     active_venue_count: int
 
 
+# ─── Venue category admin schemas ─────────────────────────────────────────────
+
+class CategoryCreateRequest(BaseModel):
+    slug: str = Field(..., min_length=1, max_length=100, pattern=r'^[a-z0-9_]+$')
+    label: str = Field(..., min_length=1, max_length=100)
+    icon: Optional[str] = None
+    sort_order: int = Field(default=0, ge=0)
+
+
+class CategoryUpdateRequest(BaseModel):
+    label: Optional[str] = Field(None, min_length=1, max_length=100)
+    icon: Optional[str] = None
+    sort_order: Optional[int] = Field(None, ge=0)
+    is_active: Optional[bool] = None
+
+
+class AdminCategoryResponse(BaseModel):
+    id: uuid.UUID
+    slug: str
+    label: str
+    icon: Optional[str]
+    banner_image: Optional[str]
+    is_active: bool
+    sort_order: int
+    created_at: datetime
+    deleted_at: Optional[datetime]
+    venue_count: int
+
+    model_config = {"from_attributes": True}
+
+
+class CategoryListResponse(BaseModel):
+    items: list[AdminCategoryResponse]
+    total: int
+
+
+class CategoryDeleteResponse(BaseModel):
+    deleted: bool
+    venue_count: int
+
+
+class CategoryBannerResponse(BaseModel):
+    banner_image: str
+
+
+# ─── Booking admin schemas ─────────────────────────────────────────────────────
+
+class BookingStatsResponse(BaseModel):
+    total: int
+    requested: int
+    confirmed: int
+    completed: int
+    cancelled: int
+
+
+class AdminBookingSummary(BaseModel):
+    id: uuid.UUID
+    venue_id: uuid.UUID
+    venue_name: str
+    customer_name: str | None
+    customer_email: str | None
+    customer_phone: str | None
+    owner_id: uuid.UUID
+    owner_name: str | None
+    owner_email: str | None
+    owner_phone: str | None
+    status: str
+    payment_status: str
+    event_date: str
+    guest_count: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminBookingListResponse(BaseModel):
+    items: list[AdminBookingSummary]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    stats: BookingStatsResponse
+
+
 # ─── Venue admin schemas ───────────────────────────────────────────────────────
+
+class GrowthStatsResponse(BaseModel):
+    labels: list[str]
+    users: list[int]
+    owners: list[int]
+    venues: list[int]
+    bookings: list[int]
+    totals: dict[str, int]
+
+
+class VenueStatsResponse(BaseModel):
+    total: int
+    pending_approval: int
+    approved: int
+    rejected: int
+    suspended: int
+    draft: int
+
 
 class VenueActionRequest(BaseModel):
     reason: str = ""
@@ -129,7 +231,7 @@ class AdminVenueItem(BaseModel):
     name: str
     slug: str | None
     description: str | None
-    venue_type: str
+    category_slug: str
     address_line1: str
     city: str
     state: str

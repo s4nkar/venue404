@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.modules.auth.dependencies import require_owner, AuthContext
 from app.modules.venue.schemas import (
     VenueResponse,
+    VenueCategoryResponse,
     CreateVenueRequest,
     UpdateVenueRequest,
     PricingPreviewResponse,
@@ -208,7 +209,12 @@ def list_pending_venue_bookings(
 
 
 
-# Public routes 
+# Public routes
+
+@router.get("/categories", response_model=list[VenueCategoryResponse])
+def get_venue_categories(db: Session = Depends(get_db)):
+    return service.get_venue_categories(db)
+
 
 @router.get("/amenities", response_model=list[AmenityResponse])
 def get_platform_amenities(db: Session = Depends(get_db)):
