@@ -31,10 +31,11 @@ class Settings(BaseSettings):
     super_admin_name: str = ""
     super_admin_email: str = ""
     super_admin_password: str = ""
-    
     cloudinary_cloud_name: str = ""
     cloudinary_api_key: str = ""
     cloudinary_api_secret: str = ""
+
+    log_level: str = "INFO"  # DEBUG / INFO / WARNING / ERROR
 
     class Config:
         env_file = ".env"
