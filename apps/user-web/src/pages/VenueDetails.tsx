@@ -152,7 +152,14 @@ function useVenueBooking(venue: VenueResponse) {
       }
       navigate('/checkout', {
         state: {
-          /* ... existing state */
+          venueId: venue.id,
+          venueName: venue.name,
+          venueCoverImage: venue.photos?.find((p) => p.is_cover)?.image_url ?? null,
+          bookingType,
+          startsAt: validation.effective_starts_at,
+          endsAt: validation.effective_ends_at,
+          bookingDate: toUtcIso(startDate),
+          quote: quoteQuery.data,
         },
       })
     },
