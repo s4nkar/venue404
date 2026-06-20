@@ -73,7 +73,9 @@ export function VenueAvailabilitySection({
           <p className="mt-1 text-sm text-zinc-400">Click a start date, then click an end date</p>
         )}
         {startDate && !endDate && bookingType === 'full_day' && (
-          <p className="mt-1 text-sm text-zinc-400">Now click an end date, or click the same day for a 1-day event</p>
+          <p className="mt-1 text-sm text-zinc-400">
+            Click the same day for a 1-day event or select an end date for multi-day
+          </p>
         )}
       </div>
 

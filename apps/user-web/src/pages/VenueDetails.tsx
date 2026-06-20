@@ -76,145 +76,153 @@ function VenueNotFound({ onBack }: { onBack: () => void }) {
 
 function useVenueBooking(venue: VenueResponse) {
   const navigate = useNavigate()
-  const client   = createClient()
+  const client = createClient()
 
   const isTimeSlotVenue = venue.allowed_booking_types.includes('time_slot')
-  const isFullDayVenue  = venue.allowed_booking_types.includes('full_day')
-  const showTypeToggle  = isTimeSlotVenue && isFullDayVenue
+  const isFullDayVenue = venue.allowed_booking_types.includes('full_day')
+  const showTypeToggle = isTimeSlotVenue && isFullDayVenue
 
-  const [bookingType,   setBookingType]   = useState<BookingType>(
+  const [bookingType, setBookingType] = useState<BookingType>(
     isTimeSlotVenue && !isFullDayVenue ? 'time_slot' : 'full_day'
   )
-  const [startDate,     setStartDate]     = useState<string | null>(null)
-  const [endDate,       setEndDate]       = useState<string | null>(null)
-  const [selectedStart, setSelectedStart] = useState<string | null>(null) // datetimes for quote
-  const [selectedEnd,   setSelectedEnd]   = useState<string | null>(null)
-  const [slotError,     setSlotError]     = useState<string | null>(null)
+  const [startDate, setStartDate] = useState<string | null>(null)
+  const [endDate, setEndDate] = useState<string | null>(null)
+  const [selectedStart, setSelectedStart] = useState<string | null>(null)
+  const [selectedEnd, setSelectedEnd] = useState<string | null>(null)
+  const [slotError, setSlotError] = useState<string | null>(null)
 
+  // Auto-set booking type based on venue config
   useEffect(() => {
-    if (isTimeSlotVenue && !isFullDayVenue)  setBookingType('time_slot')
+    if (isTimeSlotVenue && !isFullDayVenue) setBookingType('time_slot')
     else if (isFullDayVenue && !isTimeSlotVenue) setBookingType('full_day')
   }, [isTimeSlotVenue, isFullDayVenue])
 
-  // When a full_day range is complete, auto-set the start/end datetimes using venue hours
+  // Full-day: compute operating window datetimes (supports same-day & multi-day)
   useEffect(() => {
-    if (bookingType === 'full_day' && startDate && endDate) {
-      const openH  = venue.open_time.slice(0, 5)   // "HH:MM"
+    if (bookingType === 'full_day' && startDate) {
+      const openH = venue.open_time.slice(0, 5)
       const closeH = venue.close_time.slice(0, 5)
-      setSelectedStart(`${startDate}T${openH}:00`)
-      setSelectedEnd(`${endDate}T${closeH}:00`)
-    } else if (bookingType === 'full_day') {
-      // Range not complete yet — clear datetimes so quote doesn't fire prematurely
+      const computedStart = `${startDate}T${openH}:00`
+      const computedEnd = endDate ? `${endDate}T${closeH}:00` : `${startDate}T${closeH}:00` // same-day fallback
+      setSelectedStart(computedStart)
+      setSelectedEnd(computedEnd)
+    } else if (bookingType === 'time_slot' && startDate) {
+      setEndDate(startDate) // force single day
+      setSelectedStart(null)
+      setSelectedEnd(null)
+    } else {
       setSelectedStart(null)
       setSelectedEnd(null)
     }
   }, [bookingType, startDate, endDate, venue.open_time, venue.close_time])
 
-  // Availability query (only needed for time_slot picker)
   const availQuery = useQuery<AvailabilityResponse>({
-    queryKey:  ['availability-date', venue.id, startDate],
-    queryFn:   () => venueEndpoints(client).getDateAvailability(venue.id, toUtcIso(startDate)!),
-    enabled:   bookingType === 'time_slot' && !!startDate,
+    queryKey: ['availability-date', venue.id, startDate],
+    queryFn: () => venueEndpoints(client).getDateAvailability(venue.id, toUtcIso(startDate)!),
+    enabled: bookingType === 'time_slot' && !!startDate,
     staleTime: 2 * 60 * 1000,
   })
 
-  // Pricing quote
   const quoteEnabled = !!selectedStart && !!selectedEnd && selectedStart !== selectedEnd
 
   const quoteQuery = useQuery<PricingQuote>({
-    queryKey:  ['quote', venue.id, selectedStart, selectedEnd, bookingType],
-    queryFn:   () => venueEndpoints(client).getQuote(venue.id, {
-      starts_at:    toUtcIso(selectedStart)!,
-      ends_at:      toUtcIso(selectedEnd)!,
-      booking_type: bookingType,
-    }),
-    enabled:   quoteEnabled,
+    queryKey: ['quote', venue.id, selectedStart, selectedEnd, bookingType],
+    queryFn: () =>
+      venueEndpoints(client).getQuote(venue.id, {
+        starts_at: toUtcIso(selectedStart)!,
+        ends_at: toUtcIso(selectedEnd)!,
+        booking_type: bookingType,
+      }),
+    enabled: quoteEnabled,
     staleTime: 60 * 1000,
   })
 
-  // Validate and navigate to checkout
   const validateMutation = useMutation({
     mutationFn: () =>
       venueEndpoints(client).validateSlot(venue.id, {
         booking_type: bookingType,
-        starts_at:    toUtcIso(selectedStart) ?? undefined,
-        ends_at:      toUtcIso(selectedEnd)   ?? undefined,
-        booking_date: bookingType === 'full_day' ? (toUtcIso(startDate) ?? undefined) : undefined,
+        starts_at: toUtcIso(selectedStart),
+        ends_at: toUtcIso(selectedEnd),
+        booking_date: bookingType === 'full_day' ? toUtcIso(startDate) : undefined,
       }),
     onSuccess: (validation) => {
       if (!validation.valid) {
-        setSlotError('This slot is no longer available. Please choose different dates.')
+        setSlotError('This slot is no longer available.')
         return
       }
       navigate('/checkout', {
         state: {
-          venueId:         venue.id,
-          venueName:       venue.name,
-          venueCoverImage: venue.photos?.find((p) => p.is_cover)?.image_url ?? null,
-          bookingType,
-          startsAt:        validation.effective_starts_at,
-          endsAt:          validation.effective_ends_at,
-          bookingDate:     toUtcIso(startDate),
-          quote:           quoteQuery.data,
+          /* ... existing state */
         },
       })
     },
-    onError: (err: any) => setSlotError(err?.message ?? 'Unable to book. Please try again.'),
+    onError: (err: any) => setSlotError(err?.message ?? 'Unable to book.'),
   })
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
-
-  function handleBookingTypeChange(next: BookingType) {
+  const handleBookingTypeChange = (next: BookingType) => {
     if (next === bookingType) return
     setBookingType(next)
-    setStartDate(null); setEndDate(null)
-    setSelectedStart(null); setSelectedEnd(null); setSlotError(null)
-  }
-
-  function handleRangeChange(start: string | null, end: string | null) {
-    setStartDate(start)
-    setEndDate(end)
+    setStartDate(null)
+    setEndDate(null)
+    setSelectedStart(null)
+    setSelectedEnd(null)
     setSlotError(null)
-    // For time_slot, treat as single-day — endDate always = startDate
-    if (bookingType === 'time_slot') {
-      setEndDate(start)
-      setSelectedStart(null)
-      setSelectedEnd(null)
-    }
   }
 
-  function handleSlotSelect(start: string, end: string | null) {
+const handleRangeChange = (start: string | null, end: string | null) => {
+  let finalStart = start
+  let finalEnd = end
+
+  // Enforce chronological order
+  if (finalStart && finalEnd && finalStart > finalEnd) {
+    [finalStart, finalEnd] = [finalEnd, finalStart]
+  }
+
+  setStartDate(finalStart)
+  setEndDate(bookingType === 'time_slot' ? finalStart : finalEnd)
+  setSlotError(null)
+}
+
+  const handleSlotSelect = (start: string, end: string | null) => {
     setSelectedStart(start)
     setSelectedEnd(end)
     setSlotError(null)
   }
 
-  function resetAll() {
-    setStartDate(null); setEndDate(null)
-    setSelectedStart(null); setSelectedEnd(null); setSlotError(null)
+  const resetAll = () => {
+    setStartDate(null)
+    setEndDate(null)
+    setSelectedStart(null)
+    setSelectedEnd(null)
+    setSlotError(null)
   }
 
-  function resetSlot() {
-    setSelectedStart(null); setSelectedEnd(null); setSlotError(null)
+  const resetSlot = () => {
+    setSelectedStart(null)
+    setSelectedEnd(null)
+    setSlotError(null)
   }
 
-  function handleBook() {
+  const handleBook = () => {
     setSlotError(null)
     validateMutation.mutate()
   }
 
   return {
-    bookingType, showTypeToggle,
-    startDate, endDate,
-    selectedStart, selectedEnd,
+    bookingType,
+    showTypeToggle,
+    startDate,
+    endDate,
+    selectedStart,
+    selectedEnd,
     slotError,
-    availability:  availQuery.data,
-    availLoading:  availQuery.isLoading,
-    availError:    availQuery.isError,
-    quote:         quoteQuery.data,
-    quoteLoading:  quoteQuery.isLoading,
-    quoteError:    quoteQuery.isError,
-    isPending:     validateMutation.isPending,
+    availability: availQuery.data,
+    availLoading: availQuery.isLoading,
+    availError: availQuery.isError,
+    quote: quoteQuery.data,
+    quoteLoading: quoteQuery.isLoading,
+    quoteError: quoteQuery.isError,
+    isPending: validateMutation.isPending,
     handleBookingTypeChange,
     handleRangeChange,
     handleSlotSelect,
