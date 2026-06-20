@@ -4,7 +4,7 @@ import { createClient, venueEndpoints } from '@venue404/api-client'
 import { toDateString, addMonths } from '../../utils'
 import type { CalendarDay } from '../../types'
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DAY_LABELS = ['Sun','Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 const STATUS_DOT: Record<string, string | null> = {
   available: null,
