@@ -6,11 +6,8 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.modules.booking._stubs import (
-    cancel_payment_intent,
-    create_notification,
-    initiate_refund,
-)
+from app.modules.notification import service as notifications
+from app.modules.payment import service as payment_service
 from app.modules.booking.helpers import (
     _now,
     _format_inr,
@@ -129,20 +126,25 @@ def user_cancel_booking(db: Session, booking_id: UUID, user_id: UUID) -> Booking
 
     metadata = None
     if old_status == BookingStatus.owner_accepted:
-        cancel_payment_intent(booking.stripe_advance_payment_intent_id)
+        # No advance has been captured yet (acceptance does not take payment),
+        # so there is nothing to refund — just release and cancel.
+        pass
     else:
         refund = _compute_refund(booking, _load_policy(db, booking.venue_id), booking.cancelled_at)
+        refunded = 0
         if refund.refund_amount_paise > 0:
-            initiate_refund(booking, refund.refund_amount_paise)
-        booking.refund_amount_paise = refund.refund_amount_paise
-        if refund.refund_amount_paise == 0:
-            booking.payment_status = PaymentStatus.refunded if booking.amount_paid_paise == 0 else booking.payment_status
-        elif refund.refund_amount_paise >= booking.amount_paid_paise:
+            refunded = payment_service.refund_for_cancellation(
+                db, booking, refund.refund_amount_paise, "user_cancellation"
+            )
+        if refunded <= 0:
+            pass  # nothing captured, zero policy refund, or the Stripe refund failed
+        elif refunded >= booking.amount_paid_paise:
             booking.payment_status = PaymentStatus.refunded
         else:
             booking.payment_status = PaymentStatus.partially_refunded
         metadata = {
             "refund_amount_paise": refund.refund_amount_paise,
+            "refunded_paise": refunded,
             "penalty_amount_paise": refund.penalty_amount_paise,
             "refund_pct_applied": refund.refund_pct_applied,
             "tier_matched": refund.tier_matched,
@@ -151,7 +153,8 @@ def user_cancel_booking(db: Session, booking_id: UUID, user_id: UUID) -> Booking
     db.add(_history(booking, old_status, BookingStatus.user_cancelled, changed_by=user_id, metadata=metadata))
     db.flush()
     db.refresh(booking)
-    create_notification(booking.venue.owner_id, booking.id, "booking_cancelled", "Booking cancelled", "The customer cancelled a booking.")
+    notifications.notify(db, booking.venue.owner_id, "booking_canceled",
+                         context={"venue_name": booking.venue.name}, booking_id=booking.id)
     return _booking_out(booking)
 
 
@@ -177,7 +180,8 @@ def owner_cancel_forfeit(db: Session, booking_id: UUID, owner_id: UUID) -> Booki
     ))
     db.flush()
     db.refresh(booking)
-    create_notification(booking.user_id, booking.id, "booking_cancelled", "Booking cancelled", "Your booking was cancelled after the balance became overdue.")
+    notifications.notify(db, booking.user_id, "booking_canceled",
+                         context={"venue_name": booking.venue.name}, booking_id=booking.id)
     return _booking_out(booking)
 
 
@@ -192,23 +196,24 @@ def owner_cancel_goodwill(db: Session, booking_id: UUID, owner_id: UUID) -> Book
     refund_amount = math.floor(
         booking.advance_due_paise * (float(booking.overdue_advance_refund_pct) / 100)
     )
+    refunded = 0
     if refund_amount > 0:
-        initiate_refund(booking, refund_amount)
+        refunded = payment_service.refund_for_cancellation(db, booking, refund_amount, "goodwill")
 
     booking.status = BookingStatus.user_cancelled
     booking.cancelled_at = _now()
-    booking.refund_amount_paise = refund_amount
-    booking.payment_status = PaymentStatus.partially_refunded if refund_amount > 0 else booking.payment_status
+    booking.payment_status = PaymentStatus.partially_refunded if refunded > 0 else booking.payment_status
     db.add(_history(
         booking,
         old_status,
         BookingStatus.user_cancelled,
         changed_by=owner_id,
-        metadata={"refund_amount_paise": refund_amount, "goodwill": True},
+        metadata={"refund_amount_paise": refund_amount, "refunded_paise": refunded, "goodwill": True},
     ))
     db.flush()
     db.refresh(booking)
-    create_notification(booking.user_id, booking.id, "booking_cancelled", "Booking cancelled", "Your overdue booking was cancelled with a goodwill refund.")
+    notifications.notify(db, booking.user_id, "booking_canceled",
+                         context={"venue_name": booking.venue.name}, booking_id=booking.id)
     return _booking_out(booking)
 
 

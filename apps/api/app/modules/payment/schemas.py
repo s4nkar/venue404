@@ -1,10 +1,14 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
 class CreatePaymentRequest(BaseModel):
     booking_id: str
-    # Amount is computed server-side from the venue pricing snapshot — never
-    # trusted from the client.
+    # "advance" (token, confirms the booking) or "balance" (settles a confirmed
+    # booking). Amount is computed server-side from the venue pricing snapshot —
+    # never trusted from the client.
+    payment_type: Literal["advance", "balance"] = "advance"
 
 
 class PaymentIntentResponse(BaseModel):

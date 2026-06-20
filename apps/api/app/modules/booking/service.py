@@ -4,14 +4,10 @@ from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.availability.service import validate_booking_request
-from app.modules.booking._stubs import (
-    create_advance_payment_intent,
-    create_notification,
-)
+from app.modules.notification import service as notifications
 from app.modules.booking.helpers import (
     _now,
     _history,
@@ -45,12 +41,6 @@ from app.modules.booking.cancellation import (
     owner_cancel_forfeit,
     owner_cancel_goodwill,
     admin_force_cancel,
-)
-
-# Re-expose functions from payment module
-from app.modules.booking.payment import (
-    handle_advance_payment_captured,
-    handle_balance_payment_captured,
 )
 
 logger = logging.getLogger(__name__)
@@ -126,12 +116,19 @@ def create_booking_request(
     db.flush()
     db.refresh(booking)
 
-    create_notification(
+    notifications.notify(
+        db,
         venue.owner_id,
-        booking.id,
-        "booking_requested",
-        "New booking request",
-        "A customer requested your venue.",
+        "new_request_owner",
+        context={"venue_name": venue.name},
+        booking_id=booking.id,
+    )
+    notifications.notify(
+        db,
+        booking.user_id,
+        "request_received",
+        context={"venue_name": venue.name},
+        booking_id=booking.id,
     )
     return _booking_out(booking)
 
@@ -189,30 +186,24 @@ def owner_accept_booking(db: Session, booking_id: UUID, owner_id: UUID) -> Booki
 
     slot = _slot_for_update(db, booking.id)
     old_status = booking.status
-    slot.is_blocking = True
+    # Acceptance does NOT reserve the slot (CLAUDE.md): the slot is blocked only
+    # once the token advance is paid. Multiple requesters may be accepted; the
+    # first to pay wins and the rest are conflict-cancelled at confirmation time.
+    slot.is_blocking = False
     booking.status = BookingStatus.owner_accepted
     booking.owner_responded_at = _now()
     booking.hold_expires_at = booking.owner_responded_at + timedelta(hours=USER_PAYMENT_HOLD_HOURS)
 
-    try:
-        db.flush()
-    except IntegrityError as exc:
-        db.rollback()
-        if "booking_slots_no_overlap" in str(exc.orig):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Slot already blocked") from exc
-        raise
-
-    booking.stripe_advance_payment_intent_id = create_advance_payment_intent(booking)
     db.add(_history(booking, old_status, BookingStatus.owner_accepted, changed_by=owner_id))
     db.flush()
     db.refresh(booking)
 
-    create_notification(
+    notifications.notify(
+        db,
         booking.user_id,
-        booking.id,
-        "booking_accepted",
-        "Booking accepted",
-        f"The venue owner accepted your request. Please pay the advance within {USER_PAYMENT_HOLD_HOURS} hours.",
+        "request_accepted",
+        context={"venue_name": booking.venue.name},
+        booking_id=booking.id,
     )
     return _booking_out(booking)
 
@@ -235,12 +226,12 @@ def owner_reject_booking(
     db.flush()
     db.refresh(booking)
 
-    create_notification(
+    notifications.notify(
+        db,
         booking.user_id,
-        booking.id,
         "booking_rejected",
-        "Booking rejected",
-        reason,
+        context={"venue_name": booking.venue.name, "reason": reason},
+        booking_id=booking.id,
     )
     return _booking_out(booking)
 
@@ -285,7 +276,13 @@ def owner_extend_deadline(
     ))
     db.flush()
     db.refresh(booking)
-    create_notification(booking.user_id, booking.id, "balance_deadline_extended", "Balance deadline extended", "Your balance payment deadline was extended.")
+    notifications.notify(
+        db,
+        booking.user_id,
+        "balance_deadline_extended",
+        context={"venue_name": booking.venue.name},
+        booking_id=booking.id,
+    )
     return _booking_out(booking)
 
 

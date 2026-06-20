@@ -5,9 +5,11 @@ import urllib.error
 from datetime import datetime, timezone
 from typing import List
 
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.database import SessionLocal
 from app.core.email import send_email
 from app.core.exceptions import NotFoundError, ForbiddenError
 from app.modules.notification.models import InAppNotification
@@ -18,25 +20,58 @@ logger = logging.getLogger(__name__)
 
 
 def notify(db: Session, user_id, type: str, context: dict | None = None, booking_id=None) -> InAppNotification:
-    """Create an in-app notification and best-effort send the email.
+    """Create an in-app notification and queue its email for after-commit send.
 
-    Always writes the in-app row. Email is best-effort: failures are logged and
-    leave sent_at NULL, never aborting the surrounding DB transaction. The caller
-    is responsible for commit (request path commits; webhook/job context commits).
+    Always writes the in-app row inside the caller's transaction. The email is
+    deferred: it is sent only once the transaction commits (see the after_commit
+    listener), so no network I/O happens while the caller still holds DB row
+    locks, and a rollback sends nothing. Email delivery is best-effort and never
+    affects the transaction. The caller owns the commit.
     """
     title, body, html = render_notification(type, context, booking_id)
     row = InAppNotification(user_id=user_id, booking_id=booking_id, type=type, title=title, body=body)
     db.add(row)
     db.flush()
 
-    try:
-        email = _get_user_email(user_id)
-        if email and send_email(email, title, html):
-            row.sent_at = datetime.now(timezone.utc)
-    except Exception:
-        logger.exception("Notification email failed for user %s (type=%s)", user_id, type)
-
+    pending = db.info.setdefault("_pending_emails", [])
+    pending.append({"user_id": str(user_id), "subject": title, "html": html, "notification_id": row.id})
     return row
+
+
+def _send_pending_emails(session: Session) -> None:
+    """after_commit hook: send any emails queued by notify() during this txn.
+
+    Runs after the lock-holding transaction has committed. sent_at is stamped via
+    a fresh short-lived session so we never re-enter the just-committed one.
+    """
+    pending = session.info.pop("_pending_emails", None)
+    if not pending:
+        return
+    for item in pending:
+        try:
+            email = _get_user_email(item["user_id"])
+            if email and send_email(email, item["subject"], item["html"]):
+                _mark_email_sent(item["notification_id"])
+        except Exception:
+            logger.exception("Deferred notification email failed (notification=%s)", item.get("notification_id"))
+
+
+def _mark_email_sent(notification_id) -> None:
+    s = SessionLocal()
+    try:
+        row = s.get(InAppNotification, notification_id)
+        if row and row.sent_at is None:
+            row.sent_at = datetime.now(timezone.utc)
+            s.commit()
+    except Exception:
+        logger.exception("Could not stamp sent_at for notification %s", notification_id)
+    finally:
+        s.close()
+
+
+# Drain queued emails whenever any app session commits. The fresh session opened
+# in _mark_email_sent re-fires this with an empty queue, so there is no loop.
+event.listen(SessionLocal, "after_commit", _send_pending_emails)
 
 
 def list_notifications(db: Session, user_id) -> List[NotificationResponse]:

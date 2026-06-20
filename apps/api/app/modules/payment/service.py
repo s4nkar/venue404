@@ -10,6 +10,10 @@ Invariants enforced (see CLAUDE.md):
 Commit policy: create_payment_intent / refund_booking are called from request
 handlers and commit themselves. confirm_payment / fail_payment are called from
 the webhook handler, which owns the commit.
+
+Refund safety: Stripe refund calls are wrapped (a failure records a `failed`
+Refund row and never aborts the surrounding confirmation) and are idempotent
+(a payment already past `succeeded` is not refunded twice).
 """
 import logging
 from datetime import datetime, timezone
@@ -36,37 +40,56 @@ from app.modules.notification import service as notifications
 
 logger = logging.getLogger(__name__)
 
+ADVANCE = "advance"
+BALANCE = "balance"
+
 
 # --------------------------------------------------------------------------- #
-# Request-path: create a payment intent
+# Request-path: create a payment intent (advance or balance)
 # --------------------------------------------------------------------------- #
-def create_payment_intent(db: Session, current_user_id, booking_id: str) -> PaymentIntentResponse:
+def create_payment_intent(
+    db: Session, current_user_id, booking_id: str, payment_type: str = ADVANCE
+) -> PaymentIntentResponse:
     booking = db.query(Booking).filter(Booking.id == booking_id).with_for_update().first()
     if not booking:
         raise NotFoundError("Booking not found")
     if str(booking.user_id) != str(current_user_id):
         raise ForbiddenError("You do not own this booking")
-    if booking.status != BookingStatus.owner_accepted:
-        raise BadRequestError("Booking is not awaiting payment")
-    now = datetime.now(timezone.utc)
-    if not booking.hold_expires_at or booking.hold_expires_at < now:
-        raise BadRequestError("Payment hold has expired")
 
     venue = db.get(Venue, booking.venue_id)
     if not venue:
         raise NotFoundError("Venue not found")
 
-    # Charge the token advance snapshotted on the booking at quote time.
-    amount_paise = booking.advance_due_paise
-    if amount_paise <= 0:
-        raise BadRequestError("Booking has no advance amount due")
+    if payment_type == ADVANCE:
+        if booking.status != BookingStatus.owner_accepted:
+            raise BadRequestError("Booking is not awaiting payment")
+        now = datetime.now(timezone.utc)
+        if not booking.hold_expires_at or booking.hold_expires_at < now:
+            raise BadRequestError("Payment hold has expired")
+        amount_paise = booking.advance_due_paise
+        if amount_paise <= 0:
+            raise BadRequestError("Booking has no advance amount due")
+        idempotency_key = f"booking-{booking.id}-advance"
+    elif payment_type == BALANCE:
+        if booking.status != BookingStatus.confirmed or booking.payment_status != PaymentStatus.advance_paid:
+            raise BadRequestError("Booking is not awaiting a balance payment")
+        amount_paise = booking.balance_due_paise
+        if amount_paise <= 0:
+            raise BadRequestError("Booking has no balance amount due")
+        idempotency_key = f"booking-{booking.id}-balance"
+    else:
+        raise BadRequestError("Invalid payment type")
 
     stripe = get_stripe()
     intent = stripe.PaymentIntent.create(
         amount=amount_paise,
         currency=settings.stripe_currency,
-        metadata={"booking_id": str(booking.id), "user_id": str(booking.user_id)},
-        idempotency_key=f"booking-{booking.id}",
+        metadata={
+            "booking_id": str(booking.id),
+            "user_id": str(booking.user_id),
+            "payment_type": payment_type,
+        },
+        idempotency_key=idempotency_key,
     )
 
     payment = Payment(
@@ -76,10 +99,14 @@ def create_payment_intent(db: Session, current_user_id, booking_id: str) -> Paym
         status=PaymentAttemptStatus.pending,
         stripe_payment_intent_id=intent.id,
         stripe_client_secret=intent.client_secret,
+        payment_type=payment_type,
     )
     db.add(payment)
-    booking.stripe_advance_payment_intent_id = intent.id
-    booking.payment_status = PaymentStatus.unpaid
+    if payment_type == ADVANCE:
+        booking.stripe_advance_payment_intent_id = intent.id
+        booking.payment_status = PaymentStatus.unpaid
+    else:
+        booking.stripe_balance_payment_intent_id = intent.id
     db.commit()
     db.refresh(payment)
 
@@ -111,6 +138,11 @@ def confirm_payment(db: Session, payment_intent_id: str) -> None:
         logger.warning("confirm_payment: no booking for payment %s", payment.id)
         return
 
+    if payment.payment_type == BALANCE:
+        confirm_balance_payment(db, payment, booking)
+        return
+
+    # ---- advance payment confirmation ----
     # Idempotent: already confirmed
     if payment.status == PaymentAttemptStatus.succeeded and booking.status == BookingStatus.confirmed:
         return
@@ -133,7 +165,7 @@ def confirm_payment(db: Session, payment_intent_id: str) -> None:
         db.flush()
     except IntegrityError:
         db.rollback()
-        logger.info("confirm_payment: booking %s lost the slot race; conflict-canceling", booking_id)
+        logger.info("confirm_payment: booking %s lost the slot race; conflict-canceling", booking.id)
         _conflict_cancel_self_and_refund(db, payment_intent_id)
         return
 
@@ -184,6 +216,48 @@ def confirm_payment(db: Session, payment_intent_id: str) -> None:
                              context={"venue_name": venue_name}, booking_id=booking.id)
 
 
+def confirm_balance_payment(db: Session, payment: Payment, booking: Booking) -> None:
+    """Capture the remaining balance on an already-confirmed booking.
+
+    The slot is already reserved (claimed at advance confirmation), so there is
+    no slot/conflict work here — only the advance_paid -> fully_paid transition.
+    """
+    # Idempotent: already fully paid
+    if payment.status == PaymentAttemptStatus.succeeded and booking.payment_status == PaymentStatus.fully_paid:
+        return
+
+    if booking.status != BookingStatus.confirmed:
+        logger.warning("confirm_balance_payment: booking %s in %s, refunding stray balance", booking.id, booking.status)
+        _record_refund(db, payment, booking, payment.amount_paise, "balance_not_payable")
+        return
+
+    venue = db.get(Venue, booking.venue_id)
+    owner_id = venue.owner_id if venue else booking.user_id
+
+    payment.status = PaymentAttemptStatus.succeeded
+    booking.amount_paid_paise = (booking.amount_paid_paise or 0) + payment.amount_paise
+    booking.payment_status = PaymentStatus.fully_paid
+    booking.balance_overdue_at = None
+    booking.owner_action_deadline = None
+
+    db.add(LedgerEntry(
+        booking_id=booking.id, venue_id=booking.venue_id, owner_id=owner_id,
+        user_id=booking.user_id, entry_type="charge", amount_paise=payment.amount_paise,
+        direction="credit", stripe_pi_ref=payment.stripe_payment_intent_id,
+    ))
+    db.add(BookingStatusHistory(
+        booking_id=booking.id, old_status=BookingStatus.confirmed,
+        new_status=BookingStatus.confirmed, reason="balance_payment_succeeded",
+    ))
+
+    venue_name = venue.name if venue else "your venue"
+    notifications.notify(db, booking.user_id, "balance_paid",
+                         context={"venue_name": venue_name}, booking_id=booking.id)
+    if venue:
+        notifications.notify(db, venue.owner_id, "balance_paid",
+                             context={"venue_name": venue_name}, booking_id=booking.id)
+
+
 def fail_payment(db: Session, payment_intent_id: str) -> None:
     payment = (
         db.query(Payment)
@@ -194,10 +268,8 @@ def fail_payment(db: Session, payment_intent_id: str) -> None:
     if not payment:
         return
     payment.status = PaymentAttemptStatus.failed
-    booking = db.get(Booking, payment.booking_id)
-    if booking and booking.payment_status == PaymentStatus.unpaid:
-        # Leave the booking unpaid; the hold-expiry job reclaims it if no retry succeeds.
-        pass
+    # Booking stays in its current state; the hold-expiry / balance-overdue jobs
+    # reclaim it if no retry succeeds.
 
 
 # --------------------------------------------------------------------------- #
@@ -213,13 +285,23 @@ def refund_booking(db: Session, booking_id: str, current_user: AuthContext, reas
     if not current_user.is_admin() and not is_venue_owner:
         raise ForbiddenError("Only the venue owner or an admin can refund this booking")
 
-    payment = _succeeded_payment(db, booking.id)
-    if not payment:
+    payments = _succeeded_payments(db, booking.id)
+    if not payments:
         raise BadRequestError("No captured payment to refund")
 
-    refunded = _record_refund(db, payment, booking, payment.amount_paise, reason or "owner_cancellation")
+    # Full refund: every captured payment (advance + balance) is returned.
+    refunded = 0
+    for p in payments:
+        refunded += _record_refund(db, p, booking, p.amount_paise, reason or "owner_cancellation")
 
-    if booking.status == BookingStatus.confirmed:
+    if refunded > 0:
+        booking.payment_status = PaymentStatus.refunded
+        venue_name = venue.name if venue else "your venue"
+        notifications.notify(db, booking.user_id, "refund_issued",
+                             context={"venue_name": venue_name, "amount_rupees": refunded // 100},
+                             booking_id=booking.id)
+
+    if booking.status == BookingStatus.confirmed and can_transition(booking.status, BookingStatus.user_cancelled):
         booking.status = BookingStatus.user_cancelled
         booking.cancelled_at = datetime.now(timezone.utc)
         db.add(BookingStatusHistory(
@@ -231,7 +313,32 @@ def refund_booking(db: Session, booking_id: str, current_user: AuthContext, reas
             s.is_blocking = False
 
     db.commit()
-    return RefundResponse(booking_id=str(booking.id), refunded_paise=refunded, status="succeeded")
+    return RefundResponse(
+        booking_id=str(booking.id), refunded_paise=refunded,
+        status="succeeded" if refunded > 0 else "failed",
+    )
+
+
+def refund_for_cancellation(db: Session, booking: Booking, amount_paise: int, reason: str) -> int:
+    """Refund up to `amount_paise` across a booking's captured payments.
+
+    Used by the booking cancellation flows so their computed policy refunds
+    (full / partial / goodwill) move real money and write ledger entries.
+    Does NOT commit and does NOT set booking.payment_status — the caller owns
+    both (the caller knows whether the result is a full or partial refund).
+    """
+    if amount_paise <= 0:
+        return 0
+    remaining = amount_paise
+    refunded = 0
+    for p in _succeeded_payments(db, booking.id):
+        if remaining <= 0:
+            break
+        take = min(remaining, p.amount_paise)
+        got = _record_refund(db, p, booking, take, reason)
+        refunded += got
+        remaining -= got
+    return refunded
 
 
 def list_payments_for_booking(db: Session, booking_id: str, current_user: AuthContext) -> list[PaymentResponse]:
@@ -257,29 +364,53 @@ def list_payments_for_booking(db: Session, booking_id: str, current_user: AuthCo
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
-def _succeeded_payment(db: Session, booking_id) -> Payment | None:
+def _succeeded_payments(db: Session, booking_id) -> list[Payment]:
     return (
         db.query(Payment)
         .filter(Payment.booking_id == booking_id, Payment.status == PaymentAttemptStatus.succeeded)
-        .first()
+        .order_by(Payment.created_at.asc())
+        .all()
     )
 
 
 def _record_refund(db: Session, payment: Payment, booking: Booking, amount_paise: int, reason: str) -> int:
-    """Issue a Stripe refund and record it (refund row + ledger debit + booking update)."""
+    """Issue a Stripe refund and record it (refund row + ledger debit).
+
+    Resilient: a Stripe failure records a `failed` Refund row and returns 0
+    rather than raising (so a competitor-refund failure never rolls back the
+    winner's confirmation). Idempotent: a payment that is not in `succeeded`
+    state is skipped (prevents double refunds). Does NOT send notifications —
+    the caller decides which message to send.
+    """
+    if amount_paise <= 0:
+        return 0
+    if payment.status != PaymentAttemptStatus.succeeded:
+        logger.info("refund skipped: payment %s not refundable (status=%s)", payment.id, payment.status)
+        return 0
+
     stripe = get_stripe()
-    refund = stripe.Refund.create(
-        payment_intent=payment.stripe_payment_intent_id,
-        amount=amount_paise,
-        metadata={"booking_id": str(booking.id), "reason": reason},
-    )
+    try:
+        refund = stripe.Refund.create(
+            payment_intent=payment.stripe_payment_intent_id,
+            amount=amount_paise,
+            metadata={"booking_id": str(booking.id), "reason": reason},
+        )
+    except Exception:  # noqa: BLE001 — Stripe/network failure must not abort the txn
+        logger.exception("Stripe refund failed for payment %s (booking %s)", payment.id, booking.id)
+        db.add(Refund(
+            payment_id=payment.id, booking_id=booking.id, amount_paise=amount_paise,
+            reason=reason, status=RefundStatus.failed, stripe_refund_id=None,
+        ))
+        return 0
+
     db.add(Refund(
         payment_id=payment.id, booking_id=booking.id, amount_paise=amount_paise,
         reason=reason, status=RefundStatus.succeeded, stripe_refund_id=refund.id,
     ))
-    payment.status = PaymentAttemptStatus.refunded
+    # Mark the attempt refunded only when the whole captured amount is returned.
+    if amount_paise >= payment.amount_paise:
+        payment.status = PaymentAttemptStatus.refunded
     booking.refund_amount_paise = (booking.refund_amount_paise or 0) + amount_paise
-    booking.payment_status = PaymentStatus.refunded
 
     venue = db.get(Venue, booking.venue_id)
     owner_id = venue.owner_id if venue else booking.user_id
@@ -288,10 +419,6 @@ def _record_refund(db: Session, payment: Payment, booking: Booking, amount_paise
         user_id=booking.user_id, entry_type="refund", amount_paise=amount_paise,
         direction="debit", stripe_pi_ref=payment.stripe_payment_intent_id,
     ))
-    venue_name = venue.name if venue else "your venue"
-    notifications.notify(db, booking.user_id, "refund_issued",
-                         context={"venue_name": venue_name, "amount_rupees": amount_paise / 100},
-                         booking_id=booking.id)
     return amount_paise
 
 
@@ -322,14 +449,18 @@ def _find_competing_bookings(db: Session, booking: Booking) -> list[Booking]:
 
 def _conflict_cancel(db: Session, competitor: Booking, venue: Venue | None) -> None:
     old = competitor.status
+    if not can_transition(old, BookingStatus.conflict_cancelled):
+        logger.warning("skip conflict-cancel: illegal %s -> conflict_cancelled for booking %s", old, competitor.id)
+        return
     competitor.status = BookingStatus.conflict_cancelled
     competitor.cancelled_at = datetime.now(timezone.utc)
     db.add(BookingStatusHistory(
         booking_id=competitor.id, old_status=old, new_status=BookingStatus.conflict_cancelled,
         reason="slot_confirmed_by_another",
     ))
-    paid = _succeeded_payment(db, competitor.id)
-    if paid:
+    # Refund any captured payment; the conflict_canceled notice (below) already
+    # tells the user their money was refunded, so no separate refund_issued.
+    for paid in _succeeded_payments(db, competitor.id):
         _record_refund(db, paid, competitor, paid.amount_paise, "conflict_canceled")
     venue_name = venue.name if venue else "the venue"
     notifications.notify(db, competitor.user_id, "conflict_canceled",
@@ -351,12 +482,18 @@ def _conflict_cancel_self_and_refund(db: Session, payment_intent_id: str) -> Non
         return
     venue = db.get(Venue, booking.venue_id)
     old = booking.status
+    if not can_transition(old, BookingStatus.conflict_cancelled):
+        logger.warning("skip self conflict-cancel: illegal %s -> conflict_cancelled for booking %s", old, booking.id)
+        return
     booking.status = BookingStatus.conflict_cancelled
     booking.cancelled_at = datetime.now(timezone.utc)
     db.add(BookingStatusHistory(
         booking_id=booking.id, old_status=old, new_status=BookingStatus.conflict_cancelled,
         reason="lost_slot_race",
     ))
+    # This payment just succeeded but hasn't been marked succeeded yet — do so
+    # so the refund guard recognises it as refundable.
+    payment.status = PaymentAttemptStatus.succeeded
     _record_refund(db, payment, booking, payment.amount_paise, "lost_slot_race")
     venue_name = venue.name if venue else "the venue"
     notifications.notify(db, booking.user_id, "conflict_canceled",

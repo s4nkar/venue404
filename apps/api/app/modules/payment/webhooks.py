@@ -40,19 +40,35 @@ async def handle(request: Request):
 
     db = SessionLocal()
     try:
-        # Idempotency guard: PK is the Stripe event id. A replay collides and no-ops.
-        db.add(StripeEvent(id=event_id, type=event_type, raw_payload=_json_safe(event)))
-        try:
-            db.commit()
-        except IntegrityError:
-            db.rollback()
-            logger.info("Duplicate Stripe event %s ignored", event_id)
+        # Idempotency guard keyed on the Stripe event id. We record the event
+        # first, but treat it as a true duplicate ONLY once it has been
+        # *successfully* processed (processed_at set). An event that was seen but
+        # failed to process (processing_error, processed_at NULL) is re-dispatched
+        # when Stripe retries — so a transient failure can never strand a paid
+        # booking in an unconfirmed state.
+        stored = db.get(StripeEvent, event_id)
+        if stored is None:
+            stored = StripeEvent(id=event_id, type=event_type, raw_payload=_json_safe(event))
+            db.add(stored)
+            try:
+                db.commit()
+            except IntegrityError:
+                # Concurrent delivery inserted it first — reload and continue.
+                db.rollback()
+                stored = db.get(StripeEvent, event_id)
+
+        if stored is None:
+            # Extremely unlikely row contention; ask Stripe to retry.
+            raise HTTPException(status_code=409, detail="Event contention, retry")
+        if stored.processed_at is not None:
+            logger.info("Duplicate Stripe event %s ignored (already processed)", event_id)
             return {"status": "duplicate"}
 
         try:
             _dispatch(db, event)
             stored = db.get(StripeEvent, event_id)
             stored.processed_at = datetime.now(timezone.utc)
+            stored.processing_error = None
             db.commit()
         except HTTPException:
             raise

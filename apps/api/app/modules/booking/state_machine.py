@@ -14,6 +14,9 @@ VALID_TRANSITIONS: dict[BookingStatus, set[BookingStatus]] = {
         BookingStatus.hold_expired,
         BookingStatus.user_cancelled,
         BookingStatus.admin_cancelled,
+        # A competing accepted booking is conflict-cancelled when another
+        # requester pays the advance first (acceptance no longer reserves the slot).
+        BookingStatus.conflict_cancelled,
     },
     BookingStatus.confirmed: {
         BookingStatus.completed,
