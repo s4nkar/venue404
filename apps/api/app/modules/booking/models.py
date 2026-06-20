@@ -32,7 +32,6 @@ if TYPE_CHECKING:
     from app.modules.venue.models import Venue
 
 
-
 class BookingType(str, enum.Enum):
     full_day = "full_day"
     time_slot = "time_slot"
@@ -373,6 +372,20 @@ class BookingSlot(Base):
 class BookingStatusHistory(Base):
     __tablename__ = "booking_status_history"
 
+    __table_args__ = (
+        # Update or expand the CHECK constraint to match spec
+        CheckConstraint(
+            """
+            (old_status IS NULL) OR
+            (old_status = 'requested' AND new_status IN ('owner_accepted', 'owner_rejected', 'user_cancelled', 'conflict_cancelled', 'request_expired')) OR
+            (old_status = 'owner_accepted' AND new_status IN ('confirmed', 'hold_expired', 'user_cancelled')) OR
+            (old_status = 'confirmed' AND new_status IN ('completed', 'user_cancelled', 'admin_cancelled', 'balance_overdue_cancelled')) OR
+            (old_status = 'hold_expired' AND new_status = 'owner_accepted')
+            """,
+            name="ck_booking_status_history_transition",
+        ),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
@@ -421,7 +434,7 @@ class BookingStatusHistory(Base):
     booking: Mapped["Booking"] = relationship(
         back_populates="status_history",
     )
-    
+
     changed_by_user: Mapped["Profile"] = relationship(
         "Profile",
         foreign_keys=[changed_by],
