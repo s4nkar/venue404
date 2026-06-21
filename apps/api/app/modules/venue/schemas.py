@@ -1,12 +1,9 @@
 from pydantic import BaseModel, field_validator, Field
 from uuid import UUID
 from datetime import datetime, time
-from typing import Optional, Literal
+from typing import Optional
 from decimal import Decimal
 from enum import Enum
-
-
-PaymentMode = Literal["advance_balance", "full"]
 
 
 
@@ -163,7 +160,6 @@ class VenueResponse(BaseModel):
 
     
     advance_pct: Decimal
-    payment_mode: PaymentMode
     balance_due_days_before_event: int
     owner_action_window_hours: int
     overdue_advance_refund_pct: Decimal
@@ -233,7 +229,6 @@ class CreateVenueRequest(BaseModel):
 
     
     advance_pct: Decimal = Field(default=Decimal("30.00"), gt=0, le=100)
-    payment_mode: PaymentMode = "advance_balance"
     balance_due_days_before_event: int = Field(default=7, gt=0)
     owner_action_window_hours: int = Field(default=48, ge=24, le=72)
     overdue_advance_refund_pct: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
@@ -326,7 +321,6 @@ class UpdateVenueRequest(BaseModel):
     hourly_rate_paise: Optional[int] = Field(default=None, ge=0)
 
     advance_pct: Optional[Decimal] = Field(default=None, gt=0, le=100)
-    payment_mode: Optional[PaymentMode] = None
     balance_due_days_before_event: Optional[int] = Field(default=None, gt=0)
     owner_action_window_hours: Optional[int] = Field(default=None, ge=24, le=72)
     overdue_advance_refund_pct: Optional[Decimal] = Field(default=None, ge=0, le=100)

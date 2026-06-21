@@ -228,13 +228,6 @@ class Booking(Base):
         default=0,
     )
 
-    # Effective payment mode for this booking (snapshot of the venue default at
-    # request time, optionally overridden by the owner at acceptance):
-    # "advance_balance" = advance now + balance later; "full" = one 100% payment.
-    payment_mode: Mapped[str] = mapped_column(
-        String, nullable=False, server_default="advance_balance", default="advance_balance"
-    )
-
     payment_status: Mapped[PaymentStatus] = mapped_column(
         Enum(PaymentStatus, name="payment_status"),
         nullable=False,

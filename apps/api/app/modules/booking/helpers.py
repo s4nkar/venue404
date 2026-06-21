@@ -132,7 +132,6 @@ def _booking_out(booking: Booking) -> BookingOut:
         booking_type=_enum_value(booking.booking_type),
         status=_enum_value(booking.status),
         payment_status=_enum_value(booking.payment_status),
-        payment_mode=booking.payment_mode,
         starts_at=slot.starts_at,
         ends_at=slot.ends_at,
         effective_starts_at=slot.effective_starts_at,

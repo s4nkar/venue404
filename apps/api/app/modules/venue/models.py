@@ -80,9 +80,6 @@ class Venue(Base):
 
     platform_commission_pct: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, server_default="10.00")
     advance_pct: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, server_default="30.00")
-    # "advance_balance" = token advance now + balance later (uses advance_pct);
-    # "full" = a single 100% payment upfront. The owner's default for this venue.
-    payment_mode: Mapped[str] = mapped_column(Text, nullable=False, server_default="advance_balance")
 
     balance_due_days_before_event: Mapped[int] = mapped_column(Integer, nullable=False, server_default="7")
     owner_action_window_hours: Mapped[int] = mapped_column(Integer, nullable=False, server_default="48")

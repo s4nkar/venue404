@@ -8,9 +8,6 @@ from pydantic import BaseModel, Field
 BookingTypeValue = Literal["full_day", "time_slot"]
 
 
-PaymentModeValue = Literal["advance_balance", "full"]
-
-
 class BookingRequestIn(BaseModel):
     venue_id: UUID
     venue_name: str
@@ -22,12 +19,6 @@ class BookingRequestIn(BaseModel):
     guest_count: int = Field(gt=0)
     event_type: str | None = None
     user_notes: str | None = None
-
-
-class AcceptBookingIn(BaseModel):
-    # Optional per-booking override of the venue's default payment mode. Omit to
-    # keep the mode snapshotted at request time.
-    payment_mode: PaymentModeValue | None = None
 
 
 class BookingDisplay(BaseModel):
@@ -48,7 +39,6 @@ class BookingOut(BaseModel):
     booking_type: str
     status: str
     payment_status: str
-    payment_mode: str
     starts_at: datetime
     ends_at: datetime
     effective_starts_at: datetime

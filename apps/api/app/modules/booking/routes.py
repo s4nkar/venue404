@@ -7,7 +7,6 @@ from app.core.database import get_db
 from app.modules.auth.dependencies import AuthContext, require_auth, require_owner
 from app.modules.booking import service
 from app.modules.booking.schemas import (
-    AcceptBookingIn,
     BookingOut,
     BookingRequestIn,
     CancellationPreviewOut,
@@ -83,11 +82,10 @@ def user_cancel_booking(
 @router.post("/{booking_id}/accept", response_model=BookingOut)
 def owner_accept_booking(
     booking_id: UUID,
-    body: AcceptBookingIn | None = None,
     auth: AuthContext = Depends(require_owner),
     db: Session = Depends(get_db),
 ):
-    return service.owner_accept_booking(db, booking_id, auth.user_id, body)
+    return service.owner_accept_booking(db, booking_id, auth.user_id)
 
 
 @router.post("/{booking_id}/reject", response_model=BookingOut)

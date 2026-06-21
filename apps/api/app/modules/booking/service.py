@@ -1,7 +1,6 @@
 import logging
 import uuid
 from datetime import date, timedelta
-from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -9,7 +8,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.availability.service import validate_booking_request
-from app.modules.notification import service as notifications
+from app.modules.booking._stubs import (
+    create_advance_payment_intent,
+    create_notification,
+)
 from app.modules.booking.helpers import (
     _now,
     _history,
@@ -28,13 +30,12 @@ from app.modules.booking.models import (
     PaymentStatus,
 )
 from app.modules.booking.schemas import (
-    AcceptBookingIn,
     BookingOut,
     BookingRequestIn,
     ExtendDeadlineIn,
 )
 from app.modules.venue.models import Venue, VenueStatus
-from app.modules.venue.service import ( get_pricing_quote_for_slot,  _get_active_venue_or_404, _banker_round )
+from app.modules.venue.service import ( get_pricing_quote_for_slot,  _get_active_venue_or_404 )
 
 # Re-expose functions from cancellation module
 from app.modules.booking.cancellation import (
@@ -44,6 +45,12 @@ from app.modules.booking.cancellation import (
     owner_cancel_forfeit,
     owner_cancel_goodwill,
     admin_force_cancel,
+)
+
+# Re-expose functions from payment module
+from app.modules.booking.payment import (
+    handle_advance_payment_captured,
+    handle_balance_payment_captured,
 )
 
 logger = logging.getLogger(__name__)
@@ -99,7 +106,6 @@ def create_booking_request(
         advance_due_paise=quote.advance_due_paise,
         balance_due_paise=quote.balance_due_paise,
         overdue_advance_refund_pct=venue.overdue_advance_refund_pct,
-        payment_mode=venue.payment_mode,
         payment_status=PaymentStatus.unpaid,
     )
     db.add(booking)
@@ -120,19 +126,12 @@ def create_booking_request(
     db.flush()
     db.refresh(booking)
 
-    notifications.notify(
-        db,
+    create_notification(
         venue.owner_id,
-        "new_request_owner",
-        context={"venue_name": venue.name},
-        booking_id=booking.id,
-    )
-    notifications.notify(
-        db,
-        booking.user_id,
-        "request_received",
-        context={"venue_name": venue.name},
-        booking_id=booking.id,
+        booking.id,
+        "booking_requested",
+        "New booking request",
+        "A customer requested your venue.",
     )
     return _booking_out(booking)
 
@@ -176,9 +175,7 @@ def list_venue_bookings(
     return [_booking_out(booking) for booking in query.order_by(Booking.requested_at.asc()).all()]
 
 
-def owner_accept_booking(
-    db: Session, booking_id: UUID, owner_id: UUID, body: AcceptBookingIn | None = None
-) -> BookingOut:
+def owner_accept_booking(db: Session, booking_id: UUID, owner_id: UUID) -> BookingOut:
     booking = _booking_or_404(db, booking_id, for_update=True)
     _assert_booking_owner(booking, owner_id)
 
@@ -192,52 +189,30 @@ def owner_accept_booking(
 
     slot = _slot_for_update(db, booking.id)
     old_status = booking.status
-    # Owner approval is exclusive: it reserves the slot so only ONE requester can
-    # be approved (and then pay) at a time — there is no multi-booking race at
-    # payment. Other requests stay pending and are conflict-cancelled once this
-    # booking's advance payment confirms. The GIST exclusion rejects a second
-    # overlapping reservation on the same venue.
     slot.is_blocking = True
     booking.status = BookingStatus.owner_accepted
     booking.owner_responded_at = _now()
     booking.hold_expires_at = booking.owner_responded_at + timedelta(hours=USER_PAYMENT_HOLD_HOURS)
-
-    # Optional per-booking override of the payment mode. Recompute the advance /
-    # balance split so the price-split invariant (advance + balance = quoted) holds.
-    if body is not None and body.payment_mode is not None:
-        booking.payment_mode = body.payment_mode
-        if body.payment_mode == "full":
-            booking.advance_due_paise = booking.quoted_price_paise
-            booking.balance_due_paise = 0
-            booking.advance_pct = 100
-        else:
-            advance = _banker_round(
-                Decimal(str(booking.quoted_price_paise))
-                * Decimal(str(booking.venue.advance_pct))
-                / Decimal("100")
-            )
-            booking.advance_due_paise = advance
-            booking.balance_due_paise = booking.quoted_price_paise - advance
-            booking.advance_pct = float(booking.venue.advance_pct)
 
     try:
         db.flush()
     except IntegrityError as exc:
         db.rollback()
         if "booking_slots_no_overlap" in str(exc.orig):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Slot already reserved") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Slot already blocked") from exc
         raise
 
+    booking.stripe_advance_payment_intent_id = create_advance_payment_intent(booking)
     db.add(_history(booking, old_status, BookingStatus.owner_accepted, changed_by=owner_id))
     db.flush()
     db.refresh(booking)
 
-    notifications.notify(
-        db,
+    create_notification(
         booking.user_id,
-        "request_accepted",
-        context={"venue_name": booking.venue.name},
-        booking_id=booking.id,
+        booking.id,
+        "booking_accepted",
+        "Booking accepted",
+        f"The venue owner accepted your request. Please pay the advance within {USER_PAYMENT_HOLD_HOURS} hours.",
     )
     return _booking_out(booking)
 
@@ -260,12 +235,12 @@ def owner_reject_booking(
     db.flush()
     db.refresh(booking)
 
-    notifications.notify(
-        db,
+    create_notification(
         booking.user_id,
+        booking.id,
         "booking_rejected",
-        context={"venue_name": booking.venue.name, "reason": reason},
-        booking_id=booking.id,
+        "Booking rejected",
+        reason,
     )
     return _booking_out(booking)
 
@@ -310,13 +285,7 @@ def owner_extend_deadline(
     ))
     db.flush()
     db.refresh(booking)
-    notifications.notify(
-        db,
-        booking.user_id,
-        "balance_deadline_extended",
-        context={"venue_name": booking.venue.name},
-        booking_id=booking.id,
-    )
+    create_notification(booking.user_id, booking.id, "balance_deadline_extended", "Balance deadline extended", "Your balance payment deadline was extended.")
     return _booking_out(booking)
 
 
