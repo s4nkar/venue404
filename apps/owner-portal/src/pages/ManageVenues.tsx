@@ -84,8 +84,14 @@ export default function ManageVenues() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredVenues.map(venue => {
             const coverPhoto = venue.photos?.find((p: any) => p.is_cover)?.image_url || venue.photos?.[0]?.image_url
+            
+            const isWizardCompleted = venue.last_completed_step >= 8
+            const targetUrl = venue.status === 'draft' && !isWizardCompleted
+              ? `/venues/new?id=${venue.id}&step=${(venue.last_completed_step || 0) + 1}`
+              : `/venues/${venue.id}/overview`
+
             return (
-            <Link key={venue.id} to={`/venues/${venue.id}/overview`} className="block group">
+            <Link key={venue.id} to={targetUrl} className="block group">
               <Card className="overflow-hidden flex flex-col h-full transition-all group-hover:shadow-md group-hover:border-zinc-300">
                 {/* Image Header */}
                 <div className="h-48 bg-zinc-100 relative border-b border-zinc-200 flex items-center justify-center">

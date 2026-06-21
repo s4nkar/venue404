@@ -100,18 +100,20 @@ export default function VenueOverview() {
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <SectionHeader 
-          title={venue.name} 
-          description={`${venue.city}, ${venue.state}`} 
-        />
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900">{venue.name}</h1>
+          <p className="mt-1 text-sm text-zinc-500">{venue.city}, {venue.state}</p>
+        </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard label="Bookings this month" value="0" icon={<CalendarDays className="h-4 w-4"/>} accent="brand" />
-        <MetricCard label="Revenue this month" value="₹0" icon={<IndianRupee className="h-4 w-4"/>} accent="emerald" />
-        <MetricCard label="Max Capacity" value={venue.max_capacity?.toString() || '0'} icon={<Users className="h-4 w-4"/>} accent="violet" />
-      </div>
+      {venue.status !== 'draft' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <MetricCard label="Bookings this month" value="0" icon={<CalendarDays className="h-4 w-4"/>} accent="brand" />
+          <MetricCard label="Revenue this month" value="₹0" icon={<IndianRupee className="h-4 w-4"/>} accent="emerald" />
+          <MetricCard label="Max Capacity" value={venue.max_capacity?.toString() || '0'} icon={<Users className="h-4 w-4"/>} accent="violet" />
+        </div>
+      )}
 
       {/* Calendar & Availability */}
       {venue.status === 'approved' && (
