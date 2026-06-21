@@ -171,13 +171,19 @@ def get_pricing_preview(
 
     owner_payout_paise = quoted_price_paise - platform_fee_paise
 
-    advance_due_paise = _banker_round(
-        Decimal(str(quoted_price_paise))
-        * Decimal(str(venue.advance_pct))
-        / Decimal("100")
-    )
-
-    balance_due_paise = quoted_price_paise - advance_due_paise
+    if venue.payment_mode == "full":
+        # Full payment upfront: one 100% payment, no balance step.
+        advance_due_paise = quoted_price_paise
+        balance_due_paise = 0
+        effective_advance_pct = 100.0
+    else:
+        advance_due_paise = _banker_round(
+            Decimal(str(quoted_price_paise))
+            * Decimal(str(venue.advance_pct))
+            / Decimal("100")
+        )
+        balance_due_paise = quoted_price_paise - advance_due_paise
+        effective_advance_pct = float(venue.advance_pct)
 
     if advance_due_paise + balance_due_paise != quoted_price_paise:
         raise ConflictError("Pricing invariant violated: advance_due + balance_due != quoted_price")
@@ -188,7 +194,7 @@ def get_pricing_preview(
         platform_commission_pct=float(venue.platform_commission_pct),
         platform_fee_paise=platform_fee_paise,
         owner_payout_paise=owner_payout_paise,
-        advance_pct=float(venue.advance_pct),
+        advance_pct=effective_advance_pct,
         advance_due_paise=advance_due_paise,
         balance_due_paise=balance_due_paise,
         display=PricingDisplay(
@@ -286,6 +292,7 @@ def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue
 
        
         advance_pct=body.advance_pct,
+        payment_mode=body.payment_mode,
         balance_due_days_before_event=body.balance_due_days_before_event,
         owner_action_window_hours=body.owner_action_window_hours,
         overdue_advance_refund_pct=body.overdue_advance_refund_pct,
