@@ -19,6 +19,10 @@ _TEMPLATES: dict[str, tuple[str, str]] = {
         "Your booking was accepted",
         "Pay the token advance within 24 hours to confirm your booking for {venue_name}.",
     ),
+    "booking_rejected": (
+        "Booking request declined",
+        "The owner could not accept your request for {venue_name}.",
+    ),
     "payment_reminder": (
         "Reminder: complete your payment",
         "Your 24-hour hold for {venue_name} is expiring soon. Pay the token advance to confirm.",
@@ -26,6 +30,18 @@ _TEMPLATES: dict[str, tuple[str, str]] = {
     "payment_confirmed": (
         "Booking confirmed",
         "Your booking for {venue_name} is confirmed. We look forward to your event!",
+    ),
+    "balance_paid": (
+        "Balance paid — booking fully paid",
+        "Thanks! Your balance for {venue_name} is paid and your booking is fully settled.",
+    ),
+    "balance_overdue": (
+        "Balance payment overdue",
+        "The remaining balance for {venue_name} is overdue. Please pay it to keep your booking.",
+    ),
+    "balance_deadline_extended": (
+        "Balance deadline extended",
+        "Your balance payment deadline for {venue_name} has been extended.",
     ),
     "hold_expired": (
         "Payment hold expired",
@@ -38,6 +54,10 @@ _TEMPLATES: dict[str, tuple[str, str]] = {
     "booking_canceled": (
         "Booking canceled",
         "Your booking for {venue_name} was canceled.",
+    ),
+    "request_expired": (
+        "Request expired",
+        "Your booking request for {venue_name} expired before the owner responded.",
     ),
     "refund_issued": (
         "Refund issued",

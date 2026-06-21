@@ -18,8 +18,8 @@ def create_payment(
     user: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a Stripe PaymentIntent for a booking's token advance."""
-    return service.create_payment_intent(db, user.user_id, body.booking_id)
+    """Create a Stripe PaymentIntent for a booking's token advance or balance."""
+    return service.create_payment_intent(db, user.user_id, body.booking_id, body.payment_type)
 
 
 @router.post("/webhook")

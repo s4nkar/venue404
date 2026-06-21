@@ -34,7 +34,7 @@ def run():
             ))
             venue = db.get(Venue, b.venue_id)
             venue_name = venue.name if venue else "the venue"
-            notifications.notify(db, b.user_id, "booking_canceled",
+            notifications.notify(db, b.user_id, "request_expired",
                                  context={"venue_name": venue_name}, booking_id=b.id)
             expired += 1
         logger.info("stale_requests: expired %d request(s)", expired)
