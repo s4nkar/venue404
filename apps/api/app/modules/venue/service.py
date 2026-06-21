@@ -146,22 +146,26 @@ def get_pricing_preview(
 
     venue = _get_active_venue_or_404(db, venue_id)
 
-    if venue.pricing_mode == "flat" or (venue.pricing_mode == "mixed" and booking_type == BookingType.full_day):
-        quoted_price_paise = venue.starting_price_paise
+    if ends_at <= starts_at:
+        raise ConflictError("ends_at must be after starts_at")
 
-    elif venue.pricing_mode == "hourly" or (venue.pricing_mode == "mixed" and booking_type == BookingType.time_slot):
-        if ends_at <= starts_at:
-            raise ConflictError("ends_at must be after starts_at")
+    # ── Pricing Logic ─────────────────────────────────────
+    if booking_type == BookingType.full_day:
+        days = (ends_at.date() - starts_at.date()).days + 1
+        base = venue.starting_price_paise or 0
+        quoted_price_paise = base * days
+        used_mode = "flat"  # full_day always uses base price (per day)
 
+    elif booking_type == BookingType.time_slot:
         duration_seconds = (ends_at - starts_at).total_seconds()
         duration_hours = Decimal(str(duration_seconds)) / Decimal("3600")
-
         quoted_price_paise = _banker_round(
-            Decimal(str(venue.hourly_rate_paise)) * duration_hours
+            Decimal(str(venue.hourly_rate_paise or 0)) * duration_hours
         )
+        used_mode = "hourly"
 
     else:
-        raise ConflictError(f"Invalid pricing_mode or booking_type combination: {venue.pricing_mode} / {booking_type}")
+        raise ConflictError(f"Invalid booking_type: {booking_type}")
 
     platform_fee_paise = _banker_round(
         Decimal(str(quoted_price_paise))
@@ -179,11 +183,8 @@ def get_pricing_preview(
 
     balance_due_paise = quoted_price_paise - advance_due_paise
 
-    if advance_due_paise + balance_due_paise != quoted_price_paise:
-        raise ConflictError("Pricing invariant violated: advance_due + balance_due != quoted_price")
-
     return PricingPreviewResponse(
-        pricing_mode=venue.pricing_mode,
+        pricing_mode=used_mode,  
         quoted_price_paise=quoted_price_paise,
         platform_commission_pct=float(venue.platform_commission_pct),
         platform_fee_paise=platform_fee_paise,
@@ -298,6 +299,35 @@ def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue
     )
 
     db.add(venue)
+    db.flush()
+
+    if body.cancellation_policy:
+        policy = VenueCancellationPolicy(
+            id=uuid.uuid4(),
+            venue_id=venue.id,
+            tier_1_hours=body.cancellation_policy.tier_1_hours,
+            tier_1_refund_pct=body.cancellation_policy.tier_1_refund_pct,
+            tier_2_hours=body.cancellation_policy.tier_2_hours,
+            tier_2_refund_pct=body.cancellation_policy.tier_2_refund_pct,
+            tier_3_hours=body.cancellation_policy.tier_3_hours,
+            tier_3_refund_pct=body.cancellation_policy.tier_3_refund_pct,
+            no_show_refund_pct=body.cancellation_policy.no_show_refund_pct,
+            platform_fee_refundable=body.cancellation_policy.platform_fee_refundable,
+            notes=body.cancellation_policy.notes,
+        )
+        db.add(policy)
+
+    if body.amenity_ids:
+        valid_amenities = db.query(Amenity).filter(
+            Amenity.id.in_(body.amenity_ids),
+            Amenity.deleted_at.is_(None),
+        ).all()
+        if len(valid_amenities) != len(set(body.amenity_ids)):
+            raise ConflictError("One or more amenity IDs provided do not exist in the platform.")
+
+        new_links = [VenueAmenity(venue_id=venue.id, amenity_id=am_id) for am_id in set(body.amenity_ids)]
+        db.add_all(new_links)
+
     db.commit()
     db.refresh(venue)
     return venue

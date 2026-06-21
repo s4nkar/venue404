@@ -172,6 +172,8 @@ class VenueResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    last_completed_step: int
+
     
     photos: list[VenuePhotoResponse] = Field(default_factory=list)
     amenities: list[AmenityResponse] = Field(default_factory=list)
@@ -233,7 +235,8 @@ class CreateVenueRequest(BaseModel):
     owner_action_window_hours: int = Field(default=48, ge=24, le=72)
     overdue_advance_refund_pct: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
 
-    
+    cancellation_policy: Optional[UpdateCancellationPolicyRequest] = None
+    amenity_ids: Optional[list[UUID]] = None
 
     @field_validator("allowed_booking_types")
     @classmethod
@@ -324,6 +327,8 @@ class UpdateVenueRequest(BaseModel):
     balance_due_days_before_event: Optional[int] = Field(default=None, gt=0)
     owner_action_window_hours: Optional[int] = Field(default=None, ge=24, le=72)
     overdue_advance_refund_pct: Optional[Decimal] = Field(default=None, ge=0, le=100)
+
+    last_completed_step: Optional[int] = None
 
     @field_validator("allowed_booking_types")
     @classmethod

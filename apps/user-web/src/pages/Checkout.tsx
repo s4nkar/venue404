@@ -8,20 +8,18 @@ import type { PricingQuote, BookingType } from '../types'
 import { QuoteBreakdown } from '../components/venue/QuoteBreakdown'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 type CheckoutState = {
-  venueId:         string
-  venueName:       string
+  venueId: string
+  venueName: string
   venueCoverImage: string | null
-  bookingType:     BookingType
-  startsAt:        string
-  endsAt:          string
-  bookingDate:     string
-  quote:           PricingQuote
+  bookingType: BookingType
+  startsAt: string
+  endsAt: string
+  bookingDate: string
+  quote: PricingQuote | undefined // Made optional for safety
 }
 
 // ─── Small helpers ────────────────────────────────────────────────────────────
-
 function Spinner() {
   return (
     <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -43,14 +41,7 @@ const inputCls =
   'w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow'
 
 // ─── Booking summary sidebar card ─────────────────────────────────────────────
-
-function BookingSummaryCard({
-  state,
-  guestCount,
-}: {
-  state: CheckoutState
-  guestCount: number
-}) {
+function BookingSummaryCard({ state, guestCount }: { state: CheckoutState; guestCount: number }) {
   const { venueName, venueCoverImage, bookingType, startsAt, endsAt, bookingDate, quote } = state
 
   return (
@@ -61,8 +52,18 @@ function BookingSummaryCard({
           <img src={venueCoverImage} alt={venueName} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <svg className="h-8 w-8 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
+            <svg
+              className="h-8 w-8 text-zinc-300"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"
+              />
             </svg>
           </div>
         )}
@@ -75,22 +76,52 @@ function BookingSummaryCard({
         {/* Date / time row */}
         <div className="mt-3 space-y-1.5">
           <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <svg className="h-4 w-4 shrink-0 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            <svg
+              className="h-4 w-4 shrink-0 text-zinc-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
             </svg>
             {formatDate(bookingDate)}
           </div>
           <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <svg className="h-4 w-4 shrink-0 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="h-4 w-4 shrink-0 text-zinc-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             {bookingType === 'time_slot'
               ? `${formatTime(startsAt)} – ${formatTime(endsAt)}`
               : 'Full day'}
           </div>
           <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <svg className="h-4 w-4 shrink-0 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            <svg
+              className="h-4 w-4 shrink-0 text-zinc-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+              />
             </svg>
             {guestCount} guest{guestCount !== 1 ? 's' : ''}
           </div>
@@ -100,33 +131,40 @@ function BookingSummaryCard({
         <div className="my-5 border-t border-zinc-100" />
 
         {/* Price breakdown */}
-        <QuoteBreakdown source="quote" quote={quote} />
+        {quote ? (
+          <QuoteBreakdown source="quote" quote={quote} />
+        ) : (
+          <p className="text-sm text-zinc-500 py-4">
+            Price details will be available after owner confirmation.
+          </p>
+        )}
 
         {/* Advance callout */}
-        <div className="mt-4 rounded-xl bg-brand-light border border-brand-light-strong px-4 py-3">
-          <p className="text-sm font-semibold text-brand">
-            {formatPrice(quote.advance_due_paise)} due now
-          </p>
-          <p className="text-xs text-brand-secondary mt-0.5">
-            After owner accepts · remaining {formatPrice(quote.balance_due_paise)} paid later
-          </p>
-        </div>
+        {quote && (
+          <div className="mt-4 rounded-xl bg-brand-light border border-brand-light-strong px-4 py-3">
+            <p className="text-sm font-semibold text-brand">
+              {formatPrice(quote.advance_due_paise)} due now
+            </p>
+            <p className="text-xs text-brand-secondary mt-0.5">
+              After owner accepts · remaining {formatPrice(quote.balance_due_paise)} paid later
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function Checkout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const client   = createClient()
+  const client = createClient()
 
   const state = location.state as CheckoutState | undefined
   const [guestCount, setGuestCount] = useState(1)
-  const [eventType,  setEventType]  = useState('')
-  const [userNotes,  setUserNotes]  = useState('')
+  const [eventType, setEventType] = useState('')
+  const [userNotes, setUserNotes] = useState('')
 
   const createBooking = useMutation({
     mutationFn: () =>
@@ -150,8 +188,18 @@ export default function Checkout() {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 text-center">
         <div className="h-14 w-14 rounded-full bg-zinc-100 flex items-center justify-center mb-5">
-          <svg className="h-6 w-6 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg
+            className="h-6 w-6 text-zinc-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
         </div>
         <h2 className="text-lg font-semibold text-zinc-900 mb-2">No booking details found</h2>
@@ -170,7 +218,6 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-zinc-50/60">
-
       {/* ── Minimal checkout navbar ──────────────────────────────── */}
       <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6 py-3.5">
@@ -179,8 +226,18 @@ export default function Checkout() {
           </Link>
           {/* Step label */}
           <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <svg className="h-4 w-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="h-4 w-4 text-zinc-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             Confirm your request
           </div>
@@ -196,7 +253,6 @@ export default function Checkout() {
       {/* ── Two-column body ──────────────────────────────────────── */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
         <div className="flex flex-col lg:flex-row gap-10 xl:gap-14 items-start">
-
           {/* ── Left: form ──────────────────────────────────────── */}
           <div className="flex-1 min-w-0 space-y-6">
             <div>
@@ -220,7 +276,12 @@ export default function Checkout() {
                     aria-label="Decrease guests"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M20 12H4"
+                      />
                     </svg>
                   </button>
                   <input
@@ -238,7 +299,12 @@ export default function Checkout() {
                     aria-label="Increase guests"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -249,7 +315,9 @@ export default function Checkout() {
             <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-5 shadow-sm">
               <div>
                 <h2 className="text-base font-semibold text-zinc-900">Event details</h2>
-                <p className="text-xs text-zinc-400 mt-0.5">Optional — helps the owner prepare for your event</p>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Optional — helps the owner prepare for your event
+                </p>
               </div>
 
               <div>
@@ -295,12 +363,12 @@ export default function Checkout() {
                   {
                     n: '3',
                     title: 'Pay the advance',
-                    desc: `Once accepted, you'll pay ${formatPrice(state.quote.advance_due_paise)} to confirm your slot.`,
+                    desc: `Once accepted, you'll pay ${formatPrice(state.quote?.advance_due_paise || 0)} to confirm your slot.`,
                   },
                   {
                     n: '4',
                     title: 'Balance due later',
-                    desc: `The remaining ${formatPrice(state.quote.balance_due_paise)} is due before your event date.`,
+                    desc: `The remaining ${formatPrice(state.quote?.balance_due_paise || 0)} is due before your event date.`,
                   },
                 ].map((item) => (
                   <li key={item.n} className="flex gap-3.5">
@@ -316,13 +384,28 @@ export default function Checkout() {
               </ol>
             </div>
 
-            {/* Error */}
+            {/* Error Banner */}
             {createBooking.isError && (
               <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600 flex items-start gap-2">
-                <svg className="h-4 w-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  className="h-4 w-4 mt-0.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
-                Something went wrong. Please try again.
+                <div>
+                  <p className="font-medium">Failed to send booking request</p>
+                  <p className="mt-0.5">
+                    {(createBooking.error as any)?.message || 'Please try again.'}
+                  </p>
+                </div>
               </div>
             )}
 
@@ -334,12 +417,16 @@ export default function Checkout() {
                 className="w-full rounded-xl bg-brand py-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
               >
                 {createBooking.isPending ? (
-                  <span className="flex items-center justify-center gap-2"><Spinner /> Sending request…</span>
+                  <span className="flex items-center justify-center gap-2">
+                    <Spinner /> Sending request…
+                  </span>
                 ) : (
                   'Request to Book'
                 )}
               </button>
-              <p className="text-xs text-zinc-400 text-center mt-2">No charge until owner accepts</p>
+              <p className="text-xs text-zinc-400 text-center mt-2">
+                No charge until owner accepts
+              </p>
             </div>
           </div>
 
@@ -355,7 +442,9 @@ export default function Checkout() {
                 className="w-full rounded-xl bg-brand py-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
               >
                 {createBooking.isPending ? (
-                  <span className="flex items-center justify-center gap-2"><Spinner /> Sending request…</span>
+                  <span className="flex items-center justify-center gap-2">
+                    <Spinner /> Sending request…
+                  </span>
                 ) : (
                   'Request to Book'
                 )}

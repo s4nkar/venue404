@@ -131,12 +131,22 @@ export default function VenueEdit() {
 
     // Extract form data based on current section
     if (editSection === 'details') {
+      const minCapStr = formData.get('min_capacity') as string
+      const maxCapStr = formData.get('max_capacity') as string
+      
+      if (minCapStr && maxCapStr) {
+        if (parseInt(minCapStr, 10) > parseInt(maxCapStr, 10)) {
+          alert("Min Capacity cannot exceed Max Capacity.")
+          setSaving(false)
+          return
+        }
+      }
+
       updates.name = formData.get('name')
       updates.description = formData.get('description')
       updates.category_id = formData.get('category_id')
-      const minCap = formData.get('min_capacity')
-      updates.min_capacity = minCap ? parseInt(minCap as string, 10) : null
-      updates.max_capacity = parseInt(formData.get('max_capacity') as string, 10)
+      updates.min_capacity = minCapStr ? parseInt(minCapStr, 10) : null
+      updates.max_capacity = parseInt(maxCapStr, 10)
       updates.city = formData.get('city')
       updates.state = formData.get('state')
       updates.country = formData.get('country') || 'India'
@@ -176,8 +186,19 @@ export default function VenueEdit() {
       updates.advance_pct = parseFloat(formData.get('advance_pct') as string)
       updates.balance_due_days_before_event = parseInt(formData.get('balance_due') as string, 10)
 
-      updates.min_booking_duration_minutes = parseInt(formData.get('min_booking_duration_minutes') as string, 10)
-      updates.max_booking_duration_minutes = parseInt(formData.get('max_booking_duration_minutes') as string, 10)
+      const minDurStr = formData.get('min_booking_duration_minutes') as string
+      const maxDurStr = formData.get('max_booking_duration_minutes') as string
+
+      if (minDurStr && maxDurStr) {
+        if (parseInt(minDurStr, 10) > parseInt(maxDurStr, 10)) {
+          alert("Min Booking Duration cannot exceed Max Booking Duration.")
+          setSaving(false)
+          return
+        }
+      }
+
+      updates.min_booking_duration_minutes = parseInt(minDurStr, 10)
+      updates.max_booking_duration_minutes = parseInt(maxDurStr, 10)
       updates.slot_interval_minutes = parseInt(formData.get('slot_interval_minutes') as string, 10)
       updates.pre_buffer_minutes = parseInt(formData.get('pre_buffer_minutes') as string, 10)
       updates.post_buffer_minutes = parseInt(formData.get('post_buffer_minutes') as string, 10)
@@ -188,28 +209,62 @@ export default function VenueEdit() {
       const client = createClient()
       
       if (editSection === 'policies') {
+        const t1h = formData.get('tier_1_hours') as string
+        const t1p = formData.get('tier_1_refund_pct') as string
+        const t2h = formData.get('tier_2_hours') as string
+        const t2p = formData.get('tier_2_refund_pct') as string
+        const t3h = formData.get('tier_3_hours') as string
+        const t3p = formData.get('tier_3_refund_pct') as string
+
+        // Pairing checks
+        if ((t1h && !t1p) || (!t1h && t1p)) {
+          alert("Tier 1: Hours and Refund % must both be filled or both be empty.")
+          setSaving(false)
+          return
+        }
+        if ((t2h && !t2p) || (!t2h && t2p)) {
+          alert("Tier 2: Hours and Refund % must both be filled or both be empty.")
+          setSaving(false)
+          return
+        }
+        if ((t3h && !t3p) || (!t3h && t3p)) {
+          alert("Tier 3: Hours and Refund % must both be filled or both be empty.")
+          setSaving(false)
+          return
+        }
+
+        // Descending checks
+        const t1hv = t1h ? parseInt(t1h, 10) : null
+        const t2hv = t2h ? parseInt(t2h, 10) : null
+        const t3hv = t3h ? parseInt(t3h, 10) : null
+
+        if (t1hv !== null && t2hv !== null && t1hv <= t2hv) {
+          alert("Tier 1 hours must be strictly greater than Tier 2 hours.")
+          setSaving(false)
+          return
+        }
+        if (t2hv !== null && t3hv !== null && t2hv <= t3hv) {
+          alert("Tier 2 hours must be strictly greater than Tier 3 hours.")
+          setSaving(false)
+          return
+        }
+
         const policyPayload: any = {
           no_show_refund_pct: parseFloat(formData.get('no_show_refund_pct') as string || '0'),
           platform_fee_refundable: false,
           notes: formData.get('notes') as string || null,
         }
         
-        const t1h = formData.get('tier_1_hours') as string
-        const t1p = formData.get('tier_1_refund_pct') as string
         if (t1h && t1p) {
           policyPayload.tier_1_hours = parseInt(t1h, 10)
           policyPayload.tier_1_refund_pct = parseFloat(t1p)
         }
         
-        const t2h = formData.get('tier_2_hours') as string
-        const t2p = formData.get('tier_2_refund_pct') as string
         if (t2h && t2p) {
           policyPayload.tier_2_hours = parseInt(t2h, 10)
           policyPayload.tier_2_refund_pct = parseFloat(t2p)
         }
         
-        const t3h = formData.get('tier_3_hours') as string
-        const t3p = formData.get('tier_3_refund_pct') as string
         if (t3h && t3p) {
           policyPayload.tier_3_hours = parseInt(t3h, 10)
           policyPayload.tier_3_refund_pct = parseFloat(t3p)

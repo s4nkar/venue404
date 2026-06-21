@@ -215,19 +215,16 @@ export function TimeSlotPicker({
             selectedStartMin == null
               ? blockedAsStart
               : selectedEndMin == null && !validEndSlots.has(minutes) && minutes > selectedStartMin
-          let cls = 'px-2 py-2 rounded-lg text-xs font-medium text-center transition-all border '
-
+          let cls = 'px-3 py-2.5 rounded-xl text-sm font-medium text-center transition-all border '
           if (isStart || isEnd) {
-            cls += 'bg-brand text-white border-brand'
+            cls += 'bg-zinc-900 text-white border-zinc-900 shadow'
           } else if (isInRange) {
-            cls += 'bg-brand-light text-brand border-brand-muted'
+            cls += 'bg-blue-50 text-blue-700 border-blue-200'
           } else if (isDisabled) {
             cls += 'bg-zinc-50 text-zinc-300 border-zinc-100 cursor-not-allowed'
           } else {
-            cls +=
-              'bg-white text-zinc-700 border-zinc-200 hover:border-brand-muted hover:bg-brand-light cursor-pointer'
+            cls += 'hover:bg-blue-50 hover:border-blue-200 border-zinc-200'
           }
-
           return (
             <button
               key={slotISO}
