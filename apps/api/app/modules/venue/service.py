@@ -146,22 +146,26 @@ def get_pricing_preview(
 
     venue = _get_active_venue_or_404(db, venue_id)
 
-    if venue.pricing_mode == "flat" or (venue.pricing_mode == "mixed" and booking_type == BookingType.full_day):
-        quoted_price_paise = venue.starting_price_paise
+    if ends_at <= starts_at:
+        raise ConflictError("ends_at must be after starts_at")
 
-    elif venue.pricing_mode == "hourly" or (venue.pricing_mode == "mixed" and booking_type == BookingType.time_slot):
-        if ends_at <= starts_at:
-            raise ConflictError("ends_at must be after starts_at")
+    # ── Pricing Logic ─────────────────────────────────────
+    if booking_type == BookingType.full_day:
+        days = (ends_at.date() - starts_at.date()).days + 1
+        base = venue.starting_price_paise or 0
+        quoted_price_paise = base * days
+        used_mode = "flat"  # full_day always uses base price (per day)
 
+    elif booking_type == BookingType.time_slot:
         duration_seconds = (ends_at - starts_at).total_seconds()
         duration_hours = Decimal(str(duration_seconds)) / Decimal("3600")
-
         quoted_price_paise = _banker_round(
-            Decimal(str(venue.hourly_rate_paise)) * duration_hours
+            Decimal(str(venue.hourly_rate_paise or 0)) * duration_hours
         )
+        used_mode = "hourly"
 
     else:
-        raise ConflictError(f"Invalid pricing_mode or booking_type combination: {venue.pricing_mode} / {booking_type}")
+        raise ConflictError(f"Invalid booking_type: {booking_type}")
 
     platform_fee_paise = _banker_round(
         Decimal(str(quoted_price_paise))
@@ -179,11 +183,8 @@ def get_pricing_preview(
 
     balance_due_paise = quoted_price_paise - advance_due_paise
 
-    if advance_due_paise + balance_due_paise != quoted_price_paise:
-        raise ConflictError("Pricing invariant violated: advance_due + balance_due != quoted_price")
-
     return PricingPreviewResponse(
-        pricing_mode=venue.pricing_mode,
+        pricing_mode=used_mode,  
         quoted_price_paise=quoted_price_paise,
         platform_commission_pct=float(venue.platform_commission_pct),
         platform_fee_paise=platform_fee_paise,

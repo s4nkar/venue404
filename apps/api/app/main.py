@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.core.config import settings
+from app.core.logging import setup_logging
 from app.core.middleware import register_middleware
 from app.jobs import scheduler as job_scheduler
 from app.modules.auth.routes import router as auth_router
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    setup_logging()
     seed_super_admin()
     if settings.enable_jobs:
         logger.info("ENABLE_JOBS=true — starting background scheduler")
