@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Input, SectionHeader, LocationPickerMap } from '@venue404/ui'
 import * as Icons from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
@@ -17,7 +17,14 @@ const STEPS = [
 
 export default function CreateVenueWizard() {
   const navigate = useNavigate()
-  const [currentStep, setCurrentStep] = useState(0)
+  const [searchParams, setSearchParams] = useSearchParams()
+  
+  const [venueId, setVenueId] = useState<string | null>(searchParams.get('id'))
+  const [currentStep, setCurrentStep] = useState(() => {
+    const step = searchParams.get('step')
+    return step ? parseInt(step, 10) - 1 : 0
+  })
+  
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -98,6 +105,66 @@ export default function CreateVenueWizard() {
   }, [])
 
   useEffect(() => {
+    async function loadDraft() {
+      if (!venueId) return
+      try {
+        const client = createClient()
+        const data = await venueEndpoints(client).getMyVenue(venueId)
+        
+        // Populate formData
+        setFormData(prev => ({
+          ...prev,
+          name: data.name || '',
+          category_id: data.category?.id || data.category_id || '',
+          description: data.description || '',
+          min_capacity: data.min_capacity?.toString() || '',
+          max_capacity: data.max_capacity?.toString() || '',
+          address_line1: data.address_line1 || '',
+          address_line2: data.address_line2 || '',
+          city: data.city || '',
+          state: data.state || '',
+          country: data.country || 'India',
+          postal_code: data.postal_code || '',
+          latitude: data.latitude || null,
+          longitude: data.longitude || null,
+          open_time: data.open_time ? data.open_time.slice(0, 5) : '09:00',
+          close_time: data.close_time ? data.close_time.slice(0, 5) : '23:00',
+          min_booking_duration_minutes: data.min_booking_duration_minutes || 60,
+          max_booking_duration_minutes: data.max_booking_duration_minutes || 1440,
+          slot_interval_minutes: data.slot_interval_minutes || 30,
+          pre_buffer_minutes: data.pre_buffer_minutes || 30,
+          post_buffer_minutes: data.post_buffer_minutes || 30,
+          pricing_mode: data.pricing_mode || 'flat',
+          base_price: data.starting_price_paise ? (data.starting_price_paise / 100).toString() : '',
+          hourly_rate: data.hourly_rate_paise ? (data.hourly_rate_paise / 100).toString() : '',
+          advance_pct: data.advance_pct || 30,
+          balance_due: data.balance_due_days_before_event || 7,
+          spans_next_day: data.spans_next_day || false,
+          allowed_booking_types: data.allowed_booking_types || ['full_day', 'time_slot'],
+          owner_action_window_hours: data.owner_action_window_hours || 48,
+          overdue_advance_refund_pct: data.overdue_advance_refund_pct || 0,
+          
+          tier_1_hours: data.cancellation_policy?.tier_1_hours?.toString() || '',
+          tier_1_refund_pct: data.cancellation_policy?.tier_1_refund_pct?.toString() || '',
+          tier_2_hours: data.cancellation_policy?.tier_2_hours?.toString() || '',
+          tier_2_refund_pct: data.cancellation_policy?.tier_2_refund_pct?.toString() || '',
+          tier_3_hours: data.cancellation_policy?.tier_3_hours?.toString() || '',
+          tier_3_refund_pct: data.cancellation_policy?.tier_3_refund_pct?.toString() || '',
+          no_show_refund_pct: data.cancellation_policy?.no_show_refund_pct?.toString() || '0',
+          notes: data.cancellation_policy?.notes || '',
+        }))
+
+        if (data.amenities) {
+          setSelectedAmenities(data.amenities.map((a: any) => a.id))
+        }
+      } catch (err) {
+        console.error('Failed to load draft venue', err)
+      }
+    }
+    loadDraft()
+  }, [venueId])
+
+  useEffect(() => {
     const hasFullDay = formData.allowed_booking_types.includes('full_day')
     const hasTimeSlot = formData.allowed_booking_types.includes('time_slot')
     
@@ -132,7 +199,7 @@ export default function CreateVenueWizard() {
     })
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
     setError(null)
     
     // Step 0: Basic Details Validation
@@ -194,7 +261,49 @@ export default function CreateVenueWizard() {
     }
 
     if (currentStep < STEPS.length - 1) {
-      setCurrentStep(s => s + 1)
+      const payload = buildPayload()
+      // @ts-ignore - appending dynamically
+      payload.last_completed_step = currentStep + 1
+
+      try {
+        setSubmitting(true)
+        const client = createClient()
+        let activeVenueId = venueId
+
+        if (!venueId && currentStep === 0) {
+          const newVenue = await venueEndpoints(client).createVenue(payload)
+          setVenueId(newVenue.id)
+          activeVenueId = newVenue.id
+        } else if (venueId) {
+          await venueEndpoints(client).updateVenue(venueId, payload)
+        }
+
+        if (activeVenueId) {
+          setSearchParams({ id: activeVenueId, step: (currentStep + 2).toString() })
+        }
+
+        // Upload photos if we are on the Photos step
+        if (currentStep === 1 && photos.length > 0 && activeVenueId) {
+          for (const file of photos) {
+            try {
+              const fd = new FormData()
+              fd.append('file', file)
+              await venueEndpoints(client).addVenuePhoto(activeVenueId, fd)
+            } catch (err) {
+              console.error('Failed to upload a photo', err)
+            }
+          }
+          // Clear local photos array so we don't upload them again
+          setPhotos([])
+        }
+
+        setCurrentStep(s => s + 1)
+      } catch (err: any) {
+        showError(err.message || 'Failed to save draft.')
+        return
+      } finally {
+        setSubmitting(false)
+      }
     } else {
       submitVenue()
     }
@@ -208,15 +317,11 @@ export default function CreateVenueWizard() {
     }
   }
 
-  const submitVenue = async () => {
-    setSubmitting(true)
-    setError(null)
-
-    // Build the CreateVenueRequest payload
-    const payload = {
+  const buildPayload = () => {
+    const payload: any = {
       name: formData.name,
       description: formData.description || null,
-      category_id: formData.category_id,
+      category_id: formData.category_id || null,
       address_line1: formData.address_line1 || 'TBD',
       address_line2: formData.address_line2 || null,
       city: formData.city || 'TBD',
@@ -227,7 +332,7 @@ export default function CreateVenueWizard() {
       longitude: formData.longitude,
       timezone: 'Asia/Kolkata',
       min_capacity: formData.min_capacity ? parseInt(formData.min_capacity.toString(), 10) : null,
-      max_capacity: formData.max_capacity ? parseInt(formData.max_capacity.toString(), 10) : 100, // required
+      max_capacity: formData.max_capacity ? parseInt(formData.max_capacity.toString(), 10) : 100,
       open_time: `${formData.open_time}:00`,
       close_time: `${formData.close_time}:00`,
       spans_next_day: formData.spans_next_day,
@@ -270,27 +375,28 @@ export default function CreateVenueWizard() {
     
     payload.cancellation_policy = policyPayload
 
+    return payload
+  }
+
+  const submitVenue = async () => {
+    setSubmitting(true)
+    setError(null)
+
     try {
       const client = createClient()
-      const newVenue = await venueEndpoints(client).createVenue(payload)
+      const payload = buildPayload()
+      payload.last_completed_step = 8
 
-      // Upload selected photos now that we have the venue ID
-      if (photos.length > 0) {
-        for (const file of photos) {
-          try {
-            const fd = new FormData()
-            fd.append('file', file)
-            await venueEndpoints(client).addVenuePhoto(newVenue.id, fd)
-          } catch (err) {
-            console.error('Failed to upload a photo', err)
-          }
-        }
+      if (venueId) {
+        await venueEndpoints(client).updateVenue(venueId, payload)
+        navigate(`/venues/${venueId}/overview`)
+      } else {
+        const newVenue = await venueEndpoints(client).createVenue(payload)
+        navigate(`/venues/${newVenue.id}/overview`)
       }
-
-      navigate(`/venues/${newVenue.id}/overview`)
     } catch (err: any) {
-      console.error('Failed to create venue', err)
-      showError(err.message || 'Failed to create venue. Check your inputs.')
+      console.error('Failed to submit venue', err)
+      showError(err.message || 'Failed to submit venue. Check your inputs.')
     } finally {
       setSubmitting(false)
     }
@@ -590,8 +696,8 @@ export default function CreateVenueWizard() {
           <div className="space-y-6">
             <div className="p-6 bg-brand-light text-brand-hover rounded-xl text-center border border-brand-muted/30">
               <Icons.Check className="h-12 w-12 mx-auto text-brand mb-4" />
-              <h3 className="text-xl font-semibold">Your Workspace is Ready!</h3>
-              <p className="mt-2 text-sm max-w-sm mx-auto">Review your details. Once submitted, your venue draft workspace will be created. You can continue fine-tuning your photos and policies there before officially submitting it for admin approval.</p>
+              <h3 className="text-xl font-semibold">Ready to Review!</h3>
+              <p className="mt-2 text-sm max-w-sm mx-auto">Your initial setup is complete. Proceed to your venue workspace to review your details, add more photos, and submit it for admin approval when you are ready.</p>
             </div>
           </div>
         )}
@@ -603,7 +709,7 @@ export default function CreateVenueWizard() {
             Previous Step
           </Button>
           <Button type="submit" variant="primary" disabled={submitting}>
-            {currentStep === STEPS.length - 1 ? (submitting ? 'Creating...' : 'Create Draft Workspace') : 'Continue'}
+            {currentStep === STEPS.length - 1 ? (submitting ? 'Loading...' : 'Review my venue setup') : 'Continue'}
           </Button>
         </div>
       </form>
