@@ -8,7 +8,6 @@ from app.modules.booking.jobs import (
     run_booking_completion_job,
     run_balance_overdue_flag_job,
     run_balance_overdue_autocancel_job,
-    run_balance_due_reminders_job,
 )
 
 logger = logging.getLogger(__name__)
@@ -82,13 +81,6 @@ def start():
             "interval",
             hours=1,
             id="balance_overdue_autocancel",
-        )
-
-        scheduler.add_job(
-            _wrap_job(run_balance_due_reminders_job),
-            "interval",
-            hours=1,
-            id="balance_due_reminders",
         )
 
         scheduler.start()
