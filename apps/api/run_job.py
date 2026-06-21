@@ -39,9 +39,11 @@ def run_job(job_name: str):
     db = SessionLocal()
     try:
         count = job_func(db)
+        db.commit()   
         print(f"✅ {job_name} completed. Processed: {count}")
         return True
     except Exception as e:
+        db.rollback()
         print(f"❌ Error in {job_name}: {e}")
         import traceback
 
