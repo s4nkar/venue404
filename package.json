@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "concurrently -n user,owner,admin -c blue,green,magenta \"pnpm --filter user-web dev\" \"pnpm --filter owner-portal dev\" \"pnpm --filter admin-panel dev\"",
-    "dev:all": "concurrently -n docker,user,owner,admin -c yellow,blue,green,magenta \"docker compose up\" \"pnpm --filter user-web dev\" \"pnpm --filter owner-portal dev\" \"pnpm --filter admin-panel dev\"",
-    "dev:api": "docker compose up api",
+    "dev:all": "concurrently -n docker,user,owner,admin -c yellow,blue,green,magenta \"docker compose up --build\" \"pnpm --filter user-web dev\" \"pnpm --filter owner-portal dev\" \"pnpm --filter admin-panel dev\"",
+    "dev:api": "docker compose up --build api",
     "api:migrate": "docker compose exec api alembic upgrade head",
     "api:migrate:new": "docker compose exec api alembic revision --autogenerate -m",
     "api:migrate:down": "docker compose exec api alembic downgrade -1",
