@@ -99,8 +99,29 @@ def get_cancellation_preview(
 ) -> CancellationPreviewOut:
     booking = _booking_or_404(db, booking_id)
     _assert_booking_user(booking, user_id)
-    if booking.status not in (BookingStatus.owner_accepted, BookingStatus.confirmed):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Booking cannot be cancelled")
+
+    if booking.status not in (
+        BookingStatus.requested,
+        BookingStatus.owner_accepted,
+        BookingStatus.confirmed,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Booking cannot be cancelled at this stage",
+        )
+
+    if (
+        booking.status == BookingStatus.requested
+        or booking.status == BookingStatus.owner_accepted
+    ):
+        # No refund for pre-payment
+        return CancellationPreviewOut(
+            refund_amount_paise=0,
+            penalty_amount_paise=0,
+            refund_pct_applied=0.0,
+            tier_matched=None,
+            display=CancellationDisplay(refund_amount="₹0", penalty_amount="₹0"),
+        )
 
     refund = _compute_refund(booking, _load_policy(db, booking.venue_id))
     return CancellationPreviewOut(
@@ -118,29 +139,59 @@ def get_cancellation_preview(
 def user_cancel_booking(db: Session, booking_id: UUID, user_id: UUID) -> BookingOut:
     booking = _booking_or_404(db, booking_id, for_update=True)
     _assert_booking_user(booking, user_id)
-    if booking.status not in (BookingStatus.owner_accepted, BookingStatus.confirmed):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Booking cannot be cancelled")
+
+    if booking.status in TERMINAL_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot cancel a terminal booking",
+        )
+
+    # Per spec: allowed on requested, owner_accepted, confirmed
+    if booking.status not in (
+        BookingStatus.requested,
+        BookingStatus.owner_accepted,
+        BookingStatus.confirmed,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Booking cannot be cancelled at this stage",
+        )
 
     old_status = booking.status
-    slot = _slot_for_update(db, booking.id)
-    slot.is_blocking = False
+    slot = (
+        _slot_for_update(db, booking.id)
+        if hasattr(booking, "slot") and booking.slot
+        else None
+    )
+    if slot:
+        slot.is_blocking = False
+
     booking.status = BookingStatus.user_cancelled
     booking.cancelled_at = _now()
 
     metadata = None
-    if old_status == BookingStatus.owner_accepted:
-        cancel_payment_intent(booking.stripe_advance_payment_intent_id)
-    else:
-        refund = _compute_refund(booking, _load_policy(db, booking.venue_id), booking.cancelled_at)
+    if old_status == BookingStatus.requested:
+        # Simple cancel - no payment
+        pass
+    elif old_status == BookingStatus.owner_accepted:
+        # Cancel pending PaymentIntent
+        if booking.stripe_advance_payment_intent_id:
+            cancel_payment_intent(booking.stripe_advance_payment_intent_id)
+    else:  # confirmed
+        refund = _compute_refund(
+            booking, _load_policy(db, booking.venue_id), booking.cancelled_at
+        )
         if refund.refund_amount_paise > 0:
             initiate_refund(booking, refund.refund_amount_paise)
         booking.refund_amount_paise = refund.refund_amount_paise
+
         if refund.refund_amount_paise == 0:
-            booking.payment_status = PaymentStatus.refunded if booking.amount_paid_paise == 0 else booking.payment_status
+            pass  # keep existing payment_status
         elif refund.refund_amount_paise >= booking.amount_paid_paise:
             booking.payment_status = PaymentStatus.refunded
         else:
             booking.payment_status = PaymentStatus.partially_refunded
+
         metadata = {
             "refund_amount_paise": refund.refund_amount_paise,
             "penalty_amount_paise": refund.penalty_amount_paise,
@@ -148,10 +199,26 @@ def user_cancel_booking(db: Session, booking_id: UUID, user_id: UUID) -> Booking
             "tier_matched": refund.tier_matched,
         }
 
-    db.add(_history(booking, old_status, BookingStatus.user_cancelled, changed_by=user_id, metadata=metadata))
+    db.add(
+        _history(
+            booking,
+            old_status,
+            BookingStatus.user_cancelled,
+            changed_by=user_id,
+            metadata=metadata,
+        )
+    )
     db.flush()
     db.refresh(booking)
-    create_notification(booking.venue.owner_id, booking.id, "booking_cancelled", "Booking cancelled", "The customer cancelled a booking.")
+
+    # Notifications (spec: notify owner)
+    create_notification(
+        booking.venue.owner_id,
+        booking.id,
+        "booking_cancelled",
+        "Booking cancelled",
+        "The customer cancelled a booking.",
+    )
     return _booking_out(booking)
 
 
