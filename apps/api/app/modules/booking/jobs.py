@@ -2,7 +2,6 @@ from datetime import date, datetime, timezone, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.modules.venue.models import Venue
 from app.modules.booking._stubs import create_notification
 from app.modules.booking.models import Booking, BookingSlot, BookingStatus, BookingStatusHistory, PaymentStatus
 
