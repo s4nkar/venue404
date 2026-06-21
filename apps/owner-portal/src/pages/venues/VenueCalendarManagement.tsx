@@ -96,6 +96,18 @@ export default function VenueCalendarManagement() {
     if (!venueId) return
     setSavingWeekly(true)
     setError(null)
+
+    // Validation for availability times
+    for (const avail of availabilities) {
+      if (avail.is_available) {
+        if (!avail.opens_at || !avail.closes_at) {
+          setError(`Opening and closing times are required for ${DAYS_OF_WEEK[avail.day_of_week]} if available.`)
+          setSavingWeekly(false)
+          return
+        }
+      }
+    }
+
     try {
       const client = createClient()
       const data = await venueEndpoints(client).bulkUpdateVenueAvailability(venueId, {
@@ -138,6 +150,11 @@ export default function VenueCalendarManagement() {
 
     if (!starts_at || !ends_at) {
       setError("Start and end times are required")
+      return
+    }
+
+    if (new Date(ends_at) <= new Date(starts_at)) {
+      setError("End time must be strictly after start time")
       return
     }
 

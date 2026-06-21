@@ -21,6 +21,13 @@ export default function CreateVenueWizard() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const showError = (msg: string) => {
+    setError(msg)
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }, 10)
+  }
+
   // Centralized state for the entire form
   const [formData, setFormData] = useState({
     name: '',
@@ -126,6 +133,66 @@ export default function CreateVenueWizard() {
   }
 
   const handleNext = () => {
+    setError(null)
+    
+    // Step 0: Basic Details Validation
+    if (currentStep === 0) {
+      if (formData.min_capacity && formData.max_capacity) {
+        if (parseInt(formData.min_capacity.toString(), 10) > parseInt(formData.max_capacity.toString(), 10)) {
+          showError("Min Capacity cannot exceed Max Capacity.")
+          return
+        }
+      }
+    }
+    
+    // Step 3: Booking Settings Validation
+    if (currentStep === 3) {
+      if (formData.min_booking_duration_minutes && formData.max_booking_duration_minutes) {
+        if (parseInt(formData.min_booking_duration_minutes.toString(), 10) > parseInt(formData.max_booking_duration_minutes.toString(), 10)) {
+          showError("Min Booking Duration cannot exceed Max Booking Duration.")
+          return
+        }
+      }
+    }
+
+    // Step 5: Cancellation Policy Validation
+    if (currentStep === 5) {
+      const t1h = formData.tier_1_hours
+      const t1p = formData.tier_1_refund_pct
+      const t2h = formData.tier_2_hours
+      const t2p = formData.tier_2_refund_pct
+      const t3h = formData.tier_3_hours
+      const t3p = formData.tier_3_refund_pct
+
+      // Pairing checks
+      if ((t1h && t1p === '') || (!t1h && t1p !== '')) {
+        showError("Tier 1: Hours and Refund % must both be filled or both be empty.")
+        return
+      }
+      if ((t2h && t2p === '') || (!t2h && t2p !== '')) {
+        showError("Tier 2: Hours and Refund % must both be filled or both be empty.")
+        return
+      }
+      if ((t3h && t3p === '') || (!t3h && t3p !== '')) {
+        showError("Tier 3: Hours and Refund % must both be filled or both be empty.")
+        return
+      }
+
+      // Descending checks
+      const t1hv = t1h ? parseInt(t1h.toString(), 10) : null
+      const t2hv = t2h ? parseInt(t2h.toString(), 10) : null
+      const t3hv = t3h ? parseInt(t3h.toString(), 10) : null
+
+      if (t1hv !== null && t2hv !== null && t1hv <= t2hv) {
+        showError("Tier 1 hours must be strictly greater than Tier 2 hours.")
+        return
+      }
+      if (t2hv !== null && t3hv !== null && t2hv <= t3hv) {
+        showError("Tier 2 hours must be strictly greater than Tier 3 hours.")
+        return
+      }
+    }
+
     if (currentStep < STEPS.length - 1) {
       setCurrentStep(s => s + 1)
     } else {
@@ -179,6 +246,30 @@ export default function CreateVenueWizard() {
       overdue_advance_refund_pct: parseFloat(formData.overdue_advance_refund_pct.toString())
     }
 
+    if (selectedAmenities.length > 0) {
+      payload.amenity_ids = selectedAmenities
+    }
+
+    const policyPayload: any = {
+      no_show_refund_pct: parseFloat(formData.no_show_refund_pct.toString() || '0'),
+      platform_fee_refundable: false,
+      notes: formData.notes || null,
+    }
+    if (formData.tier_1_hours && formData.tier_1_refund_pct !== '') {
+      policyPayload.tier_1_hours = parseInt(formData.tier_1_hours.toString(), 10)
+      policyPayload.tier_1_refund_pct = parseFloat(formData.tier_1_refund_pct.toString())
+    }
+    if (formData.tier_2_hours && formData.tier_2_refund_pct !== '') {
+      policyPayload.tier_2_hours = parseInt(formData.tier_2_hours.toString(), 10)
+      policyPayload.tier_2_refund_pct = parseFloat(formData.tier_2_refund_pct.toString())
+    }
+    if (formData.tier_3_hours && formData.tier_3_refund_pct !== '') {
+      policyPayload.tier_3_hours = parseInt(formData.tier_3_hours.toString(), 10)
+      policyPayload.tier_3_refund_pct = parseFloat(formData.tier_3_refund_pct.toString())
+    }
+    
+    payload.cancellation_policy = policyPayload
+
     try {
       const client = createClient()
       const newVenue = await venueEndpoints(client).createVenue(payload)
@@ -196,44 +287,10 @@ export default function CreateVenueWizard() {
         }
       }
 
-      // Submit Cancellation Policy
-      try {
-        const policyPayload: any = {
-          no_show_refund_pct: parseFloat(formData.no_show_refund_pct.toString() || '0'),
-          platform_fee_refundable: false,
-          notes: formData.notes || null,
-        }
-        if (formData.tier_1_hours && formData.tier_1_refund_pct !== '') {
-          policyPayload.tier_1_hours = parseInt(formData.tier_1_hours.toString(), 10)
-          policyPayload.tier_1_refund_pct = parseFloat(formData.tier_1_refund_pct.toString())
-        }
-        if (formData.tier_2_hours && formData.tier_2_refund_pct !== '') {
-          policyPayload.tier_2_hours = parseInt(formData.tier_2_hours.toString(), 10)
-          policyPayload.tier_2_refund_pct = parseFloat(formData.tier_2_refund_pct.toString())
-        }
-        if (formData.tier_3_hours && formData.tier_3_refund_pct !== '') {
-          policyPayload.tier_3_hours = parseInt(formData.tier_3_hours.toString(), 10)
-          policyPayload.tier_3_refund_pct = parseFloat(formData.tier_3_refund_pct.toString())
-        }
-        
-        await venueEndpoints(client).updateCancellationPolicy(newVenue.id, policyPayload)
-      } catch (err) {
-        console.error('Failed to set cancellation policy', err)
-      }
-
-      // Submit Amenities
-      if (selectedAmenities.length > 0) {
-        try {
-          await venueEndpoints(client).updateVenueAmenities(newVenue.id, { amenity_ids: selectedAmenities })
-        } catch (err) {
-          console.error('Failed to set amenities', err)
-        }
-      }
-
       navigate(`/venues/${newVenue.id}/overview`)
     } catch (err: any) {
       console.error('Failed to create venue', err)
-      setError(err.message || 'Failed to create venue. Check your inputs.')
+      showError(err.message || 'Failed to create venue. Check your inputs.')
     } finally {
       setSubmitting(false)
     }

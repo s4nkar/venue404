@@ -298,6 +298,35 @@ def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue
     )
 
     db.add(venue)
+    db.flush()
+
+    if body.cancellation_policy:
+        policy = VenueCancellationPolicy(
+            id=uuid.uuid4(),
+            venue_id=venue.id,
+            tier_1_hours=body.cancellation_policy.tier_1_hours,
+            tier_1_refund_pct=body.cancellation_policy.tier_1_refund_pct,
+            tier_2_hours=body.cancellation_policy.tier_2_hours,
+            tier_2_refund_pct=body.cancellation_policy.tier_2_refund_pct,
+            tier_3_hours=body.cancellation_policy.tier_3_hours,
+            tier_3_refund_pct=body.cancellation_policy.tier_3_refund_pct,
+            no_show_refund_pct=body.cancellation_policy.no_show_refund_pct,
+            platform_fee_refundable=body.cancellation_policy.platform_fee_refundable,
+            notes=body.cancellation_policy.notes,
+        )
+        db.add(policy)
+
+    if body.amenity_ids:
+        valid_amenities = db.query(Amenity).filter(
+            Amenity.id.in_(body.amenity_ids),
+            Amenity.deleted_at.is_(None),
+        ).all()
+        if len(valid_amenities) != len(set(body.amenity_ids)):
+            raise ConflictError("One or more amenity IDs provided do not exist in the platform.")
+
+        new_links = [VenueAmenity(venue_id=venue.id, amenity_id=am_id) for am_id in set(body.amenity_ids)]
+        db.add_all(new_links)
+
     db.commit()
     db.refresh(venue)
     return venue

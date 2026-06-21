@@ -233,7 +233,8 @@ class CreateVenueRequest(BaseModel):
     owner_action_window_hours: int = Field(default=48, ge=24, le=72)
     overdue_advance_refund_pct: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
 
-    
+    cancellation_policy: Optional[UpdateCancellationPolicyRequest] = None
+    amenity_ids: Optional[list[UUID]] = None
 
     @field_validator("allowed_booking_types")
     @classmethod
