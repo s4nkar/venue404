@@ -3,6 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Input, SectionHeader, LocationPickerMap } from '@venue404/ui'
 import * as Icons from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
+import { INDIAN_STATES } from '../../lib/constants'
+import { StateSelect } from '../../components/StateSelect'
+import { DurationInput } from '../../components/DurationInput'
+import { TimeSelect } from '../../components/TimeSelect'
 
 const STEPS = [
   'Basic Details',
@@ -77,9 +81,11 @@ export default function CreateVenueWizard() {
   })
 
   const [photos, setPhotos] = useState<File[]>([])
+  const [existingPhotos, setExistingPhotos] = useState<any[]>([])
   const [platformAmenities, setPlatformAmenities] = useState<any[]>([])
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([])
   const [venueCategories, setVenueCategories] = useState<any[]>([])
+  const [isLoadingDraft, setIsLoadingDraft] = useState<boolean>(!!venueId)
 
   useEffect(() => {
     async function loadAmenities() {
@@ -108,6 +114,7 @@ export default function CreateVenueWizard() {
     async function loadDraft() {
       if (!venueId) return
       try {
+        setIsLoadingDraft(true)
         const client = createClient()
         const data = await venueEndpoints(client).getMyVenue(venueId)
         
@@ -157,8 +164,14 @@ export default function CreateVenueWizard() {
         if (data.amenities) {
           setSelectedAmenities(data.amenities.map((a: any) => a.id))
         }
+        
+        if (data.photos) {
+          setExistingPhotos(data.photos)
+        }
       } catch (err) {
         console.error('Failed to load draft venue', err)
+      } finally {
+        setIsLoadingDraft(false)
       }
     }
     loadDraft()
@@ -212,6 +225,16 @@ export default function CreateVenueWizard() {
       }
     }
     
+    // Step 2: Operating Hours Validation
+    if (currentStep === 2) {
+      if (!formData.spans_next_day) {
+        // Simple string comparison works because formats are zero-padded (e.g. 09:00 vs 17:00)
+        if (formData.close_time <= formData.open_time) {
+          showError("Closing time must be after opening time unless 'Closes next day' is checked.")
+          return
+        }
+      }
+    }
     // Step 3: Booking Settings Validation
     if (currentStep === 3) {
       if (formData.min_booking_duration_minutes && formData.max_booking_duration_minutes) {
@@ -288,7 +311,8 @@ export default function CreateVenueWizard() {
             try {
               const fd = new FormData()
               fd.append('file', file)
-              await venueEndpoints(client).addVenuePhoto(activeVenueId, fd)
+              const newPhoto = await venueEndpoints(client).addVenuePhoto(activeVenueId, fd)
+              setExistingPhotos(prev => [...prev, newPhoto])
             } catch (err) {
               console.error('Failed to upload a photo', err)
             }
@@ -333,8 +357,8 @@ export default function CreateVenueWizard() {
       timezone: 'Asia/Kolkata',
       min_capacity: formData.min_capacity ? parseInt(formData.min_capacity.toString(), 10) : null,
       max_capacity: formData.max_capacity ? parseInt(formData.max_capacity.toString(), 10) : 100,
-      open_time: `${formData.open_time}:00`,
-      close_time: `${formData.close_time}:00`,
+      open_time: formData.open_time.split(':').length === 2 ? `${formData.open_time}:00` : formData.open_time,
+      close_time: formData.close_time.split(':').length === 2 ? `${formData.close_time}:00` : formData.close_time,
       spans_next_day: formData.spans_next_day,
       allowed_booking_types: formData.allowed_booking_types.length > 0 ? formData.allowed_booking_types : ['full_day', 'time_slot'],
       min_booking_duration_minutes: parseInt(formData.min_booking_duration_minutes.toString(), 10),
@@ -400,6 +424,14 @@ export default function CreateVenueWizard() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (isLoadingDraft) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
+      </div>
+    )
   }
 
   return (
@@ -493,10 +525,13 @@ export default function CreateVenueWizard() {
               <Input label="Address Line 2" name="address_line2" value={formData.address_line2} onChange={handleChange} placeholder="Suite, floor, etc. (optional)" />
               <div className="grid grid-cols-2 gap-4">
                 <Input label="City" name="city" required value={formData.city} onChange={handleChange} />
-                <Input label="State" name="state" required value={formData.state} onChange={handleChange} />
+                <StateSelect 
+                  value={formData.state} 
+                  onChange={(val) => setFormData(prev => ({ ...prev, state: val }))} 
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Country" name="country" required value={formData.country} onChange={handleChange} />
+                <Input label="Country" name="country" required value="India" disabled />
                 <Input label="Postal Code" name="postal_code" value={formData.postal_code} onChange={handleChange} />
               </div>
               <div className="pt-2">
@@ -504,7 +539,20 @@ export default function CreateVenueWizard() {
                 <LocationPickerMap
                   latitude={formData.latitude}
                   longitude={formData.longitude}
-                  onChange={(lat, lng) => setFormData({ ...formData, latitude: lat, longitude: lng })}
+                  onChange={(lat, lng, addr) => {
+                    setFormData(prev => {
+                      const update = { ...prev, latitude: lat, longitude: lng }
+                      if (addr) {
+                        if (addr.address_line1) update.address_line1 = addr.address_line1
+                        if (addr.address_line2) update.address_line2 = addr.address_line2
+                        if (addr.city) update.city = addr.city
+                        if (addr.state) update.state = addr.state
+                        if (addr.country) update.country = addr.country
+                        if (addr.postal_code) update.postal_code = addr.postal_code
+                      }
+                      return update
+                    })
+                  }}
                 />
                 <p className="text-xs text-zinc-500 mt-1">Click on the map to set the exact coordinates of your venue.</p>
               </div>
@@ -531,29 +579,47 @@ export default function CreateVenueWizard() {
               <Button variant="secondary" className="mt-4 pointer-events-none">Select Images</Button>
             </div>
 
+            {/* Existing Photos from Backend */}
+            {existingPhotos.length > 0 && (
+              <div className="space-y-2 mt-8">
+                <h4 className="text-sm font-medium text-zinc-900">Already Uploaded</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {existingPhotos.map((photo) => (
+                    <div key={photo.id} className="relative group rounded-lg overflow-hidden border border-zinc-200 aspect-video bg-zinc-100">
+                      <img src={photo.image_url} className="w-full h-full object-cover" alt="Venue Photo" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* New Photos to be uploaded */}
             {photos.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-                {photos.map((file, i) => (
-                  <div key={i} className="relative group rounded-lg overflow-hidden border border-zinc-200 aspect-video bg-zinc-100">
-                    <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" />
-                    <button
-                      type="button"
-                      onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))}
-                      className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-20"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                  </div>
-                ))}
+              <div className="space-y-2 mt-8">
+                <h4 className="text-sm font-medium text-zinc-900">New Photos (Ready to upload)</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {photos.map((file, i) => (
+                    <div key={i} className="relative group rounded-lg overflow-hidden border border-zinc-200 aspect-video bg-zinc-100">
+                      <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" />
+                      <button
+                        type="button"
+                        onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                        className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
         )}
 
         {currentStep === 2 && (
-            <div className="space-y-6">
-              <Input label="Opening Time" name="open_time" type="time" required value={formData.open_time} onChange={handleChange} />
-              <Input label="Closing Time" name="close_time" type="time" required value={formData.close_time} onChange={handleChange} />
+            <div className="space-y-6 max-w-md">
+              <TimeSelect label="Opening Time" name="open_time" required value={formData.open_time} onChange={handleChange} />
+              <TimeSelect label="Closing Time" name="close_time" required value={formData.close_time} onChange={handleChange} />
               <label className="flex items-center gap-2">
                 <input type="checkbox" name="spans_next_day" checked={formData.spans_next_day} onChange={handleChange} className="rounded text-brand focus:ring-brand" />
                 <span className="text-sm text-zinc-700">Closes next day</span>
@@ -563,43 +629,50 @@ export default function CreateVenueWizard() {
         )}
 
         {currentStep === 3 && (
-          <div className="space-y-6">
-            <div className="space-y-2 mb-6">
+          <div className="space-y-8">
+            <div className="space-y-4">
               <h4 className="font-medium text-zinc-900">Allowed Booking Types</h4>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
-                  <input type="checkbox" checked={formData.allowed_booking_types.includes('full_day')} onChange={() => handleBookingTypeToggle('full_day')} className="rounded text-brand focus:ring-brand" />
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 cursor-pointer">
+                  <input type="checkbox" checked={formData.allowed_booking_types.includes('full_day')} onChange={() => handleBookingTypeToggle('full_day')} className="rounded text-brand focus:ring-brand w-4 h-4" />
                   Full Day
                 </label>
-                <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
-                  <input type="checkbox" checked={formData.allowed_booking_types.includes('time_slot')} onChange={() => handleBookingTypeToggle('time_slot')} className="rounded text-brand focus:ring-brand" />
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 cursor-pointer">
+                  <input type="checkbox" checked={formData.allowed_booking_types.includes('time_slot')} onChange={() => handleBookingTypeToggle('time_slot')} className="rounded text-brand focus:ring-brand w-4 h-4" />
                   Time Slot
                 </label>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <Input label="Min Booking Duration (min)" name="min_booking_duration_minutes" type="number" min={1} required value={formData.min_booking_duration_minutes} onChange={handleChange} />
-                <Input label="Max Booking Duration (min)" name="max_booking_duration_minutes" type="number" min={1} required value={formData.max_booking_duration_minutes} onChange={handleChange} />
+
+            <div className="space-y-8 pt-6 border-t border-zinc-100">
+              <h4 className="font-medium text-zinc-900">Booking Limits & Buffers</h4>
+              
+              <div className="space-y-6 max-w-3xl">
+                <div className="grid md:grid-cols-2 gap-12">
+                  <DurationInput label="Min Booking Duration" name="min_booking_duration_minutes" required value={formData.min_booking_duration_minutes} onChange={handleChange} />
+                  <DurationInput label="Max Booking Duration" name="max_booking_duration_minutes" required value={formData.max_booking_duration_minutes} onChange={handleChange} />
+                </div>
+                
+                <div className="grid md:grid-cols-2 gap-12 pt-4 border-t border-zinc-50">
+                  <DurationInput label="Slot Interval" name="slot_interval_minutes" required value={formData.slot_interval_minutes} onChange={handleChange} helperText="e.g. 30 means bookings start at :00 and :30" />
+                </div>
+                
+                <div className="grid md:grid-cols-2 gap-12 pt-4 border-t border-zinc-50">
+                  <DurationInput label="Pre-Buffer (Setup time)" name="pre_buffer_minutes" required value={formData.pre_buffer_minutes} onChange={handleChange} helperText="Gap required before a booking" />
+                  <DurationInput label="Post-Buffer (Teardown time)" name="post_buffer_minutes" required value={formData.post_buffer_minutes} onChange={handleChange} helperText="Gap required after a booking" />
+                </div>
+              </div>
             </div>
-            <Input label="Slot Interval (min)" name="slot_interval_minutes" type="number" min={1} required value={formData.slot_interval_minutes} onChange={handleChange} helperText="e.g. 30 means bookings start at :00 and :30" />
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Pre-Buffer (Setup time in min)" name="pre_buffer_minutes" type="number" min={0} required value={formData.pre_buffer_minutes} onChange={handleChange} helperText="Gap required before a booking" />
-              <Input label="Post-Buffer (Teardown time in min)" name="post_buffer_minutes" type="number" min={0} required value={formData.post_buffer_minutes} onChange={handleChange} helperText="Gap required after a booking" />
+
+            <div className="space-y-4 pt-6 border-t border-zinc-100">
+              <h4 className="font-medium text-zinc-900">Approval Settings</h4>
+              <Input label="Owner Action Window (Hours)" name="owner_action_window_hours" type="number" min={24} max={72} required value={formData.owner_action_window_hours} onChange={handleChange} helperText="How long you have to accept/reject a pending request before it auto-cancels." />
             </div>
-            <Input label="Owner Action Window (Hours)" name="owner_action_window_hours" type="number" min={24} max={72} required value={formData.owner_action_window_hours} onChange={handleChange} helperText="How long you have to accept/reject a pending request before it auto-cancels." />
           </div>
         )}
 
         {currentStep === 4 && (
           <div className="space-y-6">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-700">Pricing Mode<span className="text-red-500 ml-1">*</span></label>
-              <select name="pricing_mode" value={formData.pricing_mode} onChange={handleChange} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
-                <option value="flat">Flat Rate (Per Day)</option>
-                <option value="hourly">Hourly Rate</option>
-                <option value="mixed">Mixed (Both)</option>
-              </select>
-            </div>
             <div className="grid grid-cols-2 gap-4">
               <Input label="Base Price (₹)" name="base_price" type="number" min={0} required={formData.pricing_mode !== 'hourly'} disabled={formData.pricing_mode === 'hourly'} value={formData.base_price} onChange={handleChange} placeholder="e.g. 50000" />
               <Input label="Hourly Rate (₹)" name="hourly_rate" type="number" min={0} required={formData.pricing_mode !== 'flat'} disabled={formData.pricing_mode === 'flat'} value={formData.hourly_rate} onChange={handleChange} placeholder="e.g. 5000" />
@@ -709,7 +782,7 @@ export default function CreateVenueWizard() {
             Previous Step
           </Button>
           <Button type="submit" variant="primary" disabled={submitting}>
-            {currentStep === STEPS.length - 1 ? (submitting ? 'Loading...' : 'Review my venue setup') : 'Continue'}
+            {currentStep === STEPS.length - 1 ? (submitting ? 'Loading...' : 'Review my venue setup') : (submitting ? 'Saving...' : 'Save & Continue')}
           </Button>
         </div>
       </form>

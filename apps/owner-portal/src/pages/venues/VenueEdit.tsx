@@ -4,6 +4,10 @@ import { Card, SectionHeader, Button, Input, LocationPickerMap } from '@venue404
 import { ArrowLeft } from 'lucide-react'
 import * as Icons from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
+import { INDIAN_STATES } from '../../lib/constants'
+import { StateSelect } from '../../components/StateSelect'
+import { DurationInput } from '../../components/DurationInput'
+import { TimeSelect } from '../../components/TimeSelect'
 
 export default function VenueEdit() {
   const { venueId } = useParams()
@@ -86,7 +90,8 @@ export default function VenueEdit() {
     'photos': 'Manage Photos',
     'amenities': 'Amenities',
     'operating-hours': 'Operating Hours',
-    'pricing': 'Booking & Pricing',
+    'booking-settings': 'Booking Settings',
+    'pricing': 'Pricing',
     'policies': 'Cancellation Policies',
     'blocked-dates': 'Blocked Dates'
   }
@@ -157,11 +162,21 @@ export default function VenueEdit() {
       updates.address_line2 = formData.get('address_line2')
     } else if (editSection === 'operating-hours') {
       const ot = formData.get('open_time') as string
-      updates.open_time = ot.split(':').length === 2 ? ot + ':00' : ot
       const ct = formData.get('close_time') as string
+      const spansNextDay = formData.get('spans_next_day') === 'on'
+      
+      if (!spansNextDay) {
+        if (ct <= ot) {
+          alert("Closing time must be after opening time unless 'Closes next day' is checked.")
+          setSaving(false)
+          return
+        }
+      }
+
+      updates.open_time = ot.split(':').length === 2 ? ot + ':00' : ot
       updates.close_time = ct.split(':').length === 2 ? ct + ':00' : ct
-      updates.spans_next_day = formData.get('spans_next_day') === 'on'
-    } else if (editSection === 'pricing') {
+      updates.spans_next_day = spansNextDay
+    } else if (editSection === 'booking-settings') {
       const allowFullDay = formData.get('allow_full_day') === 'on'
       const allowTimeSlot = formData.get('allow_time_slot') === 'on'
       
@@ -181,10 +196,6 @@ export default function VenueEdit() {
       if (!allowFullDay && allowTimeSlot) calculatedPricingMode = 'hourly'
 
       updates.pricing_mode = calculatedPricingMode
-      updates.starting_price_paise = parseInt(formData.get('base_price') as string || '0', 10) * 100
-      updates.hourly_rate_paise = parseInt(formData.get('hourly_rate') as string || '0', 10) * 100
-      updates.advance_pct = parseFloat(formData.get('advance_pct') as string)
-      updates.balance_due_days_before_event = parseInt(formData.get('balance_due') as string, 10)
 
       const minDurStr = formData.get('min_booking_duration_minutes') as string
       const maxDurStr = formData.get('max_booking_duration_minutes') as string
@@ -203,6 +214,11 @@ export default function VenueEdit() {
       updates.pre_buffer_minutes = parseInt(formData.get('pre_buffer_minutes') as string, 10)
       updates.post_buffer_minutes = parseInt(formData.get('post_buffer_minutes') as string, 10)
       updates.owner_action_window_hours = parseInt(formData.get('owner_action_window_hours') as string, 10)
+    } else if (editSection === 'pricing') {
+      updates.starting_price_paise = parseInt(formData.get('base_price') as string || '0', 10) * 100
+      updates.hourly_rate_paise = parseInt(formData.get('hourly_rate') as string || '0', 10) * 100
+      updates.advance_pct = parseFloat(formData.get('advance_pct') as string)
+      updates.balance_due_days_before_event = parseInt(formData.get('balance_due') as string, 10)
     }
 
     try {
@@ -368,22 +384,38 @@ export default function VenueEdit() {
 
               <div className="space-y-4 pt-4 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Location</h4>
-                <Input label="Address Line 1" name="address_line1" defaultValue={venue.address_line1} required />
-                <Input label="Address Line 2" name="address_line2" defaultValue={venue.address_line2} />
+                <Input label="Address Line 1" name="address_line1" value={venue.address_line1 || ''} onChange={e => setVenue(prev => ({...prev, address_line1: e.target.value}))} required />
+                <Input label="Address Line 2" name="address_line2" value={venue.address_line2 || ''} onChange={e => setVenue(prev => ({...prev, address_line2: e.target.value}))} />
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="City" name="city" defaultValue={venue.city} required />
-                  <Input label="State" name="state" defaultValue={venue.state} required />
+                  <Input label="City" name="city" value={venue.city || ''} onChange={e => setVenue(prev => ({...prev, city: e.target.value}))} required />
+                  <StateSelect 
+                    value={venue.state} 
+                    onChange={(val) => setVenue(prev => ({ ...prev, state: val }))} 
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="Country" name="country" defaultValue={venue.country || 'India'} required />
-                  <Input label="Postal Code" name="postal_code" defaultValue={venue.postal_code} />
+                  <Input label="Country" name="country" value="India" disabled required />
+                  <Input label="Postal Code" name="postal_code" value={venue.postal_code || ''} onChange={e => setVenue(prev => ({...prev, postal_code: e.target.value}))} />
                 </div>
                 <div className="pt-2">
                   <label className="block text-sm font-medium text-zinc-700 mb-1">Pinpoint Location on Map</label>
                   <LocationPickerMap
                     latitude={venue.latitude}
                     longitude={venue.longitude}
-                    onChange={(lat, lng) => setVenue({ ...venue, latitude: lat, longitude: lng })}
+                    onChange={(lat, lng, addr) => {
+                      setVenue(prev => {
+                        const update = { ...prev, latitude: lat, longitude: lng }
+                        if (addr) {
+                          if (addr.address_line1) update.address_line1 = addr.address_line1
+                          if (addr.address_line2) update.address_line2 = addr.address_line2
+                          if (addr.city) update.city = addr.city
+                          if (addr.state) update.state = addr.state
+                          if (addr.country) update.country = addr.country
+                          if (addr.postal_code) update.postal_code = addr.postal_code
+                        }
+                        return update
+                      })
+                    }}
                   />
                   <p className="text-xs text-zinc-500 mt-1">Click on the map to set the exact coordinates of your venue.</p>
                 </div>
@@ -391,7 +423,7 @@ export default function VenueEdit() {
             </div>
           )}
 
-          {editSection === 'pricing' && (
+          {editSection === 'booking-settings' && (
             <div className="space-y-6">
               <div className="space-y-4">
                 <h4 className="font-medium text-zinc-900">Allowed Booking Types</h4>
@@ -420,42 +452,21 @@ export default function VenueEdit() {
               </div>
 
               <div className="space-y-4 pt-6 border-t border-zinc-100">
-                <h4 className="font-medium text-zinc-900">Pricing</h4>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-zinc-700">Pricing Mode<span className="text-red-500 ml-1">*</span></label>
-                  <select name="pricing_mode" defaultValue={venue.pricing_mode} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
-                    <option value="flat">Flat Rate (Per Day)</option>
-                    <option value="hourly">Hourly Rate</option>
-                    <option value="mixed">Mixed (Both)</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className={!allowFullDay ? 'opacity-50 pointer-events-none' : ''}>
-                    <Input label="Base Price (₹) (Full Day)" name="base_price" type="number" min={0} defaultValue={(venue.starting_price_paise || 0) / 100} disabled={!allowFullDay} required={allowFullDay} />
-                  </div>
-                  <div className={!allowTimeSlot ? 'opacity-50 pointer-events-none' : ''}>
-                    <Input label="Hourly Rate (₹) (Time Slot)" name="hourly_rate" type="number" min={0} defaultValue={(venue.hourly_rate_paise || 0) / 100} disabled={!allowTimeSlot} required={allowTimeSlot} />
-                  </div>
-                </div>
-                <p className="text-sm text-zinc-500 italic mt-2">Prices will only be applied if the corresponding booking type is enabled above.</p>
-              </div>
-
-              <div className="space-y-4 pt-6 border-t border-zinc-100">
-                <h4 className="font-medium text-zinc-900">Payment Terms</h4>
-                <Input label="Token Advance (%)" name="advance_pct" type="number" step="0.01" min={0.01} max={100} defaultValue={venue.advance_pct} required />
-                <Input label="Balance Due (Days before event)" name="balance_due" type="number" min={1} defaultValue={venue.balance_due_days_before_event} required />
-              </div>
-
-              <div className="space-y-4 pt-6 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Booking Limits & Buffers</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <Input label="Min Duration (min)" name="min_booking_duration_minutes" type="number" min={1} defaultValue={venue.min_booking_duration_minutes} required />
-                  <Input label="Max Duration (min)" name="max_booking_duration_minutes" type="number" min={1} defaultValue={venue.max_booking_duration_minutes} required />
-                  <Input label="Slot Interval (min)" name="slot_interval_minutes" type="number" min={1} defaultValue={venue.slot_interval_minutes} required helperText="e.g. 30 means bookings start at :00 and :30" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="Pre-Buffer (Setup min)" name="pre_buffer_minutes" type="number" min={0} defaultValue={venue.pre_buffer_minutes} required helperText="Gap required before a booking" />
-                  <Input label="Post-Buffer (Teardown min)" name="post_buffer_minutes" type="number" min={0} defaultValue={venue.post_buffer_minutes} required helperText="Gap required after a booking" />
+                <div className="space-y-6 max-w-3xl">
+                  <div className="grid md:grid-cols-2 gap-12">
+                    <DurationInput label="Min Booking Duration" name="min_booking_duration_minutes" defaultValue={venue.min_booking_duration_minutes} required />
+                    <DurationInput label="Max Booking Duration" name="max_booking_duration_minutes" defaultValue={venue.max_booking_duration_minutes} required />
+                  </div>
+                  
+                  <div className="grid md:grid-cols-2 gap-12 pt-4 border-t border-zinc-50">
+                    <DurationInput label="Slot Interval" name="slot_interval_minutes" defaultValue={venue.slot_interval_minutes} required helperText="e.g. 30 means bookings start at :00 and :30" />
+                  </div>
+                  
+                  <div className="grid md:grid-cols-2 gap-12 pt-4 border-t border-zinc-50">
+                    <DurationInput label="Pre-Buffer (Setup time)" name="pre_buffer_minutes" defaultValue={venue.pre_buffer_minutes} required helperText="Gap required before a booking" />
+                    <DurationInput label="Post-Buffer (Teardown time)" name="post_buffer_minutes" defaultValue={venue.post_buffer_minutes} required helperText="Gap required after a booking" />
+                  </div>
                 </div>
               </div>
 
@@ -464,6 +475,29 @@ export default function VenueEdit() {
                 <div className="grid grid-cols-2 gap-4">
                   <Input label="Owner Action Window (Hours)" name="owner_action_window_hours" type="number" min={24} max={72} defaultValue={venue.owner_action_window_hours} required helperText="How long you have to accept/reject a pending request before it auto-cancels." />
                 </div>
+              </div>
+            </div>
+          )}
+
+          {editSection === 'pricing' && (
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h4 className="font-medium text-zinc-900">Pricing</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className={!allowFullDay ? 'opacity-50 pointer-events-none' : ''}>
+                    <Input label="Base Price (₹) (Full Day)" name="base_price" type="number" min={0} defaultValue={(venue.starting_price_paise || 0) / 100} disabled={!allowFullDay} required={allowFullDay} />
+                  </div>
+                  <div className={!allowTimeSlot ? 'opacity-50 pointer-events-none' : ''}>
+                    <Input label="Hourly Rate (₹) (Time Slot)" name="hourly_rate" type="number" min={0} defaultValue={(venue.hourly_rate_paise || 0) / 100} disabled={!allowTimeSlot} required={allowTimeSlot} />
+                  </div>
+                </div>
+                <p className="text-sm text-zinc-500 italic mt-2">Prices will only be applied if the corresponding booking type is enabled in Booking Settings.</p>
+              </div>
+
+              <div className="space-y-4 pt-6 border-t border-zinc-100">
+                <h4 className="font-medium text-zinc-900">Payment Terms</h4>
+                <Input label="Token Advance (%)" name="advance_pct" type="number" step="0.01" min={0.01} max={100} defaultValue={venue.advance_pct} required />
+                <Input label="Balance Due (Days before event)" name="balance_due" type="number" min={1} defaultValue={venue.balance_due_days_before_event} required />
               </div>
             </div>
           )}
@@ -679,8 +713,8 @@ export default function VenueEdit() {
               <div className="space-y-6">
                 <h4 className="font-medium text-zinc-900">Base Schedule</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="Opening Time" name="open_time" type="time" defaultValue={venue.open_time} required />
-                  <Input label="Closing Time" name="close_time" type="time" defaultValue={venue.close_time} required />
+                  <TimeSelect label="Opening Time" name="open_time" value={venue.open_time || ''} onChange={e => setVenue(prev => ({...prev, open_time: e.target.value}))} required />
+                  <TimeSelect label="Closing Time" name="close_time" value={venue.close_time || ''} onChange={e => setVenue(prev => ({...prev, close_time: e.target.value}))} required />
                 </div>
                 <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
                   <input type="checkbox" name="spans_next_day" defaultChecked={venue.spans_next_day} className="rounded text-brand focus:ring-brand" />

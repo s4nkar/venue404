@@ -142,7 +142,8 @@ export default function VenueOverview() {
             { label: 'Photos', path: 'photos' },
             { label: 'Amenities', path: 'amenities' },
             { label: 'Operating Hours', path: 'operating-hours' },
-            { label: 'Booking & Pricing', path: 'pricing' },
+            { label: 'Booking Settings', path: 'booking-settings' },
+            { label: 'Pricing', path: 'pricing' },
             { label: 'Policies', path: 'policies' },
             { label: 'Blocked Dates', path: 'blocked-dates' }
           ].map(link => (
