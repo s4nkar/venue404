@@ -8,6 +8,7 @@ export { default as Card } from './Card'
 export { default as Modal } from './Modal'
 export { default as DatePicker } from './DatePicker'
 export { default as Alert } from './Alert'
+export { Tooltip, InfoTooltip } from './Tooltip'
 
 // Utilities
 export { cn } from './lib/utils'

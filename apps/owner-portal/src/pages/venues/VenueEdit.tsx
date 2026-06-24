@@ -1,9 +1,31 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Card, SectionHeader, Button, Input, LocationPickerMap } from '@venue404/ui'
+import { Card, SectionHeader, Button, Input, LocationPickerMap, InfoTooltip } from '@venue404/ui'
 import { ArrowLeft } from 'lucide-react'
 import * as Icons from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
+import { INDIAN_STATES } from '../../lib/constants'
+import { StateSelect } from '../../components/StateSelect'
+import { DurationInput } from '../../components/DurationInput'
+import { TimeSelect } from '../../components/TimeSelect'
+
+function HoursToDaysInput({ defaultValue, ...props }: any) {
+  const [val, setVal] = useState<string | number>(defaultValue || '');
+  const h = Number(val);
+  const suffix = (!isNaN(h) && h > 0) ? `≈ ${parseFloat((h / 24).toFixed(2))} days` : undefined;
+
+  return (
+    <Input 
+      {...props} 
+      defaultValue={defaultValue} 
+      onChange={(e) => {
+        setVal(e.target.value);
+        if (props.onChange) props.onChange(e);
+      }} 
+      suffix={suffix} 
+    />
+  );
+}
 
 export default function VenueEdit() {
   const { venueId } = useParams()
@@ -14,7 +36,6 @@ export default function VenueEdit() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [localPhotos, setLocalPhotos] = useState<any[]>([])
-  const [blockedDates, setBlockedDates] = useState<any[]>([])
 
   const [allowFullDay, setAllowFullDay] = useState(false)
   const [allowTimeSlot, setAllowTimeSlot] = useState(false)
@@ -25,6 +46,12 @@ export default function VenueEdit() {
 
   // E.g. /venues/123/edit/pricing -> 'pricing'
   const editSection = location.pathname.split('/').pop() || 'details'
+
+  useEffect(() => {
+    if (editSection === 'blocked-dates') {
+      navigate(`/venues/${venueId}/calendar`, { replace: true })
+    }
+  }, [editSection, navigate, venueId])
 
   useEffect(() => {
     if (venue?.photos) {
@@ -53,20 +80,6 @@ export default function VenueEdit() {
     loadAmenities()
   }, [editSection])
 
-  useEffect(() => {
-    async function loadBlockedDates() {
-      if (!venueId || location.pathname.split('/').pop() !== 'blocked-dates') return
-      try {
-        const client = createClient()
-        const data = await venueEndpoints(client).getBlockedDates(venueId)
-        setBlockedDates(data)
-      } catch (err) {
-        console.error("Failed to load blocked dates", err)
-      }
-    }
-    loadBlockedDates()
-  }, [venueId, location.pathname])
-
   const makeCover = (index: number) => {
     const newPhotos = [...localPhotos]
     const [item] = newPhotos.splice(index, 1)
@@ -86,9 +99,9 @@ export default function VenueEdit() {
     'photos': 'Manage Photos',
     'amenities': 'Amenities',
     'operating-hours': 'Operating Hours',
-    'pricing': 'Booking & Pricing',
-    'policies': 'Cancellation Policies',
-    'blocked-dates': 'Blocked Dates'
+    'booking-settings': 'Booking Settings',
+    'pricing': 'Pricing',
+    'policies': 'Cancellation Policies'
   }
 
   useEffect(() => {
@@ -157,11 +170,21 @@ export default function VenueEdit() {
       updates.address_line2 = formData.get('address_line2')
     } else if (editSection === 'operating-hours') {
       const ot = formData.get('open_time') as string
-      updates.open_time = ot.split(':').length === 2 ? ot + ':00' : ot
       const ct = formData.get('close_time') as string
+      const spansNextDay = formData.get('spans_next_day') === 'on'
+      
+      if (!spansNextDay) {
+        if (ct <= ot) {
+          alert("Closing time must be after opening time unless 'Closes next day' is checked.")
+          setSaving(false)
+          return
+        }
+      }
+
+      updates.open_time = ot.split(':').length === 2 ? ot + ':00' : ot
       updates.close_time = ct.split(':').length === 2 ? ct + ':00' : ct
-      updates.spans_next_day = formData.get('spans_next_day') === 'on'
-    } else if (editSection === 'pricing') {
+      updates.spans_next_day = spansNextDay
+    } else if (editSection === 'booking-settings') {
       const allowFullDay = formData.get('allow_full_day') === 'on'
       const allowTimeSlot = formData.get('allow_time_slot') === 'on'
       
@@ -181,10 +204,6 @@ export default function VenueEdit() {
       if (!allowFullDay && allowTimeSlot) calculatedPricingMode = 'hourly'
 
       updates.pricing_mode = calculatedPricingMode
-      updates.starting_price_paise = parseInt(formData.get('base_price') as string || '0', 10) * 100
-      updates.hourly_rate_paise = parseInt(formData.get('hourly_rate') as string || '0', 10) * 100
-      updates.advance_pct = parseFloat(formData.get('advance_pct') as string)
-      updates.balance_due_days_before_event = parseInt(formData.get('balance_due') as string, 10)
 
       const minDurStr = formData.get('min_booking_duration_minutes') as string
       const maxDurStr = formData.get('max_booking_duration_minutes') as string
@@ -203,6 +222,11 @@ export default function VenueEdit() {
       updates.pre_buffer_minutes = parseInt(formData.get('pre_buffer_minutes') as string, 10)
       updates.post_buffer_minutes = parseInt(formData.get('post_buffer_minutes') as string, 10)
       updates.owner_action_window_hours = parseInt(formData.get('owner_action_window_hours') as string, 10)
+    } else if (editSection === 'pricing') {
+      updates.starting_price_paise = parseInt(formData.get('base_price') as string || '0', 10) * 100
+      updates.hourly_rate_paise = parseInt(formData.get('hourly_rate') as string || '0', 10) * 100
+      updates.advance_pct = parseFloat(formData.get('advance_pct') as string)
+      updates.balance_due_days_before_event = parseInt(formData.get('balance_due') as string, 10)
     }
 
     try {
@@ -368,22 +392,38 @@ export default function VenueEdit() {
 
               <div className="space-y-4 pt-4 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Location</h4>
-                <Input label="Address Line 1" name="address_line1" defaultValue={venue.address_line1} required />
-                <Input label="Address Line 2" name="address_line2" defaultValue={venue.address_line2} />
+                <Input label="Address Line 1" name="address_line1" value={venue.address_line1 || ''} onChange={e => setVenue(prev => ({...prev, address_line1: e.target.value}))} required />
+                <Input label="Address Line 2" name="address_line2" value={venue.address_line2 || ''} onChange={e => setVenue(prev => ({...prev, address_line2: e.target.value}))} />
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="City" name="city" defaultValue={venue.city} required />
-                  <Input label="State" name="state" defaultValue={venue.state} required />
+                  <Input label="City" name="city" value={venue.city || ''} onChange={e => setVenue(prev => ({...prev, city: e.target.value}))} required />
+                  <StateSelect 
+                    value={venue.state} 
+                    onChange={(val) => setVenue(prev => ({ ...prev, state: val }))} 
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="Country" name="country" defaultValue={venue.country || 'India'} required />
-                  <Input label="Postal Code" name="postal_code" defaultValue={venue.postal_code} />
+                  <Input label="Country" name="country" value="India" disabled required />
+                  <Input label="Postal Code" name="postal_code" value={venue.postal_code || ''} onChange={e => setVenue(prev => ({...prev, postal_code: e.target.value}))} />
                 </div>
                 <div className="pt-2">
                   <label className="block text-sm font-medium text-zinc-700 mb-1">Pinpoint Location on Map</label>
                   <LocationPickerMap
                     latitude={venue.latitude}
                     longitude={venue.longitude}
-                    onChange={(lat, lng) => setVenue({ ...venue, latitude: lat, longitude: lng })}
+                    onChange={(lat, lng, addr) => {
+                      setVenue(prev => {
+                        const update = { ...prev, latitude: lat, longitude: lng }
+                        if (addr) {
+                          if (addr.address_line1) update.address_line1 = addr.address_line1
+                          if (addr.address_line2) update.address_line2 = addr.address_line2
+                          if (addr.city) update.city = addr.city
+                          if (addr.state) update.state = addr.state
+                          if (addr.country) update.country = addr.country
+                          if (addr.postal_code) update.postal_code = addr.postal_code
+                        }
+                        return update
+                      })
+                    }}
                   />
                   <p className="text-xs text-zinc-500 mt-1">Click on the map to set the exact coordinates of your venue.</p>
                 </div>
@@ -391,7 +431,7 @@ export default function VenueEdit() {
             </div>
           )}
 
-          {editSection === 'pricing' && (
+          {editSection === 'booking-settings' && (
             <div className="space-y-6">
               <div className="space-y-4">
                 <h4 className="font-medium text-zinc-900">Allowed Booking Types</h4>
@@ -420,50 +460,52 @@ export default function VenueEdit() {
               </div>
 
               <div className="space-y-4 pt-6 border-t border-zinc-100">
-                <h4 className="font-medium text-zinc-900">Pricing</h4>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-zinc-700">Pricing Mode<span className="text-red-500 ml-1">*</span></label>
-                  <select name="pricing_mode" defaultValue={venue.pricing_mode} required className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
-                    <option value="flat">Flat Rate (Per Day)</option>
-                    <option value="hourly">Hourly Rate</option>
-                    <option value="mixed">Mixed (Both)</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className={!allowFullDay ? 'opacity-50 pointer-events-none' : ''}>
-                    <Input label="Base Price (₹) (Full Day)" name="base_price" type="number" min={0} defaultValue={(venue.starting_price_paise || 0) / 100} disabled={!allowFullDay} required={allowFullDay} />
-                  </div>
-                  <div className={!allowTimeSlot ? 'opacity-50 pointer-events-none' : ''}>
-                    <Input label="Hourly Rate (₹) (Time Slot)" name="hourly_rate" type="number" min={0} defaultValue={(venue.hourly_rate_paise || 0) / 100} disabled={!allowTimeSlot} required={allowTimeSlot} />
-                  </div>
-                </div>
-                <p className="text-sm text-zinc-500 italic mt-2">Prices will only be applied if the corresponding booking type is enabled above.</p>
-              </div>
-
-              <div className="space-y-4 pt-6 border-t border-zinc-100">
-                <h4 className="font-medium text-zinc-900">Payment Terms</h4>
-                <Input label="Token Advance (%)" name="advance_pct" type="number" step="0.01" min={0.01} max={100} defaultValue={venue.advance_pct} required />
-                <Input label="Balance Due (Days before event)" name="balance_due" type="number" min={1} defaultValue={venue.balance_due_days_before_event} required />
-              </div>
-
-              <div className="space-y-4 pt-6 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Booking Limits & Buffers</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <Input label="Min Duration (min)" name="min_booking_duration_minutes" type="number" min={1} defaultValue={venue.min_booking_duration_minutes} required />
-                  <Input label="Max Duration (min)" name="max_booking_duration_minutes" type="number" min={1} defaultValue={venue.max_booking_duration_minutes} required />
-                  <Input label="Slot Interval (min)" name="slot_interval_minutes" type="number" min={1} defaultValue={venue.slot_interval_minutes} required helperText="e.g. 30 means bookings start at :00 and :30" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="Pre-Buffer (Setup min)" name="pre_buffer_minutes" type="number" min={0} defaultValue={venue.pre_buffer_minutes} required helperText="Gap required before a booking" />
-                  <Input label="Post-Buffer (Teardown min)" name="post_buffer_minutes" type="number" min={0} defaultValue={venue.post_buffer_minutes} required helperText="Gap required after a booking" />
+                <div className="space-y-6 max-w-3xl">
+                  <div className="grid md:grid-cols-2 gap-12">
+                    <DurationInput label="Min Booking Duration" name="min_booking_duration_minutes" defaultValue={venue.min_booking_duration_minutes} required info="The shortest allowed duration for a time-slot booking." />
+                    <DurationInput label="Max Booking Duration" name="max_booking_duration_minutes" defaultValue={venue.max_booking_duration_minutes} required info="The longest allowed duration for a time-slot booking." />
+                  </div>
+                  
+                  <div className="grid md:grid-cols-2 gap-12 pt-4 border-t border-zinc-50">
+                    <DurationInput label="Slot Interval" name="slot_interval_minutes" defaultValue={venue.slot_interval_minutes} required helperText="e.g. 30 means bookings start at :00 and :30" info="The intervals at which bookings can start. For example, a 30-minute interval means bookings can start at 9:00, 9:30, 10:00, etc." />
+                  </div>
+                  
+                  <div className="grid md:grid-cols-2 gap-12 pt-4 border-t border-zinc-50">
+                    <DurationInput label="Pre-Buffer (Setup time)" name="pre_buffer_minutes" defaultValue={venue.pre_buffer_minutes} required helperText="Gap required before a booking" info="Mandatory gap time added BEFORE a booking starts to allow for venue setup or cleaning." />
+                    <DurationInput label="Post-Buffer (Teardown time)" name="post_buffer_minutes" defaultValue={venue.post_buffer_minutes} required helperText="Gap required after a booking" info="Mandatory gap time added AFTER a booking ends to allow for teardown or buffer before the next client arrives." />
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-4 pt-6 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Approval Window</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="Owner Action Window (Hours)" name="owner_action_window_hours" type="number" min={24} max={72} defaultValue={venue.owner_action_window_hours} required helperText="How long you have to accept/reject a pending request before it auto-cancels." />
+                  <Input label="Owner Action Window (Hours)" name="owner_action_window_hours" type="number" min={24} max={72} defaultValue={venue.owner_action_window_hours} required helperText="How long you have to accept/reject a pending request before it auto-cancels." info="The maximum time you have to review and Accept/Reject a booking request. If no action is taken, the booking is automatically canceled and fully refunded." />
                 </div>
+              </div>
+            </div>
+          )}
+
+          {editSection === 'pricing' && (
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h4 className="font-medium text-zinc-900">Pricing</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className={!allowFullDay ? 'opacity-50 pointer-events-none' : ''}>
+                    <Input label="Base Price (₹) (Full Day)" name="base_price" type="number" min={0} defaultValue={(venue.starting_price_paise || 0) / 100} disabled={!allowFullDay} required={allowFullDay} info="The total price for a full day booking." />
+                  </div>
+                  <div className={!allowTimeSlot ? 'opacity-50 pointer-events-none' : ''}>
+                    <Input label="Hourly Rate (₹) (Time Slot)" name="hourly_rate" type="number" min={0} defaultValue={(venue.hourly_rate_paise || 0) / 100} disabled={!allowTimeSlot} required={allowTimeSlot} info="The price per hour for short time-slot bookings." />
+                  </div>
+                </div>
+                <p className="text-sm text-zinc-500 italic mt-2">Prices will only be applied if the corresponding booking type is enabled in Booking Settings.</p>
+              </div>
+
+              <div className="space-y-4 pt-6 border-t border-zinc-100">
+                <h4 className="font-medium text-zinc-900">Payment Terms</h4>
+                <Input label="Token Advance (%)" name="advance_pct" type="number" step="0.01" min={0.01} max={100} defaultValue={venue.advance_pct} required info="The percentage of the total booking cost required upfront to secure the reservation." />
+                <Input label="Balance Due (Days before event)" name="balance_due" type="number" min={1} defaultValue={venue.balance_due_days_before_event} required info="The number of days prior to the event date when the remaining balance must be paid in full." />
               </div>
             </div>
           )}
@@ -526,59 +568,78 @@ export default function VenueEdit() {
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {localPhotos.map((photo: any, index: number) => (
-                    <div key={photo.id} className="relative group rounded-lg overflow-hidden border border-zinc-200 aspect-video bg-zinc-100 flex flex-col">
-                      <img src={photo.image_url} className="w-full h-full object-cover" alt="Venue" />
+                    <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-zinc-200 aspect-video bg-zinc-100 flex flex-col shadow-sm hover:shadow-md transition-all duration-300">
+                      <img src={photo.image_url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt="Venue" />
                       
+                      {/* Cover Badge */}
                       {index === 0 && (
-                        <div className="absolute top-2 left-2 bg-brand text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">
-                          Cover
+                        <div className="absolute top-3 left-3 bg-white text-zinc-900 text-xs font-bold px-3 py-1.5 rounded-md shadow-md flex items-center gap-1.5 z-10">
+                          <Icons.Star className="w-3.5 h-3.5 fill-brand text-brand" />
+                          <span>Cover Photo</span>
                         </div>
                       )}
 
                       {/* Controls overlay */}
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
-                        <div className="flex justify-between items-start">
-                          {index !== 0 ? (
-                             <button type="button" onClick={() => makeCover(index)} className="text-[10px] uppercase font-bold tracking-wider bg-white/90 text-zinc-900 px-2 py-1 rounded hover:bg-white transition-colors">Make Cover</button>
-                          ) : <div/>}
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!confirm("Are you sure you want to delete this photo?")) return
-                              if (!venueId) return
-                              setSaving(true)
-                              try {
-                                const client = createClient()
-                                await venueEndpoints(client).deleteVenuePhoto(venueId, photo.id)
-                                setLocalPhotos(prev => prev.filter((p: any) => p.id !== photo.id))
-                                setVenue((prev: any) => ({
-                                  ...prev,
-                                  photos: prev.photos.filter((p: any) => p.id !== photo.id)
-                                }))
-                              } catch (err) {
-                                console.error('Failed to delete photo', err)
-                                alert('Deletion failed.')
-                              } finally {
-                                setSaving(false)
-                              }
-                            }}
-                            className="bg-red-600 text-white p-1.5 rounded hover:bg-red-700 transition-colors disabled:opacity-50"
-                            disabled={saving}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10">
+                        {/* Center "Make Cover" Button */}
+                        {index !== 0 && (
+                          <div className="absolute inset-0 flex items-center justify-center backdrop-blur-[1px]">
+                            <button type="button" onClick={() => makeCover(index)} className="bg-white text-zinc-900 text-sm font-semibold px-4 py-2 rounded-full shadow-lg hover:bg-brand hover:text-white hover:scale-105 transition-all duration-200 flex items-center gap-2">
+                              <Icons.Image className="w-4 h-4" />
+                              Make Cover
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Top Right Trash Button */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!confirm("Are you sure you want to delete this photo?")) return
+                            if (!venueId) return
+                            setSaving(true)
+                            try {
+                              const client = createClient()
+                              await venueEndpoints(client).deleteVenuePhoto(venueId, photo.id)
+                              setLocalPhotos(prev => prev.filter((p: any) => p.id !== photo.id))
+                              setVenue((prev: any) => ({
+                                ...prev,
+                                photos: prev.photos.filter((p: any) => p.id !== photo.id)
+                              }))
+                            } catch (err) {
+                              console.error('Failed to delete photo', err)
+                              alert('Deletion failed.')
+                            } finally {
+                              setSaving(false)
+                            }
+                          }}
+                          className="absolute top-3 right-3 bg-red-600/90 text-white p-2 rounded-full hover:bg-red-600 shadow-md transition-all hover:scale-110 disabled:opacity-50"
+                          title="Delete Photo"
+                          disabled={saving}
+                        >
+                          <Icons.Trash2 className="w-4 h-4" />
+                        </button>
+
+                        {/* Bottom Center Move Controls */}
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-zinc-900/80 backdrop-blur-md rounded-full p-1 shadow-lg border border-white/10">
+                          <button 
+                            type="button" 
+                            onClick={() => movePhoto(index, -1)} 
+                            disabled={index === 0} 
+                            className="p-1.5 text-white/70 hover:text-white hover:bg-white/20 rounded-full transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                            title="Move Left"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            <Icons.ChevronLeft className="w-4 h-4" />
                           </button>
-                        </div>
-                        <div className="flex justify-center gap-2">
-                          {index > 0 && (
-                            <button type="button" onClick={() => movePhoto(index, -1)} className="text-xs bg-white/90 text-zinc-900 px-2 py-1 rounded hover:bg-white transition-colors font-medium">
-                               &larr; Move
-                            </button>
-                          )}
-                          {index < localPhotos.length - 1 && (
-                            <button type="button" onClick={() => movePhoto(index, 1)} className="text-xs bg-white/90 text-zinc-900 px-2 py-1 rounded hover:bg-white transition-colors font-medium">
-                               Move &rarr;
-                            </button>
-                          )}
+                          <button 
+                            type="button" 
+                            onClick={() => movePhoto(index, 1)} 
+                            disabled={index === localPhotos.length - 1} 
+                            className="p-1.5 text-white/70 hover:text-white hover:bg-white/20 rounded-full transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                            title="Move Right"
+                          >
+                            <Icons.ChevronRight className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -632,37 +693,38 @@ export default function VenueEdit() {
 
           {editSection === 'policies' && (
             <div className="space-y-6">
-              <p className="text-sm text-zinc-600 mb-6">
-                Define your cancellation refund tiers. The hours must be in descending order (e.g. 168 hours = 7 days, 72 hours = 3 days).
-              </p>
+              <div className="flex items-center mb-6">
+                <h4 className="font-medium text-zinc-900">Refund Tiers</h4>
+                <InfoTooltip content="Define your cancellation refund tiers. The hours must be in descending order (e.g. 168 hours = 7 days, 72 hours = 3 days)." />
+              </div>
 
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
-                  <Input label="Tier 1: Cancel before (Hours)" name="tier_1_hours" type="number" min={1} defaultValue={venue.cancellation_policy?.tier_1_hours || ''} placeholder="e.g. 168" />
+                  <HoursToDaysInput label="Tier 1: Cancel before (Hours)" name="tier_1_hours" type="number" min={1} defaultValue={venue.cancellation_policy?.tier_1_hours || ''} placeholder="e.g. 168" />
                   <Input label="Refund %" name="tier_1_refund_pct" type="number" step="0.01" min="0" max="100" defaultValue={venue.cancellation_policy?.tier_1_refund_pct || ''} placeholder="e.g. 100" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
-                  <Input label="Tier 2: Cancel before (Hours)" name="tier_2_hours" type="number" min={1} defaultValue={venue.cancellation_policy?.tier_2_hours || ''} placeholder="e.g. 72" />
+                  <HoursToDaysInput label="Tier 2: Cancel before (Hours)" name="tier_2_hours" type="number" min={1} defaultValue={venue.cancellation_policy?.tier_2_hours || ''} placeholder="e.g. 72" />
                   <Input label="Refund %" name="tier_2_refund_pct" type="number" step="0.01" min="0" max="100" defaultValue={venue.cancellation_policy?.tier_2_refund_pct || ''} placeholder="e.g. 50" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
-                  <Input label="Tier 3: Cancel before (Hours) (Optional)" name="tier_3_hours" type="number" min={1} defaultValue={venue.cancellation_policy?.tier_3_hours || ''} placeholder="e.g. 24" />
+                  <HoursToDaysInput label="Tier 3: Cancel before (Hours) (Optional)" name="tier_3_hours" type="number" min={1} defaultValue={venue.cancellation_policy?.tier_3_hours || ''} placeholder="e.g. 24" />
                   <Input label="Refund % (Optional)" name="tier_3_refund_pct" type="number" step="0.01" min="0" max="100" defaultValue={venue.cancellation_policy?.tier_3_refund_pct || ''} placeholder="e.g. 25" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 pt-6 border-t border-zinc-100">
-                <Input label="No Show Refund (%)" name="no_show_refund_pct" type="number" step="0.01" min="0" max="100" required defaultValue={venue.cancellation_policy?.no_show_refund_pct || '0'} />
-                <Input label="Overdue Advance Refund (%)" name="overdue_advance_refund_pct" type="number" step="0.01" min="0" max="100" required defaultValue={venue.overdue_advance_refund_pct || '0'} />
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 mt-1">Refund given if you (the owner) fail to accept/reject a booking request in time.</p>
+                <Input label="No Show Refund (%)" name="no_show_refund_pct" type="number" step="0.01" min="0" max="100" required defaultValue={venue.cancellation_policy?.no_show_refund_pct || '0'} info="The percentage of the booking cost refunded to the customer if they fail to show up for their reservation without prior cancellation." />
+                <Input label="Overdue Advance Refund (%)" name="overdue_advance_refund_pct" type="number" step="0.01" min="0" max="100" required defaultValue={venue.overdue_advance_refund_pct || '0'} info="Refund given if you (the owner) fail to accept/reject a booking request in time." />
               </div>
 
               <div className="pt-4 border-t border-zinc-100">
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Additional Policy Notes (Optional)</label>
+                <label className="flex items-center text-sm font-medium text-zinc-700 mb-1">
+                  Additional Policy Notes (Optional)
+                  <InfoTooltip content="Any extra rules, exceptions, or specific conditions regarding cancellations and refunds (e.g., weather policies, rescheduling rules)." />
+                </label>
                 <textarea 
                   name="notes"
                   defaultValue={venue.cancellation_policy?.notes || ''}
@@ -679,8 +741,8 @@ export default function VenueEdit() {
               <div className="space-y-6">
                 <h4 className="font-medium text-zinc-900">Base Schedule</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="Opening Time" name="open_time" type="time" defaultValue={venue.open_time} required />
-                  <Input label="Closing Time" name="close_time" type="time" defaultValue={venue.close_time} required />
+                  <TimeSelect label="Opening Time" name="open_time" value={venue.open_time || ''} onChange={e => setVenue(prev => ({...prev, open_time: e.target.value}))} required />
+                  <TimeSelect label="Closing Time" name="close_time" value={venue.close_time || ''} onChange={e => setVenue(prev => ({...prev, close_time: e.target.value}))} required />
                 </div>
                 <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
                   <input type="checkbox" name="spans_next_day" defaultChecked={venue.spans_next_day} className="rounded text-brand focus:ring-brand" />
@@ -689,115 +751,15 @@ export default function VenueEdit() {
               </div>
             </div>
           )}
-
-          {editSection === 'blocked-dates' && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center pb-4 border-b border-zinc-100">
-                <div>
-                  <h4 className="font-medium text-zinc-900">Manage Blocked Dates</h4>
-                  <p className="text-sm text-zinc-500">Add dates when your venue is unavailable (e.g. maintenance, private event).</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-zinc-50 p-4 rounded-lg border border-zinc-200">
-                <Input label="Starts At" name="block_starts_at" type="datetime-local" />
-                <Input label="Ends At" name="block_ends_at" type="datetime-local" />
-                <Input label="Reason (Optional)" name="block_reason" placeholder="e.g. Maintenance" />
-                <Button 
-                  variant="secondary"
-                  type="button"
-                  onClick={async () => {
-                    const starts_at = (document.querySelector('input[name="block_starts_at"]') as HTMLInputElement).value
-                    const ends_at = (document.querySelector('input[name="block_ends_at"]') as HTMLInputElement).value
-                    const reason = (document.querySelector('input[name="block_reason"]') as HTMLInputElement).value
-                    if (!starts_at || !ends_at) {
-                      alert('Please select both start and end times.')
-                      return
-                    }
-                    if (new Date(ends_at) <= new Date(starts_at)) {
-                      alert('End time must be after start time.')
-                      return
-                    }
-
-                    setSaving(true)
-                    try {
-                      const client = createClient()
-                      const payload = {
-                        starts_at: new Date(starts_at).toISOString(),
-                        ends_at: new Date(ends_at).toISOString(),
-                        reason: reason || null
-                      }
-                      const newBlock = await venueEndpoints(client).createBlockedDate(venueId!, payload)
-                      setBlockedDates(prev => [...prev, newBlock].sort((a,b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()))
-                      // Clear inputs
-                      ;(document.querySelector('input[name="block_starts_at"]') as HTMLInputElement).value = ''
-                      ;(document.querySelector('input[name="block_ends_at"]') as HTMLInputElement).value = ''
-                      ;(document.querySelector('input[name="block_reason"]') as HTMLInputElement).value = ''
-                    } catch (err: any) {
-                      console.error('Failed to create block', err)
-                      alert(err.message || 'Failed to add blocked date.')
-                    } finally {
-                      setSaving(false)
-                    }
-                  }}
-                  disabled={saving}
-                >
-                  {saving ? 'Adding...' : 'Add Block'}
-                </Button>
-              </div>
-
-              {blockedDates.length === 0 ? (
-                <div className="text-center py-8 text-zinc-500 bg-zinc-50 rounded-lg border border-zinc-200">
-                  No upcoming blocked dates.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {blockedDates.map(block => (
-                    <div key={block.id} className="flex justify-between items-center p-4 bg-white border border-zinc-200 rounded-lg shadow-sm">
-                      <div>
-                        <div className="font-medium text-zinc-900">
-                          {new Date(block.starts_at).toLocaleString()} - {new Date(block.ends_at).toLocaleString()}
-                        </div>
-                        {block.reason && <div className="text-sm text-zinc-500 mt-1">Reason: {block.reason}</div>}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!confirm('Are you sure you want to delete this block?')) return
-                          setSaving(true)
-                          try {
-                            const client = createClient()
-                            await venueEndpoints(client).deleteBlockedDate(venueId!, block.id)
-                            setBlockedDates(prev => prev.filter(b => b.id !== block.id))
-                          } catch (err) {
-                            console.error('Failed to delete block', err)
-                            alert('Deletion failed.')
-                          } finally {
-                            setSaving(false)
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-700 p-2"
-                        disabled={saving}
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </Card>
 
         <div className="flex justify-end gap-3">
           <Link to={`/venues/${venueId}/overview`}>
             <Button variant="ghost" type="button">Back</Button>
           </Link>
-          {editSection !== 'blocked-dates' && (
-            <Button variant="primary" type="submit" disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          )}
+          <Button variant="primary" type="submit" disabled={saving}>
+            {saving ? 'Saving...' : 'Save Changes'}
+          </Button>
         </div>
       </form>
     </div>

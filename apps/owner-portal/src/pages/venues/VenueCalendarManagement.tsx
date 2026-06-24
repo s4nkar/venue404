@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Card, SectionHeader, Button, Input } from '@venue404/ui'
-import { ArrowLeft, Loader2, Save, Trash2, Clock, Ban } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Loader2, Save, Trash2, Clock, Ban } from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
+import { TimeSelect } from '../../components/TimeSelect'
 
 const DAYS_OF_WEEK = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
@@ -37,6 +38,9 @@ export default function VenueCalendarManagement() {
   // Blocked dates state
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([])
   const [addingBlock, setAddingBlock] = useState(false)
+  
+  const [startsTime, setStartsTime] = useState('09:00:00')
+  const [endsTime, setEndsTime] = useState('17:00:00')
 
   useEffect(() => {
     async function loadData() {
@@ -105,6 +109,16 @@ export default function VenueCalendarManagement() {
           setSavingWeekly(false)
           return
         }
+        
+        if (!avail.spans_next_day) {
+          const openStr = avail.opens_at.slice(0, 5)
+          const closeStr = avail.closes_at.slice(0, 5)
+          if (closeStr <= openStr) {
+            setError(`For ${DAYS_OF_WEEK[avail.day_of_week]}, closing time must be after opening time. If you intend to close the next day, please check the 'Closes next day' box.`)
+            setSavingWeekly(false)
+            return
+          }
+        }
       }
     }
 
@@ -140,18 +154,23 @@ export default function VenueCalendarManagement() {
     }
   }
 
-  const handleAddBlockedDate = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddBlockedDate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!venueId) return
-    const formData = new FormData(e.currentTarget)
-    const starts_at = formData.get('starts_at') as string
-    const ends_at = formData.get('ends_at') as string
+    const formData = new FormData(e.target as HTMLFormElement)
+    const starts_date = formData.get('starts_date') as string
+    const starts_time = formData.get('starts_time') as string
+    const ends_date = formData.get('ends_date') as string
+    const ends_time = formData.get('ends_time') as string
     const reason = formData.get('reason') as string
 
-    if (!starts_at || !ends_at) {
+    if (!starts_date || !starts_time || !ends_date || !ends_time) {
       setError("Start and end times are required")
       return
     }
+
+    const starts_at = `${starts_date}T${starts_time}`
+    const ends_at = `${ends_date}T${ends_time}`
 
     if (new Date(ends_at) <= new Date(starts_at)) {
       setError("End time must be strictly after start time")
@@ -315,13 +334,36 @@ export default function VenueCalendarManagement() {
           <Card className="p-6">
             <h4 className="font-medium text-zinc-900 mb-4">Add Blocked Date</h4>
             <form onSubmit={handleAddBlockedDate}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <Input label="Starts At" name="starts_at" type="datetime-local" required />
-                <Input label="Ends At" name="ends_at" type="datetime-local" required />
-                <Input label="Reason (Optional)" name="reason" placeholder="e.g. Maintenance" />
+              <div className="grid grid-cols-1 md:grid-cols-2 items-start bg-zinc-50 rounded-lg border border-zinc-200 divide-y md:divide-y-0 md:divide-x divide-zinc-200">
+                <div className="space-y-4 p-6">
+                  <h5 className="text-sm font-medium text-zinc-900 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded bg-zinc-200 flex items-center justify-center text-xs font-bold text-zinc-500">1</span>
+                    Start Range
+                  </h5>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input label="Date" name="starts_date" type="date" required />
+                    <TimeSelect label="Time" name="starts_time" value={startsTime} onChange={(e) => setStartsTime(e.target.value)} required />
+                  </div>
+                </div>
+
+                <div className="space-y-4 p-6">
+                  <h5 className="text-sm font-medium text-zinc-900 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded bg-zinc-200 flex items-center justify-center text-xs font-bold text-zinc-500">2</span>
+                    End Range
+                  </h5>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input label="Date" name="ends_date" type="date" required />
+                    <TimeSelect label="Time" name="ends_time" value={endsTime} onChange={(e) => setEndsTime(e.target.value)} required />
+                  </div>
+                </div>
               </div>
-              <div className="mt-4 flex justify-end">
-                <Button type="submit" variant="primary" disabled={addingBlock}>
+              
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="md:col-span-2">
+                  <Input label="Reason (Optional)" name="reason" placeholder="e.g. Maintenance, Private Event, Renovation" />
+                </div>
+                <Button type="submit" variant="primary" disabled={addingBlock} className="w-full h-[42px]">
+                  {addingBlock ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {addingBlock ? 'Adding...' : 'Block Date'}
                 </Button>
               </div>
@@ -336,24 +378,58 @@ export default function VenueCalendarManagement() {
                 <p>No upcoming blocked dates.</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {blockedDates.map(block => (
-                  <div key={block.id} className="flex justify-between items-center p-4 bg-white border border-zinc-200 rounded-lg shadow-sm">
-                    <div>
-                      <div className="font-medium text-zinc-900">
-                        {new Date(block.starts_at).toLocaleString()} - {new Date(block.ends_at).toLocaleString()}
+              <div className="space-y-4">
+                {blockedDates.map(block => {
+                  const start = new Date(block.starts_at)
+                  const end = new Date(block.ends_at)
+                  const dateOpts: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }
+                  const timeOpts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' }
+                  
+                  return (
+                    <div key={block.id} className="group flex flex-col md:flex-row justify-between md:items-center p-5 bg-white border border-zinc-200 rounded-xl shadow-sm hover:border-red-200 hover:shadow-md transition-all duration-300">
+                      <div className="flex items-start gap-4">
+                        <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-full bg-red-50 text-red-500 shrink-0">
+                          <Ban className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-zinc-900 font-semibold mb-1">
+                            <div className="flex items-center gap-1.5">
+                              <span>{start.toLocaleString('en-US', dateOpts)}</span>
+                              <span className="text-zinc-400 font-normal">at</span>
+                              <span className="text-brand">{start.toLocaleString('en-US', timeOpts)}</span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-zinc-300 hidden md:block" />
+                            <div className="flex items-center gap-1.5">
+                              <span>{end.toLocaleString('en-US', dateOpts)}</span>
+                              <span className="text-zinc-400 font-normal">at</span>
+                              <span className="text-brand">{end.toLocaleString('en-US', timeOpts)}</span>
+                            </div>
+                          </div>
+                          
+                          {block.reason ? (
+                            <div className="text-sm text-zinc-500 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
+                              <span>{block.reason}</span>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-zinc-400 italic flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-zinc-200"></span>
+                              <span>No specific reason provided</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      {block.reason && <div className="text-sm text-zinc-500 mt-1">Reason: {block.reason}</div>}
+                      <button 
+                        onClick={() => handleDeleteBlockedDate(block.id)}
+                        className="mt-4 md:mt-0 self-start md:self-center flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-lg transition-colors md:opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
+                        title="Unblock date"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>Unblock</span>
+                      </button>
                     </div>
-                    <button 
-                      onClick={() => handleDeleteBlockedDate(block.id)}
-                      className="text-red-600 hover:text-red-700 p-2"
-                      title="Unblock date"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

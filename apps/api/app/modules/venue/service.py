@@ -294,6 +294,7 @@ def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue
         
         status=VenueStatus.draft,
 
+        last_completed_step=body.last_completed_step,
         
         is_active=True,
     )

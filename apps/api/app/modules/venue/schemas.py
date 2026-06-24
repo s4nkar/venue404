@@ -238,6 +238,8 @@ class CreateVenueRequest(BaseModel):
     cancellation_policy: Optional[UpdateCancellationPolicyRequest] = None
     amenity_ids: Optional[list[UUID]] = None
 
+    last_completed_step: Optional[int] = Field(default=0, ge=0)
+
     @field_validator("allowed_booking_types")
     @classmethod
     def validate_booking_types(cls, v: list[BookingType]) -> list[BookingType]:
@@ -287,6 +289,9 @@ class CreateVenueRequest(BaseModel):
             raise ValueError(
                 "min_booking_duration_minutes cannot exceed max_booking_duration_minutes"
             )
+
+        if not self.spans_next_day and self.close_time <= self.open_time:
+            raise ValueError("close_time must be after open_time unless spans_next_day is true")
 
 
 class UpdateVenueRequest(BaseModel):
@@ -376,6 +381,11 @@ class UpdateVenueRequest(BaseModel):
                 "min_booking_duration_minutes cannot exceed max_booking_duration_minutes"
             )
 
+        if self.open_time is not None and self.close_time is not None:
+            spans_next = self.spans_next_day if self.spans_next_day is not None else False
+            if not spans_next and self.close_time <= self.open_time:
+                raise ValueError("close_time must be after open_time unless spans_next_day is true")
+
 
 class PricingDisplay(BaseModel):
     quoted_price: str
@@ -436,6 +446,8 @@ class VenueAvailabilityUpdate(BaseModel):
         if self.is_available:
             if self.opens_at is None or self.closes_at is None:
                 raise ValueError("opens_at and closes_at are required when is_available is true")
+            if not self.spans_next_day and self.closes_at <= self.opens_at:
+                raise ValueError("closes_at must be after opens_at unless spans_next_day is true")
 
 class BulkUpdateAvailabilityRequest(BaseModel):
     availabilities: list[VenueAvailabilityUpdate]

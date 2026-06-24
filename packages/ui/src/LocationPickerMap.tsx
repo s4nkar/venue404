@@ -13,21 +13,58 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
 })
 
+export interface LocationAddressData {
+  address_line1?: string
+  address_line2?: string
+  city?: string
+  state?: string
+  country?: string
+  postal_code?: string
+}
+
 interface LocationPickerMapProps {
   latitude: number | null
   longitude: number | null
-  onChange: (lat: number, lng: number) => void
+  onChange: (lat: number, lng: number, address?: LocationAddressData) => void
   height?: string
+}
+
+async function reverseGeocode(lat: number, lng: number): Promise<LocationAddressData | undefined> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
+      headers: {
+        'Accept-Language': 'en'
+      }
+    })
+    const data = await res.json()
+    if (data && data.address) {
+      const a = data.address
+      return {
+        address_line1: a.road || a.pedestrian || a.path || a.suburb || '',
+        address_line2: a.neighbourhood || a.village || '',
+        city: a.city || a.town || a.county || '',
+        state: a.state,
+        country: a.country,
+        postal_code: a.postcode
+      }
+    }
+  } catch (err) {
+    console.error('Reverse geocoding failed', err)
+  }
+  return undefined
 }
 
 const DEFAULT_CENTER: [number, number] = [9.9312, 76.2673] // Kochi, Kerala
 const DEFAULT_ZOOM = 12
 const ZOOM_WHEN_SET = 15
 
-function LocationMarker({ position, onChange }: { position: [number, number] | null, onChange: (lat: number, lng: number) => void }) {
+function LocationMarker({ position, onChange }: { position: [number, number] | null, onChange: (lat: number, lng: number, address?: LocationAddressData) => void }) {
   useMapEvents({
-    click(e) {
-      onChange(e.latlng.lat, e.latlng.lng)
+    async click(e) {
+      const lat = e.latlng.lat
+      const lng = e.latlng.lng
+      const addr = await reverseGeocode(lat, lng)
+      onChange(lat, lng, addr)
     },
   })
 
@@ -44,7 +81,7 @@ function MapUpdater({ center, zoom }: { center: [number, number], zoom: number }
   return null
 }
 
-function SearchField({ onChange }: { onChange: (lat: number, lng: number) => void }) {
+function SearchField({ onChange }: { onChange: (lat: number, lng: number, address?: LocationAddressData) => void }) {
   const map = useMap()
   
   useEffect(() => {
@@ -64,9 +101,12 @@ function SearchField({ onChange }: { onChange: (lat: number, lng: number) => voi
 
     map.addControl(searchControl)
 
-    const handleLocation = (result: any) => {
+    const handleLocation = async (result: any) => {
       if (result && result.location) {
-        onChange(result.location.y, result.location.x)
+        const lat = result.location.y
+        const lng = result.location.x
+        const addr = await reverseGeocode(lat, lng)
+        onChange(lat, lng, addr)
       }
     }
 
