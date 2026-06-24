@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { InfoTooltip } from '@venue404/ui'
 
 export interface DurationInputProps {
   label: string
@@ -8,9 +9,10 @@ export interface DurationInputProps {
   onChange?: (e: { target: { name: string, value: number, type: string } }) => void
   required?: boolean
   helperText?: string
+  info?: React.ReactNode
 }
 
-export function DurationInput({ label, name, value, defaultValue, onChange, required, helperText }: DurationInputProps) {
+export function DurationInput({ label, name, value, defaultValue, onChange, required, helperText, info }: DurationInputProps) {
   const [hours, setHours] = useState<string>('')
   const [minutes, setMinutes] = useState<string>('')
 
@@ -50,8 +52,10 @@ export function DurationInput({ label, name, value, defaultValue, onChange, requ
 
   return (
     <div className="space-y-1">
-      <label className="text-sm font-medium text-zinc-700 block mb-1">
-        {label}{required && <span className="text-red-500 ml-1">*</span>}
+      <label className="flex items-center text-sm font-medium text-zinc-700 mb-1">
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+        {info && <InfoTooltip content={info} />}
       </label>
       <input type="hidden" name={name} value={totalMinutes} required={required} />
       <div className="grid grid-cols-2 gap-2">

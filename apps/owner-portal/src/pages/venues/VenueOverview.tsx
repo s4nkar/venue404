@@ -107,7 +107,7 @@ export default function VenueOverview() {
       </div>
 
       {/* Quick Stats */}
-      {venue.status !== 'draft' && (
+      {venue.status === 'approved' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <MetricCard label="Bookings this month" value="0" icon={<CalendarDays className="h-4 w-4"/>} accent="brand" />
           <MetricCard label="Revenue this month" value="₹0" icon={<IndianRupee className="h-4 w-4"/>} accent="emerald" />
@@ -144,8 +144,7 @@ export default function VenueOverview() {
             { label: 'Operating Hours', path: 'operating-hours' },
             { label: 'Booking Settings', path: 'booking-settings' },
             { label: 'Pricing', path: 'pricing' },
-            { label: 'Policies', path: 'policies' },
-            { label: 'Blocked Dates', path: 'blocked-dates' }
+            { label: 'Policies', path: 'policies' }
           ].map(link => (
             <Link key={link.path} to={`/venues/${venueId}/edit/${link.path}`}>
               <div className="p-4 rounded-lg border border-zinc-200 hover:border-brand hover:bg-brand-light/30 transition-colors cursor-pointer text-sm font-medium text-zinc-700 hover:text-brand">

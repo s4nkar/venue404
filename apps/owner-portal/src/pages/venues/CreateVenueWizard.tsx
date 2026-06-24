@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Input, SectionHeader, LocationPickerMap } from '@venue404/ui'
+import { Button, Card, Input, SectionHeader, LocationPickerMap, InfoTooltip } from '@venue404/ui'
 import * as Icons from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
 import { INDIAN_STATES } from '../../lib/constants'
@@ -649,24 +649,24 @@ export default function CreateVenueWizard() {
               
               <div className="space-y-6 max-w-3xl">
                 <div className="grid md:grid-cols-2 gap-12">
-                  <DurationInput label="Min Booking Duration" name="min_booking_duration_minutes" required value={formData.min_booking_duration_minutes} onChange={handleChange} />
-                  <DurationInput label="Max Booking Duration" name="max_booking_duration_minutes" required value={formData.max_booking_duration_minutes} onChange={handleChange} />
+                  <DurationInput label="Min Booking Duration" name="min_booking_duration_minutes" required value={formData.min_booking_duration_minutes} onChange={handleChange} info="The shortest allowed duration for a time-slot booking." />
+                  <DurationInput label="Max Booking Duration" name="max_booking_duration_minutes" required value={formData.max_booking_duration_minutes} onChange={handleChange} info="The longest allowed duration for a time-slot booking." />
                 </div>
                 
                 <div className="grid md:grid-cols-2 gap-12 pt-4 border-t border-zinc-50">
-                  <DurationInput label="Slot Interval" name="slot_interval_minutes" required value={formData.slot_interval_minutes} onChange={handleChange} helperText="e.g. 30 means bookings start at :00 and :30" />
+                  <DurationInput label="Slot Interval" name="slot_interval_minutes" required value={formData.slot_interval_minutes} onChange={handleChange} helperText="e.g. 30 means bookings start at :00 and :30" info="The intervals at which bookings can start. For example, a 30-minute interval means bookings can start at 9:00, 9:30, 10:00, etc." />
                 </div>
                 
                 <div className="grid md:grid-cols-2 gap-12 pt-4 border-t border-zinc-50">
-                  <DurationInput label="Pre-Buffer (Setup time)" name="pre_buffer_minutes" required value={formData.pre_buffer_minutes} onChange={handleChange} helperText="Gap required before a booking" />
-                  <DurationInput label="Post-Buffer (Teardown time)" name="post_buffer_minutes" required value={formData.post_buffer_minutes} onChange={handleChange} helperText="Gap required after a booking" />
+                  <DurationInput label="Pre-Buffer (Setup time)" name="pre_buffer_minutes" required value={formData.pre_buffer_minutes} onChange={handleChange} helperText="Gap required before a booking" info="Mandatory gap time added BEFORE a booking starts to allow for venue setup or cleaning." />
+                  <DurationInput label="Post-Buffer (Teardown time)" name="post_buffer_minutes" required value={formData.post_buffer_minutes} onChange={handleChange} helperText="Gap required after a booking" info="Mandatory gap time added AFTER a booking ends to allow for teardown or buffer before the next client arrives." />
                 </div>
               </div>
             </div>
 
             <div className="space-y-4 pt-6 border-t border-zinc-100">
               <h4 className="font-medium text-zinc-900">Approval Settings</h4>
-              <Input label="Owner Action Window (Hours)" name="owner_action_window_hours" type="number" min={24} max={72} required value={formData.owner_action_window_hours} onChange={handleChange} helperText="How long you have to accept/reject a pending request before it auto-cancels." />
+              <Input label="Owner Action Window (Hours)" name="owner_action_window_hours" type="number" min={24} max={72} required value={formData.owner_action_window_hours} onChange={handleChange} helperText="How long you have to accept/reject a pending request before it auto-cancels." info="The maximum time you have to review and Accept/Reject a booking request. If no action is taken, the booking is automatically canceled and fully refunded." />
             </div>
           </div>
         )}
@@ -674,43 +674,44 @@ export default function CreateVenueWizard() {
         {currentStep === 4 && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Base Price (₹)" name="base_price" type="number" min={0} required={formData.pricing_mode !== 'hourly'} disabled={formData.pricing_mode === 'hourly'} value={formData.base_price} onChange={handleChange} placeholder="e.g. 50000" />
-              <Input label="Hourly Rate (₹)" name="hourly_rate" type="number" min={0} required={formData.pricing_mode !== 'flat'} disabled={formData.pricing_mode === 'flat'} value={formData.hourly_rate} onChange={handleChange} placeholder="e.g. 5000" />
+              <Input label="Base Price (₹)" name="base_price" type="number" min={0} required={formData.pricing_mode !== 'hourly'} disabled={formData.pricing_mode === 'hourly'} value={formData.base_price} onChange={handleChange} placeholder="e.g. 50000" info="The total price for a full day booking." />
+              <Input label="Hourly Rate (₹)" name="hourly_rate" type="number" min={0} required={formData.pricing_mode !== 'flat'} disabled={formData.pricing_mode === 'flat'} value={formData.hourly_rate} onChange={handleChange} placeholder="e.g. 5000" info="The price per hour for short time-slot bookings." />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Token Advance (%)" name="advance_pct" type="number" min={0.01} max={100} step="0.01" required value={formData.advance_pct} onChange={handleChange} />
-              <Input label="Balance Due (Days before event)" name="balance_due" type="number" min={1} required value={formData.balance_due} onChange={handleChange} />
+              <Input label="Token Advance (%)" name="advance_pct" type="number" min={0.01} max={100} step="0.01" required value={formData.advance_pct} onChange={handleChange} info="The percentage of the total booking cost required upfront to secure the reservation." />
+              <Input label="Balance Due (Days before event)" name="balance_due" type="number" min={1} required value={formData.balance_due} onChange={handleChange} info="The number of days prior to the event date when the remaining balance must be paid in full." />
             </div>
           </div>
         )}
 
         {currentStep === 5 && (
           <div className="space-y-6">
-            <p className="text-sm text-zinc-600 mb-6">
-              Define your cancellation refund tiers. The hours must be in descending order (e.g. 168 hours = 7 days, 72 hours = 3 days).
-            </p>
+            <div className="flex items-center mb-6">
+              <h4 className="font-medium text-zinc-900">Refund Tiers</h4>
+              <InfoTooltip content="Define your cancellation refund tiers. The hours must be in descending order (e.g. 168 hours = 7 days, 72 hours = 3 days)." />
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Tier 1: Cancel before (Hours)" name="tier_1_hours" type="number" min={1} value={formData.tier_1_hours} onChange={handleChange} placeholder="e.g. 168" />
+              <Input label="Tier 1: Cancel before (Hours)" name="tier_1_hours" type="number" min={1} value={formData.tier_1_hours} onChange={handleChange} placeholder="e.g. 168" suffix={formData.tier_1_hours && Number(formData.tier_1_hours) > 0 ? `≈ ${parseFloat((Number(formData.tier_1_hours) / 24).toFixed(2))} days` : undefined} />
               <Input label="Refund %" name="tier_1_refund_pct" type="number" step="0.01" min={0} max={100} value={formData.tier_1_refund_pct} onChange={handleChange} placeholder="e.g. 100" />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Tier 2: Cancel before (Hours)" name="tier_2_hours" type="number" min={1} value={formData.tier_2_hours} onChange={handleChange} placeholder="e.g. 72" />
+              <Input label="Tier 2: Cancel before (Hours)" name="tier_2_hours" type="number" min={1} value={formData.tier_2_hours} onChange={handleChange} placeholder="e.g. 72" suffix={formData.tier_2_hours && Number(formData.tier_2_hours) > 0 ? `≈ ${parseFloat((Number(formData.tier_2_hours) / 24).toFixed(2))} days` : undefined} />
               <Input label="Refund %" name="tier_2_refund_pct" type="number" step="0.01" min={0} max={100} value={formData.tier_2_refund_pct} onChange={handleChange} placeholder="e.g. 50" />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Tier 3: Cancel before (Hours) (Optional)" name="tier_3_hours" type="number" min={1} value={formData.tier_3_hours} onChange={handleChange} placeholder="e.g. 24" />
+              <Input label="Tier 3: Cancel before (Hours) (Optional)" name="tier_3_hours" type="number" min={1} value={formData.tier_3_hours} onChange={handleChange} placeholder="e.g. 24" suffix={formData.tier_3_hours && Number(formData.tier_3_hours) > 0 ? `≈ ${parseFloat((Number(formData.tier_3_hours) / 24).toFixed(2))} days` : undefined} />
               <Input label="Refund % (Optional)" name="tier_3_refund_pct" type="number" step="0.01" min={0} max={100} value={formData.tier_3_refund_pct} onChange={handleChange} placeholder="e.g. 25" />
             </div>
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-100">
-              <Input label="No Show Refund (%)" name="no_show_refund_pct" type="number" step="0.01" min={0} max={100} required value={formData.no_show_refund_pct} onChange={handleChange} />
-              <Input label="Overdue Advance Refund (%)" name="overdue_advance_refund_pct" type="number" step="0.01" min={0} max={100} required value={formData.overdue_advance_refund_pct} onChange={handleChange} />
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500 mt-1">Refund given if you (the owner) fail to accept/reject a booking request in time.</p>
+              <Input label="No Show Refund (%)" name="no_show_refund_pct" type="number" step="0.01" min={0} max={100} required value={formData.no_show_refund_pct} onChange={handleChange} info="The percentage of the booking cost refunded to the customer if they fail to show up for their reservation without prior cancellation." />
+              <Input label="Overdue Advance Refund (%)" name="overdue_advance_refund_pct" type="number" step="0.01" min={0} max={100} required value={formData.overdue_advance_refund_pct} onChange={handleChange} info="Refund given if you (the owner) fail to accept/reject a booking request in time." />
             </div>
             <div className="pt-4 border-t border-zinc-100">
-              <label className="block text-sm font-medium text-zinc-700 mb-1">Additional Policy Notes (Optional)</label>
+              <label className="flex items-center text-sm font-medium text-zinc-700 mb-1">
+                Additional Policy Notes (Optional)
+                <InfoTooltip content="Any extra rules, exceptions, or specific conditions regarding cancellations and refunds (e.g., weather policies, rescheduling rules)." />
+              </label>
               <textarea 
                 name="notes"
                 value={formData.notes}

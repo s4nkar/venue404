@@ -18,12 +18,3 @@ class Slot(Base, TimestampMixin):
     is_available: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-class BlockedDate(Base, TimestampMixin):
-    __tablename__ = "blocked_dates"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    venue_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("venues.id", ondelete="CASCADE"), nullable=False
-    )
-    date: Mapped[date] = mapped_column(Date, nullable=False)
-    reason: Mapped[str] = mapped_column(Text, default="")
