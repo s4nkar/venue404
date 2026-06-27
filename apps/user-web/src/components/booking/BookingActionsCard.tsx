@@ -17,13 +17,45 @@ const CANCELLED_STATUSES = [
   'balance_overdue_cancelled',
 ]
 
+function PrimaryActionButton({
+  onClick,
+  children,
+}: {
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="press w-full rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm outline-none transition-colors hover:bg-brand-hover focus-visible:ring-2 focus-visible:ring-brand-secondary focus-visible:ring-offset-2"
+    >
+      {children}
+    </button>
+  )
+}
+
+function DestructiveActionButton({
+  onClick,
+  children,
+}: {
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full rounded-lg border border-red-200 px-5 py-3 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+    >
+      {children}
+    </button>
+  )
+}
+
 export function BookingActionsCard({ booking }: Props) {
   const navigate = useNavigate()
-
   const [cancelOpen, setCancelOpen] = useState(false)
 
-  const isFullPaymentRequired =
-    booking.advance_pct === 100 || booking.balance_due_paise === 0
+  const isFullPaymentRequired = booking.advance_pct === 100 || booking.balance_due_paise === 0
 
   // These conditions read live server state, so once the webhook flips the
   // booking to fully_paid / confirmed the buttons disappear automatically —
@@ -39,9 +71,9 @@ export function BookingActionsCard({ booking }: Props) {
 
   return (
     <>
-      <div className="rounded-2xl border border-zinc-200 shadow-sm bg-white p-6">
+      <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm">
         <div className="space-y-4">
-          <div className="text-xs uppercase tracking-wider text-zinc-400 font-semibold">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
             Actions
           </div>
 
@@ -50,52 +82,37 @@ export function BookingActionsCard({ booking }: Props) {
 
           {/* Advance Payment Button */}
           {showAdvancePayment && (
-            <button
-              onClick={() => navigate(`/payment/${booking.id}?type=advance`)}
-              className="w-full rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 transition-colors"
-            >
+            <PrimaryActionButton onClick={() => navigate(`/payment/${booking.id}?type=advance`)}>
               {isFullPaymentRequired
                 ? `Pay Full Amount • ${booking.display?.quoted_price || ''}`
                 : `Pay Advance • ${booking.display?.advance_due || ''}`}
-            </button>
+            </PrimaryActionButton>
           )}
 
           {/* Balance Payment Button */}
           {showBalancePayment && (
-            <button
-              onClick={() => navigate(`/payment/${booking.id}?type=balance`)}
-              className="w-full rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 transition-colors"
-            >
+            <PrimaryActionButton onClick={() => navigate(`/payment/${booking.id}?type=balance`)}>
               {`Pay Remaining Balance • ${booking.display?.balance_due || ''}`}
-            </button>
+            </PrimaryActionButton>
           )}
 
           {/* Cancel Buttons */}
           {(showAdvancePayment || showBalancePayment) && (
-            <button
-              onClick={() => setCancelOpen(true)}
-              className="w-full rounded-xl border border-red-200 px-5 py-3 text-sm font-medium text-red-700 hover:bg-red-50 transition-colors"
-            >
+            <DestructiveActionButton onClick={() => setCancelOpen(true)}>
               Cancel Booking
-            </button>
+            </DestructiveActionButton>
           )}
 
           {booking.status === 'requested' && (
-            <button
-              onClick={() => setCancelOpen(true)}
-              className="w-full rounded-xl border border-red-200 px-5 py-3 text-sm font-medium text-red-700 hover:bg-red-50 transition-colors"
-            >
+            <DestructiveActionButton onClick={() => setCancelOpen(true)}>
               Cancel Request
-            </button>
+            </DestructiveActionButton>
           )}
 
           {booking.status === 'confirmed' && !showBalancePayment && (
-            <button
-              onClick={() => setCancelOpen(true)}
-              className="w-full rounded-xl border border-red-200 px-5 py-3 text-sm font-medium text-red-700 hover:bg-red-50 transition-colors"
-            >
+            <DestructiveActionButton onClick={() => setCancelOpen(true)}>
               Cancel Booking
-            </button>
+            </DestructiveActionButton>
           )}
 
           {booking.status === 'owner_rejected' && (

@@ -3,9 +3,62 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { createClient, bookingEndpoints } from '@venue404/api-client'
 import { AppNavbar } from '../components/shared/AppNavbar'
-import { Card, Button, ErrorState } from '@venue404/ui'
 import { formatTime, formatDate, formatPrice } from '../utils'
 
+// ─── Loading ──────────────────────────────────────────────────────────────────
+function VerifyingState() {
+  return (
+    <div className="mx-auto max-w-xl px-4 py-16 text-center">
+      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-brand-light">
+        <span className="h-7 w-7 animate-spin rounded-full border-[3px] border-brand/30 border-t-brand" />
+      </div>
+      <h2 className="text-xl font-semibold text-zinc-900">Securing your time slot…</h2>
+      <p className="mt-2 text-sm text-zinc-400 max-w-xs mx-auto">
+        We're verifying your payment and locking the venue block. This usually takes a moment.
+      </p>
+    </div>
+  )
+}
+
+// ─── Error ────────────────────────────────────────────────────────────────────
+function VerifyError({ onRetry, onGoToBookings }: { onRetry: () => void; onGoToBookings: () => void }) {
+  return (
+    <div className="mx-auto max-w-xl px-4 py-16">
+      <div className="rounded-2xl border border-dashed border-zinc-200 py-20 text-center">
+        <div className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100">
+          <svg className="h-6 w-6 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
+          </svg>
+        </div>
+        <p className="text-sm font-semibold text-zinc-900">Unable to verify payment</p>
+        <p className="mt-1 text-sm text-zinc-400">
+          We had trouble checking your booking status.
+        </p>
+        <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            onClick={onRetry}
+            className="press rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover focus-visible:ring-2 focus-visible:ring-brand-secondary focus-visible:ring-offset-2"
+          >
+            Retry verification
+          </button>
+          <button
+            onClick={onGoToBookings}
+            className="rounded-lg border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 transition-colors"
+          >
+            My bookings
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PaymentResult() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -16,11 +69,6 @@ export default function PaymentResult() {
     queryKey: ['booking', bookingId],
     queryFn: () => bookingEndpoints(client).getBooking(bookingId!),
     enabled: !!bookingId,
-    // Poll while the booking is in a transitional state that the Stripe webhook
-    // will flip asynchronously. Crucially this covers BOTH the advance path
-    // (owner_accepted -> confirmed) and the balance path (advance_paid ->
-    // fully_paid), so the result page reflects the webhook landing before we
-    // stop polling.
     refetchInterval: (query) => {
       const data = query.state.data
       if (!data) return 2000
@@ -37,26 +85,15 @@ export default function PaymentResult() {
     },
   })
 
-  // Redirect if no booking ID
   useEffect(() => {
-    if (!bookingId) {
-      navigate('/')
-    }
+    if (!bookingId) navigate('/')
   }, [bookingId, navigate])
 
   if (isLoading || !booking) {
     return (
       <div className="min-h-screen bg-zinc-50">
         <AppNavbar />
-        <div className="mx-auto max-w-xl px-4 py-16 text-center">
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-brand border-t-transparent" />
-            <h2 className="text-xl font-semibold text-zinc-900">Securing your time slot…</h2>
-            <p className="text-sm text-zinc-500 max-w-xs">
-              We're verifying your transaction with Stripe and securing your venue block. This should only take a moment.
-            </p>
-          </div>
-        </div>
+        <VerifyingState />
       </div>
     )
   }
@@ -65,127 +102,132 @@ export default function PaymentResult() {
     return (
       <div className="min-h-screen bg-zinc-50">
         <AppNavbar />
-        <div className="mx-auto max-w-xl px-4 py-16">
-          <ErrorState
-            title="Unable to verify payment"
-            message="We had trouble checking your booking status. Please verify your bookings history."
-            action={
-              <div className="flex gap-2">
-                <Button onClick={() => void refetch()} variant="primary">
-                  Retry Verification
-                </Button>
-                <Button onClick={() => navigate('/my-bookings')} variant="secondary">
-                  Go to My Bookings
-                </Button>
-              </div>
-            }
-          />
-        </div>
+        <VerifyError
+          onRetry={() => void refetch()}
+          onGoToBookings={() => navigate('/my-bookings')}
+        />
       </div>
     )
   }
 
   const isConfirmed = booking.status === 'confirmed' || booking.status === 'completed'
   const isFullyPaid = booking.payment_status === 'fully_paid'
-  const isCancelled = booking.status === 'conflict_cancelled' || booking.status === 'user_cancelled'
+  const isCancelled =
+    booking.status === 'conflict_cancelled' || booking.status === 'user_cancelled'
+  const isPending = !isConfirmed && !isFullyPaid && !isCancelled
 
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNavbar />
 
       <div className="mx-auto max-w-xl px-4 py-16">
-        <Card className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
-          {isCancelled ? (
-            <>
-              {/* Failure State */}
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100 mb-6">
-                <svg className="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-zinc-900">Slot unavailable</h2>
-              <p className="mt-2 text-sm text-zinc-500">
-                Another user confirmed this slot right before your payment completed. Any funds deducted have been automatically refunded to your original payment method.
-              </p>
-            </>
-          ) : isConfirmed || isFullyPaid ? (
-            <>
-              {/* Success State */}
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-6">
-                <svg className="h-8 w-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-zinc-900">
-                {isFullyPaid ? 'Booking Fully Paid!' : 'Booking Confirmed!'}
-              </h2>
-              <p className="mt-2 text-sm text-zinc-500">
-                Your payment was processed successfully. {isFullyPaid ? 'You are all set!' : 'Your venue reservation is now locked in.'}
+        <div className="overflow-hidden rounded-3xl border border-zinc-100 bg-white shadow-sm">
+
+          {/* ── Status icon block ────────────────────────────────────────── */}
+          <div
+            className={[
+              'flex flex-col items-center px-8 pt-10 pb-8 text-center',
+              isCancelled ? 'bg-red-50' : isPending ? 'bg-amber-50' : 'bg-brand-light',
+            ].join(' ')}
+          >
+            {isCancelled ? (
+              <>
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                  <svg className="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-zinc-900">Slot unavailable</h2>
+                <p className="mt-2 text-sm text-zinc-500 max-w-xs">
+                  Another booking confirmed this slot right before your payment went through. Any amount deducted has been refunded to your original payment method.
+                </p>
+              </>
+            ) : isPending ? (
+              <>
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+                  <svg
+                    className="h-8 w-8 text-amber-500 animate-pulse"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-zinc-900">Confirming payment…</h2>
+                <p className="mt-2 text-sm text-zinc-500 max-w-xs">
+                  Stripe is still processing your transaction. This page will update automatically.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-brand/10">
+                  <svg className="h-8 w-8 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-zinc-900">
+                  {isFullyPaid ? `Fully paid — you're all set!` : `Booking confirmed!`}
+                </h2>
+                <p className="mt-2 text-sm text-zinc-500 max-w-xs">
+                  {isFullyPaid
+                    ? 'Your venue is locked in and fully settled.'
+                    : 'Your payment was processed. Your venue reservation is now locked in.'}
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* ── Booking details (success only) ───────────────────────────── */}
+          {(isConfirmed || isFullyPaid) && (
+            <div className="px-8 py-6 space-y-4 border-b border-zinc-100">
+              <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+                Booking details
               </p>
 
-              {/* Booking Details Summary */}
-              <div className="mt-8 border-t border-b border-zinc-100 py-6 text-left space-y-4">
-                <div className="flex justify-between text-sm">
-                  <span className="text-zinc-500 font-medium">Venue</span>
-                  <span className="text-zinc-900 font-semibold">{booking.venue_name}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-zinc-500 font-medium">Location</span>
-                  <span className="text-zinc-900 font-semibold">{booking.venue_city}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-zinc-500 font-medium">Date</span>
-                  <span className="text-zinc-900 font-semibold">
-                    {formatDate(booking.starts_at)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-zinc-500 font-medium">Time</span>
-                  <span className="text-zinc-900 font-semibold">
-                    {formatTime(booking.starts_at)} – {formatTime(booking.ends_at)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm pt-2 border-t border-zinc-50">
-                  <span className="text-zinc-500 font-medium">Amount Paid</span>
-                  <span className="text-brand font-bold">
+              <div className="space-y-3">
+                {[
+                  { label: 'Venue', value: booking.venue_name },
+                  { label: 'Location', value: booking.venue_city },
+                  { label: 'Date', value: formatDate(booking.starts_at) },
+                  {
+                    label: 'Time',
+                    value: `${formatTime(booking.starts_at)} – ${formatTime(booking.ends_at)}`,
+                  },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-sm text-zinc-400">{label}</span>
+                    <span className="text-sm font-medium text-zinc-900">{value}</span>
+                  </div>
+                ))}
+
+                {/* Amount paid — emphasised */}
+                <div className="flex items-center justify-between border-t border-zinc-100 pt-3">
+                  <span className="text-sm text-zinc-500">Amount paid</span>
+                  <span className="text-base font-semibold text-brand">
                     {formatPrice(booking.amount_paid_paise)}
                   </span>
                 </div>
               </div>
-            </>
-          ) : (
-            <>
-              {/* Webhook Polling Fallback */}
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 mb-6">
-                <svg className="h-8 w-8 text-amber-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-zinc-900">Payment pending confirmation</h2>
-              <p className="mt-2 text-sm text-zinc-500">
-                Stripe is still processing your transaction. This page will update automatically.
-              </p>
-            </>
+            </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            <Button
+          {/* ── Actions ─────────────────────────────────────────────────── */}
+          <div className="flex flex-col gap-3 px-8 py-6 sm:flex-row">
+            <button
               onClick={() => navigate(`/bookings/${booking.id}`)}
-              variant="primary"
-              className="w-full sm:w-auto"
+              className="press flex flex-1 items-center justify-center rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover focus-visible:ring-2 focus-visible:ring-brand-secondary focus-visible:ring-offset-2"
             >
-              View Booking Timeline
-            </Button>
-            <Button
+              View booking
+            </button>
+            <button
               onClick={() => navigate('/')}
-              variant="secondary"
-              className="w-full sm:w-auto"
+              className="flex flex-1 items-center justify-center rounded-lg border border-zinc-200 bg-white px-5 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100 transition-colors"
             >
-              Back to Home
-            </Button>
+              Back to home
+            </button>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   )

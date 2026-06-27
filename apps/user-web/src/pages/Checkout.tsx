@@ -31,27 +31,58 @@ function Spinner() {
 
 function FieldLabel({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="block text-sm font-medium text-zinc-700 mb-1.5">
+    <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-zinc-700">
       {children}
     </label>
   )
 }
 
 const inputCls =
-  'w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow'
+  'w-full rounded-lg border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 transition-shadow focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-secondary'
+
+// ─── Section card wrapper ──────────────────────────────────────────────────────
+function SectionCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="space-y-5 rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm">
+      {children}
+    </div>
+  )
+}
+
+// ─── Primary CTA button (shared mobile + sticky sidebar) ──────────────────────
+function BookButton({ pending, onClick }: { pending: boolean; onClick: () => void }) {
+  return (
+    <>
+      <button
+        onClick={onClick}
+        disabled={pending}
+        className="press flex w-full items-center justify-center gap-2 rounded-lg bg-brand py-3.5 text-sm font-semibold text-white shadow-sm outline-none transition-colors hover:bg-brand-hover focus-visible:ring-2 focus-visible:ring-brand-secondary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {pending ? (
+          <>
+            <Spinner /> Sending request…
+          </>
+        ) : (
+          'Request to Book'
+        )}
+      </button>
+      <p className="mt-2 text-center text-xs text-zinc-400">No charge until owner accepts</p>
+    </>
+  )
+}
 
 // ─── Booking summary sidebar card ─────────────────────────────────────────────
 function BookingSummaryCard({ state, guestCount }: { state: CheckoutState; guestCount: number }) {
   const { venueName, venueCoverImage, bookingType, startsAt, endsAt, bookingDate, quote } = state
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+    <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
       {/* Venue image */}
       <div className="relative h-48 bg-zinc-100">
         {venueCoverImage ? (
-          <img src={venueCoverImage} alt={venueName} className="w-full h-full object-cover" />
+          <img src={venueCoverImage} alt={venueName} className="h-full w-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="flex h-full w-full items-center justify-center">
             <svg
               className="h-8 w-8 text-zinc-300"
               fill="none"
@@ -71,7 +102,7 @@ function BookingSummaryCard({ state, guestCount }: { state: CheckoutState; guest
 
       <div className="p-5">
         {/* Venue name */}
-        <h3 className="text-base font-semibold text-zinc-900 leading-snug">{venueName}</h3>
+        <h3 className="text-base font-semibold leading-snug text-zinc-900">{venueName}</h3>
 
         {/* Date / time row */}
         <div className="mt-3 space-y-1.5">
@@ -134,23 +165,103 @@ function BookingSummaryCard({ state, guestCount }: { state: CheckoutState; guest
         {quote ? (
           <QuoteBreakdown source="quote" quote={quote} />
         ) : (
-          <p className="text-sm text-zinc-500 py-4">
+          <p className="py-4 text-sm text-zinc-500">
             Price details will be available after owner confirmation.
           </p>
         )}
 
         {/* Advance callout */}
         {quote && (
-          <div className="mt-4 rounded-xl bg-brand-light border border-brand-light-strong px-4 py-3">
+          <div className="mt-4 rounded-xl border border-brand-light-strong bg-brand-light px-4 py-3">
             <p className="text-sm font-semibold text-brand">
               {formatPrice(quote.advance_due_paise)} due now
             </p>
-            <p className="text-xs text-brand-secondary mt-0.5">
+            <p className="mt-0.5 text-xs text-brand-secondary">
               After owner accepts · remaining {formatPrice(quote.balance_due_paise)} paid later
             </p>
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─── "What happens next" steps ─────────────────────────────────────────────────
+
+function NextSteps({ quote }: { quote: PricingQuote | undefined }) {
+  const steps = [
+    {
+      n: '1',
+      title: 'Request sent',
+      desc: 'The venue owner will be notified of your booking request.',
+    },
+    {
+      n: '2',
+      title: 'Owner confirms',
+      desc: `The owner has ${quote ? '48' : '—'} hours to accept or decline.`,
+    },
+    {
+      n: '3',
+      title: 'Pay the advance',
+      desc: `Once accepted, you'll pay ${formatPrice(quote?.advance_due_paise || 0)} to confirm your slot.`,
+    },
+    {
+      n: '4',
+      title: 'Balance due later',
+      desc: `The remaining ${formatPrice(quote?.balance_due_paise || 0)} is due before your event date.`,
+    },
+  ]
+
+  return (
+    <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm">
+      <h2 className="mb-4 text-sm font-semibold text-zinc-900">What happens next</h2>
+      <ol className="space-y-4">
+        {steps.map((item) => (
+          <li key={item.n} className="flex gap-3.5">
+            <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+              {item.n}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-900">{item.title}</p>
+              <p className="mt-0.5 text-xs text-zinc-500">{item.desc}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
+// ─── Empty / guard state ──────────────────────────────────────────────────────
+
+function NoBookingState({ onBrowse }: { onBrowse: () => void }) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-white px-4 text-center">
+      <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100">
+        <svg
+          className="h-6 w-6 text-zinc-300"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      </div>
+      <h2 className="mb-2 text-lg font-semibold text-zinc-900">No booking details found</h2>
+      <p className="mb-6 max-w-sm text-sm text-zinc-500">
+        Please start your booking from a venue page.
+      </p>
+      <button
+        onClick={onBrowse}
+        className="press rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover"
+      >
+        Browse venues
+      </button>
     </div>
   )
 }
@@ -185,42 +296,14 @@ export default function Checkout() {
 
   // ── Guard: no state ────────────────────────────────────────────────────
   if (!state) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 text-center">
-        <div className="h-14 w-14 rounded-full bg-zinc-100 flex items-center justify-center mb-5">
-          <svg
-            className="h-6 w-6 text-zinc-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </div>
-        <h2 className="text-lg font-semibold text-zinc-900 mb-2">No booking details found</h2>
-        <p className="text-sm text-zinc-500 mb-6 max-w-sm">
-          Please start your booking from a venue page.
-        </p>
-        <button
-          onClick={() => navigate('/')}
-          className="rounded-xl bg-zinc-900 px-6 py-3 text-sm font-semibold text-white hover:bg-zinc-800 transition-colors"
-        >
-          Browse venues
-        </button>
-      </div>
-    )
+    return <NoBookingState onBrowse={() => navigate('/')} />
   }
 
   return (
     <div className="min-h-screen bg-zinc-50/60">
       {/* ── Minimal checkout navbar ──────────────────────────────── */}
       <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6 py-3.5">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6">
           <Link to="/">
             <Logo />
           </Link>
@@ -243,7 +326,7 @@ export default function Checkout() {
           </div>
           <button
             onClick={() => navigate(-1)}
-            className="text-sm text-zinc-500 hover:text-zinc-800 transition-colors"
+            className="text-sm text-zinc-500 transition-colors hover:text-zinc-800"
           >
             ← Back
           </button>
@@ -251,19 +334,19 @@ export default function Checkout() {
       </header>
 
       {/* ── Two-column body ──────────────────────────────────────── */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
-        <div className="flex flex-col lg:flex-row gap-10 xl:gap-14 items-start">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        <div className="flex flex-col items-start gap-10 lg:flex-row xl:gap-14">
           {/* ── Left: form ──────────────────────────────────────── */}
-          <div className="flex-1 min-w-0 space-y-6">
+          <div className="min-w-0 flex-1 space-y-6">
             <div>
-              <h1 className="text-2xl font-semibold text-zinc-900">Request to book</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Request to book</h1>
               <p className="mt-1.5 text-sm text-zinc-500">
                 No payment taken now — the owner will confirm your request first.
               </p>
             </div>
 
             {/* ── Guest count ─────────────────────────────────── */}
-            <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-5 shadow-sm">
+            <SectionCard>
               <h2 className="text-base font-semibold text-zinc-900">Your booking</h2>
 
               <div>
@@ -272,7 +355,7 @@ export default function Checkout() {
                   <button
                     type="button"
                     onClick={() => setGuestCount((n) => Math.max(1, n - 1))}
-                    className="h-9 w-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 transition-colors"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition-colors hover:border-zinc-400 hover:text-zinc-900"
                     aria-label="Decrease guests"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,12 +373,12 @@ export default function Checkout() {
                     min={1}
                     value={guestCount}
                     onChange={(e) => setGuestCount(Math.max(1, Number(e.target.value) || 1))}
-                    className="w-16 text-center rounded-xl border border-zinc-200 px-2 py-2 text-base font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-16 rounded-lg border border-zinc-200 px-2 py-2 text-center text-base font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-brand-secondary"
                   />
                   <button
                     type="button"
                     onClick={() => setGuestCount((n) => n + 1)}
-                    className="h-9 w-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 transition-colors"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition-colors hover:border-zinc-400 hover:text-zinc-900"
                     aria-label="Increase guests"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -309,13 +392,13 @@ export default function Checkout() {
                   </button>
                 </div>
               </div>
-            </div>
+            </SectionCard>
 
             {/* ── Event details ────────────────────────────────── */}
-            <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-5 shadow-sm">
+            <SectionCard>
               <div>
                 <h2 className="text-base font-semibold text-zinc-900">Event details</h2>
-                <p className="text-xs text-zinc-400 mt-0.5">
+                <p className="mt-0.5 text-xs text-zinc-400">
                   Optional — helps the owner prepare for your event
                 </p>
               </div>
@@ -343,52 +426,19 @@ export default function Checkout() {
                   className={inputCls}
                 />
               </div>
-            </div>
+            </SectionCard>
 
             {/* ── What happens next ────────────────────────────── */}
-            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-zinc-900 mb-4">What happens next</h2>
-              <ol className="space-y-4">
-                {[
-                  {
-                    n: '1',
-                    title: 'Request sent',
-                    desc: 'The venue owner will be notified of your booking request.',
-                  },
-                  {
-                    n: '2',
-                    title: 'Owner confirms',
-                    desc: `The owner has ${state.quote ? '48' : '—'} hours to accept or decline.`,
-                  },
-                  {
-                    n: '3',
-                    title: 'Pay the advance',
-                    desc: `Once accepted, you'll pay ${formatPrice(state.quote?.advance_due_paise || 0)} to confirm your slot.`,
-                  },
-                  {
-                    n: '4',
-                    title: 'Balance due later',
-                    desc: `The remaining ${formatPrice(state.quote?.balance_due_paise || 0)} is due before your event date.`,
-                  },
-                ].map((item) => (
-                  <li key={item.n} className="flex gap-3.5">
-                    <div className="h-6 w-6 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                      {item.n}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-zinc-900">{item.title}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{item.desc}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
+            <NextSteps quote={state.quote} />
 
             {/* Error Banner */}
             {createBooking.isError && (
-              <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600 flex items-start gap-2">
+              <div
+                role="alert"
+                className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
+              >
                 <svg
-                  className="h-4 w-4 mt-0.5 shrink-0"
+                  className="mt-0.5 h-4 w-4 shrink-0"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -411,47 +461,23 @@ export default function Checkout() {
 
             {/* CTA — visible on mobile here, hidden on lg (sidebar has it) */}
             <div className="lg:hidden">
-              <button
+              <BookButton
+                pending={createBooking.isPending}
                 onClick={() => createBooking.mutate()}
-                disabled={createBooking.isPending}
-                className="w-full rounded-xl bg-brand py-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-              >
-                {createBooking.isPending ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Spinner /> Sending request…
-                  </span>
-                ) : (
-                  'Request to Book'
-                )}
-              </button>
-              <p className="text-xs text-zinc-400 text-center mt-2">
-                No charge until owner accepts
-              </p>
+              />
             </div>
           </div>
 
           {/* ── Right: sticky summary ─────────────────────────── */}
-          <div className="w-full lg:w-[380px] xl:w-[400px] shrink-0 lg:sticky lg:top-[80px]">
+          <div className="w-full shrink-0 lg:sticky lg:top-[80px] lg:w-[380px] xl:w-[400px]">
             <BookingSummaryCard state={state} guestCount={guestCount} />
 
             {/* CTA — lg only */}
-            <div className="hidden lg:block mt-4">
-              <button
+            <div className="mt-4 hidden lg:block">
+              <BookButton
+                pending={createBooking.isPending}
                 onClick={() => createBooking.mutate()}
-                disabled={createBooking.isPending}
-                className="w-full rounded-xl bg-brand py-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-              >
-                {createBooking.isPending ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Spinner /> Sending request…
-                  </span>
-                ) : (
-                  'Request to Book'
-                )}
-              </button>
-              <p className="text-xs text-zinc-400 text-center mt-2">
-                No charge until owner accepts
-              </p>
+              />
             </div>
           </div>
         </div>
