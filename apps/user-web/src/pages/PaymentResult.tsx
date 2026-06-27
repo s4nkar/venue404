@@ -2,9 +2,9 @@ import { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { createClient, bookingEndpoints } from '@venue404/api-client'
-import { Navbar } from '../components/Navbar'
-import { Card, Button, LoadingScreen, ErrorState } from '@venue404/ui'
-import { formatTime, formatDate } from '../utils'
+import { AppNavbar } from '../components/shared/AppNavbar'
+import { Card, Button, ErrorState } from '@venue404/ui'
+import { formatTime, formatDate, formatPrice } from '../utils'
 
 export default function PaymentResult() {
   const [searchParams] = useSearchParams()
@@ -16,7 +16,11 @@ export default function PaymentResult() {
     queryKey: ['booking', bookingId],
     queryFn: () => bookingEndpoints(client).getBooking(bookingId!),
     enabled: !!bookingId,
-    // Poll every 2 seconds if status is still owner_accepted or payment status is unpaid
+    // Poll while the booking is in a transitional state that the Stripe webhook
+    // will flip asynchronously. Crucially this covers BOTH the advance path
+    // (owner_accepted -> confirmed) and the balance path (advance_paid ->
+    // fully_paid), so the result page reflects the webhook landing before we
+    // stop polling.
     refetchInterval: (query) => {
       const data = query.state.data
       if (!data) return 2000
@@ -24,7 +28,8 @@ export default function PaymentResult() {
         data.status === 'owner_accepted' ||
         data.status === 'requested' ||
         data.payment_status === 'unpaid' ||
-        (data.status === 'confirmed' && data.payment_status === 'pending')
+        data.payment_status === 'pending' ||
+        (data.status === 'confirmed' && data.payment_status === 'advance_paid')
       ) {
         return 2000
       }
@@ -42,7 +47,7 @@ export default function PaymentResult() {
   if (isLoading || !booking) {
     return (
       <div className="min-h-screen bg-zinc-50">
-        <Navbar />
+        <AppNavbar />
         <div className="mx-auto max-w-xl px-4 py-16 text-center">
           <div className="flex flex-col items-center justify-center space-y-4">
             <div className="h-12 w-12 animate-spin rounded-full border-4 border-brand border-t-transparent" />
@@ -59,7 +64,7 @@ export default function PaymentResult() {
   if (isError) {
     return (
       <div className="min-h-screen bg-zinc-50">
-        <Navbar />
+        <AppNavbar />
         <div className="mx-auto max-w-xl px-4 py-16">
           <ErrorState
             title="Unable to verify payment"
@@ -86,7 +91,7 @@ export default function PaymentResult() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <Navbar />
+      <AppNavbar />
 
       <div className="mx-auto max-w-xl px-4 py-16">
         <Card className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
@@ -143,7 +148,7 @@ export default function PaymentResult() {
                 <div className="flex justify-between text-sm pt-2 border-t border-zinc-50">
                   <span className="text-zinc-500 font-medium">Amount Paid</span>
                   <span className="text-brand font-bold">
-                    {booking.display.quoted_price}
+                    {formatPrice(booking.amount_paid_paise)}
                   </span>
                 </div>
               </div>

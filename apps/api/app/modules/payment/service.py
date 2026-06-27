@@ -245,10 +245,6 @@ def confirm_balance_payment(db: Session, payment: Payment, booking: Booking) -> 
         user_id=booking.user_id, entry_type="charge", amount_paise=payment.amount_paise,
         direction="credit", stripe_pi_ref=payment.stripe_payment_intent_id,
     ))
-    db.add(BookingStatusHistory(
-        booking_id=booking.id, old_status=BookingStatus.confirmed,
-        new_status=BookingStatus.confirmed, reason="balance_payment_succeeded",
-    ))
 
     venue_name = venue.name if venue else "your venue"
     notifications.notify(db, booking.user_id, "balance_paid",

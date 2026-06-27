@@ -178,9 +178,11 @@ export default function MyBookingCard({
           <div className="mt-auto flex items-center justify-end pt-8">
             <Button
               onClick={() =>
-                navigate(
-                  `/bookings/${booking.id}`,
-                )
+                requiresAdvance
+                  ? navigate(`/payment/${booking.id}?type=advance`)
+                  : requiresBalance
+                    ? navigate(`/payment/${booking.id}?type=balance`)
+                    : navigate(`/bookings/${booking.id}`)
               }
             >
               {actionLabel}

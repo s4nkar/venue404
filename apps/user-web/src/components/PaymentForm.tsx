@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -11,11 +11,19 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!)
 
 type Props = {
   booking: BookingOut
+  paymentType?: 'advance' | 'balance'
+  isFullPayment?: boolean
   onSuccess: () => void
   onCancel: () => void
 }
 
-function InnerCheckoutForm({ booking, onSuccess, onCancel }: Props) {
+function InnerCheckoutForm({
+  booking,
+  paymentType = 'advance',
+  isFullPayment = false,
+  onSuccess,
+  onCancel,
+}: Props) {
   const stripe = useStripe()
   const elements = useElements()
   const queryClient = useQueryClient()
@@ -25,25 +33,23 @@ function InnerCheckoutForm({ booking, onSuccess, onCancel }: Props) {
   const [succeeded, setSucceeded] = useState(false)
 
   const paymentMutation = useMutation({
-    mutationFn: () => paymentEndpoints(createClient()).createPaymentIntent(booking.id),
+    mutationFn: () =>
+      paymentEndpoints(createClient()).createPaymentIntent(booking.id, {
+        payment_type: paymentType,
+      }),
+
     onSuccess: async (data: PaymentIntentResponse) => {
       if (!stripe || !elements || !data.client_secret) {
         setError('Payment system not ready')
         return
       }
 
-      if (succeeded) return // Prevent double confirmation
-
       setProcessing(true)
       setError(null)
 
       const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(
         data.client_secret,
-        {
-          payment_method: {
-            card: elements.getElement(CardElement)!,
-          },
-        }
+        { payment_method: { card: elements.getElement(CardElement)! } }
       )
 
       setProcessing(false)
@@ -58,6 +64,12 @@ function InnerCheckoutForm({ booking, onSuccess, onCancel }: Props) {
     },
   })
 
+  const buttonText = isFullPayment
+    ? `Pay Full Amount • ${booking.display?.quoted_price || ''}`
+    : paymentType === 'balance'
+      ? `Pay Remaining Balance • ${booking.display?.balance_due || ''}`
+      : `Pay Advance • ${booking.display?.advance_due || ''}`
+
   return (
     <div className="space-y-6 pt-2">
       <div className="border border-zinc-200 rounded-xl p-4 bg-white">
@@ -65,7 +77,6 @@ function InnerCheckoutForm({ booking, onSuccess, onCancel }: Props) {
       </div>
 
       {error && <Alert variant="destructive">{error}</Alert>}
-
       {succeeded && <Alert variant="success">Payment Successful!</Alert>}
 
       <div className="flex gap-3">
@@ -74,11 +85,7 @@ function InnerCheckoutForm({ booking, onSuccess, onCancel }: Props) {
           disabled={!stripe || processing || succeeded}
           className="flex-1"
         >
-          {processing
-            ? 'Processing...'
-            : succeeded
-              ? 'Payment Done'
-              : `Pay Advance • ${booking.display?.advance_due || ''}`}
+          {processing ? 'Processing...' : succeeded ? 'Payment Done' : buttonText}
         </Button>
         <Button
           variant="secondary"
