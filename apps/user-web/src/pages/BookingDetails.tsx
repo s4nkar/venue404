@@ -130,7 +130,7 @@ export default function BookingDetail() {
           <div className="min-w-0 flex-1 space-y-8">
             <BookingStatusHero booking={booking} />
             <VenueSummaryCard venue={venue} />
-            <BookingInformationCard booking={booking} />
+            <BookingInformationCard booking={booking} venue={venue} />{' '}
             <BookingTimelineCard booking={booking} />
             <CancellationPolicyCard policy={venue.cancellation_policy} />
           </div>

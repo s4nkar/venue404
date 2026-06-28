@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { createClient, bookingEndpoints } from '@venue404/api-client'
@@ -12,11 +12,13 @@ type CheckoutState = {
   venueId: string
   venueName: string
   venueCoverImage: string | null
+  userStartsAt: string
+  userEndsAt: string
   bookingType: BookingType
   startsAt: string
   endsAt: string
   bookingDate: string
-  quote: PricingQuote | undefined // Made optional for safety
+  quote: PricingQuote | undefined
 }
 
 // ─── Small helpers ────────────────────────────────────────────────────────────
@@ -49,7 +51,7 @@ function SectionCard({ children }: { children: React.ReactNode }) {
   )
 }
 
-// ─── Primary CTA button (shared mobile + sticky sidebar) ──────────────────────
+// ─── Primary CTA button ───────────────────────────────────────────────────────
 function BookButton({ pending, onClick }: { pending: boolean; onClick: () => void }) {
   return (
     <>
@@ -71,13 +73,26 @@ function BookButton({ pending, onClick }: { pending: boolean; onClick: () => voi
   )
 }
 
-// ─── Booking summary sidebar card ─────────────────────────────────────────────
+// ─── Booking summary sidebar card (Multi-day + TimeSlot Fixed) ────────────────
 function BookingSummaryCard({ state, guestCount }: { state: CheckoutState; guestCount: number }) {
-  const { venueName, venueCoverImage, bookingType, startsAt, endsAt, bookingDate, quote } = state
+  const { venueName, venueCoverImage, bookingType, userStartsAt, userEndsAt, quote } = state
+
+  const rangeLabel =
+    userStartsAt && userEndsAt
+      ? `${formatDate(userStartsAt)} — ${formatDate(userEndsAt)}`
+      : formatDate(state.bookingDate)
+
+  const timeLabel =
+    bookingType === 'time_slot' && userStartsAt && userEndsAt
+      ? `${formatTime(userStartsAt)} – ${formatTime(userEndsAt)}`
+      : bookingType === 'full_day'
+        ? 'Full day'
+        : ''
+
 
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
-      {/* Venue image */}
+      {/* Venue image (unchanged) */}
       <div className="relative h-48 bg-zinc-100">
         {venueCoverImage ? (
           <img src={venueCoverImage} alt={venueName} className="h-full w-full object-cover" />
@@ -101,10 +116,8 @@ function BookingSummaryCard({ state, guestCount }: { state: CheckoutState; guest
       </div>
 
       <div className="p-5">
-        {/* Venue name */}
         <h3 className="text-base font-semibold leading-snug text-zinc-900">{venueName}</h3>
 
-        {/* Date / time row */}
         <div className="mt-3 space-y-1.5">
           <div className="flex items-center gap-2 text-sm text-zinc-500">
             <svg
@@ -120,26 +133,28 @@ function BookingSummaryCard({ state, guestCount }: { state: CheckoutState; guest
                 d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             </svg>
-            {formatDate(bookingDate)}
+            {rangeLabel}
           </div>
-          <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <svg
-              className="h-4 w-4 shrink-0 text-zinc-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            {bookingType === 'time_slot'
-              ? `${formatTime(startsAt)} – ${formatTime(endsAt)}`
-              : 'Full day'}
-          </div>
+
+          {timeLabel && (
+            <div className="flex items-center gap-2 text-sm text-zinc-500">
+              <svg
+                className="h-4 w-4 shrink-0 text-zinc-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              {timeLabel}
+            </div>
+          )}
+
           <div className="flex items-center gap-2 text-sm text-zinc-500">
             <svg
               className="h-4 w-4 shrink-0 text-zinc-400"
@@ -158,10 +173,8 @@ function BookingSummaryCard({ state, guestCount }: { state: CheckoutState; guest
           </div>
         </div>
 
-        {/* Divider */}
         <div className="my-5 border-t border-zinc-100" />
 
-        {/* Price breakdown */}
         {quote ? (
           <QuoteBreakdown source="quote" quote={quote} />
         ) : (
@@ -170,7 +183,6 @@ function BookingSummaryCard({ state, guestCount }: { state: CheckoutState; guest
           </p>
         )}
 
-        {/* Advance callout */}
         {quote && (
           <div className="mt-4 rounded-xl border border-brand-light-strong bg-brand-light px-4 py-3">
             <p className="text-sm font-semibold text-brand">
@@ -187,7 +199,6 @@ function BookingSummaryCard({ state, guestCount }: { state: CheckoutState; guest
 }
 
 // ─── "What happens next" steps ─────────────────────────────────────────────────
-
 function NextSteps({ quote }: { quote: PricingQuote | undefined }) {
   const steps = [
     {
@@ -233,7 +244,6 @@ function NextSteps({ quote }: { quote: PricingQuote | undefined }) {
 }
 
 // ─── Empty / guard state ──────────────────────────────────────────────────────
-
 function NoBookingState({ onBrowse }: { onBrowse: () => void }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-white px-4 text-center">
@@ -284,8 +294,8 @@ export default function Checkout() {
         venue_name: state!.venueName,
         venue_cover_image: state!.venueCoverImage,
         booking_type: state!.bookingType,
-        starts_at: state!.startsAt,
-        ends_at: state!.endsAt,
+        starts_at: state!.userStartsAt,
+        ends_at: state!.userEndsAt,
         booking_date: state!.bookingDate,
         guest_count: guestCount,
         event_type: eventType.trim() || null,
@@ -301,13 +311,12 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-zinc-50/60">
-      {/* ── Minimal checkout navbar ──────────────────────────────── */}
+      {/* Header unchanged */}
       <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6">
           <Link to="/">
             <Logo />
           </Link>
-          {/* Step label */}
           <div className="flex items-center gap-2 text-sm text-zinc-500">
             <svg
               className="h-4 w-4 text-zinc-400"
@@ -333,18 +342,18 @@ export default function Checkout() {
         </div>
       </header>
 
-      {/* ── Two-column body ──────────────────────────────────────── */}
+      {/* Two-column body */}
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <div className="flex flex-col items-start gap-10 lg:flex-row xl:gap-14">
-          {/* ── Left: form ──────────────────────────────────────── */}
+          {/* Left form (unchanged) */}
           <div className="min-w-0 flex-1 space-y-6">
+            {/* ... your existing form content ... */}
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Request to book</h1>
               <p className="mt-1.5 text-sm text-zinc-500">
                 No payment taken now — the owner will confirm your request first.
               </p>
             </div>
-
             {/* ── Guest count ─────────────────────────────────── */}
             <SectionCard>
               <h2 className="text-base font-semibold text-zinc-900">Your booking</h2>
@@ -459,7 +468,7 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* CTA — visible on mobile here, hidden on lg (sidebar has it) */}
+            {/* CTA mobile */}
             <div className="lg:hidden">
               <BookButton
                 pending={createBooking.isPending}
@@ -468,11 +477,11 @@ export default function Checkout() {
             </div>
           </div>
 
-          {/* ── Right: sticky summary ─────────────────────────── */}
+          {/* Right: sticky summary */}
           <div className="w-full shrink-0 lg:sticky lg:top-[80px] lg:w-[380px] xl:w-[400px]">
             <BookingSummaryCard state={state} guestCount={guestCount} />
 
-            {/* CTA — lg only */}
+            {/* CTA desktop */}
             <div className="mt-4 hidden lg:block">
               <BookButton
                 pending={createBooking.isPending}
