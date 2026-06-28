@@ -146,6 +146,7 @@ function useVenueBooking(venue: VenueResponse) {
         booking_date: bookingType === 'full_day' ? toUtcIso(startDate) : undefined,
       }),
     onSuccess: (validation) => {
+      console.log(validation)
       if (!validation.valid) {
         setSlotError('This slot is no longer available.')
         return
