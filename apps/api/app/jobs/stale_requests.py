@@ -9,9 +9,10 @@ from app.modules.notification import service as notifications
 logger = logging.getLogger(__name__)
 
 STALE_AFTER = timedelta(days=7)
+BATCH = 100
 
 
-def run():
+def run() -> int:
     """Auto-expire booking requests that have been pending (requested) for 7 days."""
     now = datetime.now(timezone.utc)
     cutoff = now - STALE_AFTER
@@ -22,7 +23,10 @@ def run():
             .filter(
                 Booking.status == BookingStatus.requested,
                 Booking.requested_at < cutoff,
+                Booking.deleted_at.is_(None),
             )
+            .with_for_update(skip_locked=True)
+            .limit(BATCH)
             .all()
         )
         for b in rows:
@@ -38,3 +42,4 @@ def run():
                                  context={"venue_name": venue_name}, booking_id=b.id)
             expired += 1
         logger.info("stale_requests: expired %d request(s)", expired)
+        return expired

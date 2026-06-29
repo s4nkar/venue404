@@ -10,8 +10,10 @@ from app.modules.notification import service as notifications
 
 logger = logging.getLogger(__name__)
 
+BATCH = 100
 
-def run():
+
+def run() -> int:
     """Mark confirmed bookings completed once the event date has passed and no
     payment is pending. (Dispute/cancellation workflow checks go here too.)
     """
@@ -24,9 +26,12 @@ def run():
             .filter(
                 Booking.status == BookingStatus.confirmed,
                 Booking.payment_status == PaymentStatus.fully_paid,
+                Booking.deleted_at.is_(None),
                 BookingSlot.deleted_at.is_(None),
                 BookingSlot.effective_ends_at < now,
             )
+            .with_for_update(skip_locked=True)
+            .limit(BATCH)
             .all()
         )
         for b in rows:
@@ -44,3 +49,4 @@ def run():
                                  context={"venue_name": venue_name}, booking_id=b.id)
             completed += 1
         logger.info("booking_completion: completed %d booking(s)", completed)
+        return completed

@@ -11,9 +11,10 @@ from app.modules.notification import service as notifications
 logger = logging.getLogger(__name__)
 
 DEFAULT_ACTION_WINDOW_HOURS = 48
+BATCH = 100
 
 
-def run_flag():
+def run_flag() -> int:
     """Flag confirmed-but-balance-unpaid bookings whose balance due date has
     passed, opening the owner-action window (extend / forfeit / goodwill).
     """
@@ -29,7 +30,10 @@ def run_flag():
                 Booking.balance_due_date.isnot(None),
                 Booking.balance_due_date < today,
                 Booking.balance_overdue_at.is_(None),
+                Booking.deleted_at.is_(None),
             )
+            .with_for_update(skip_locked=True)
+            .limit(BATCH)
             .all()
         )
         for b in rows:
@@ -45,11 +49,16 @@ def run_flag():
                                      context={"venue_name": venue_name}, booking_id=b.id)
             flagged += 1
         logger.info("balance_overdue_flag: flagged %d booking(s)", flagged)
+        return flagged
 
 
-def run_autocancel():
+def run_autocancel() -> int:
     """Auto-cancel bookings whose owner-action window expired without the owner
     extending the deadline or otherwise acting on the overdue balance.
+
+    The advance is NOT refunded here: the customer missed the balance deadline,
+    so the advance is forfeited (this is a system cancel for non-payment, not an
+    owner cancellation). Owner-initiated cancels still refund per their own paths.
     """
     now = datetime.now(timezone.utc)
     cancelled = 0
@@ -62,7 +71,10 @@ def run_autocancel():
                 Booking.balance_overdue_at.isnot(None),
                 Booking.owner_action_deadline.isnot(None),
                 Booking.owner_action_deadline < now,
+                Booking.deleted_at.is_(None),
             )
+            .with_for_update(skip_locked=True)
+            .limit(BATCH)
             .all()
         )
         for b in rows:
@@ -82,3 +94,4 @@ def run_autocancel():
                                  context={"venue_name": venue_name}, booking_id=b.id)
             cancelled += 1
         logger.info("balance_overdue_autocancel: cancelled %d booking(s)", cancelled)
+        return cancelled

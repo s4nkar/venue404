@@ -69,11 +69,23 @@ _TEMPLATES: dict[str, tuple[str, str]] = {
     ),
 }
 
+# Spelling/legacy aliases -> canonical template key. Both British and American
+# spellings are valid, so either resolves to the same copy. Older raw strings
+# used by callers are mapped here too, so nothing falls back to the generic copy.
+_ALIASES: dict[str, str] = {
+    "booking_cancelled": "booking_canceled",
+    "conflict_cancelled": "conflict_canceled",
+    "booking_confirmed": "payment_confirmed",
+    "booking_requested": "new_request_owner",
+    "booking_accepted": "request_accepted",
+}
+
 
 def render_notification(
     type: str, context: dict | None = None, booking_id=None
 ) -> tuple[str, str, str]:
     context = {"venue_name": "your venue", **(context or {})}
+    type = _ALIASES.get(type, type)
     title, body_tmpl = _TEMPLATES.get(type, ("Notification", "You have a new notification."))
     try:
         body = body_tmpl.format(**context)
