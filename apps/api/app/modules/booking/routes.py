@@ -34,6 +34,17 @@ def list_my_bookings(
     return service.list_user_bookings(db, auth.user_id)
 
 
+@router.get("/owner", response_model=list[BookingOut])
+def list_owner_bookings(
+    tab: str | None = None,
+    venue_id: str | None = None,
+    search: str | None = None,
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    return service.list_all_owner_bookings(db, auth.user_id, tab, venue_id, search)
+
+
 @router.get("/venues/{venue_id}/bookings", response_model=list[BookingOut])
 def list_venue_bookings(
     venue_id: UUID,

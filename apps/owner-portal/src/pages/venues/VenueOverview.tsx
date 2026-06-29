@@ -104,6 +104,14 @@ export default function VenueOverview() {
           <h1 className="text-2xl font-bold text-zinc-900">{venue.name}</h1>
           <p className="mt-1 text-sm text-zinc-500">{venue.city}, {venue.state}</p>
         </div>
+        {venue.status === 'approved' && (
+          <Link to={`/venues/${venueId}/bookings`} className="shrink-0 w-full sm:w-auto">
+            <Button variant="primary" className="bg-zinc-900 hover:bg-zinc-800 text-white w-full sm:w-auto flex items-center justify-center gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Manage Bookings
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Quick Stats */}

@@ -36,6 +36,7 @@ class BookingOut(BaseModel):
     venue_city: str
     venue_cover_photo_url: str | None = None
     user_id: UUID
+    user_full_name: str | None = None
     booking_type: str
     status: str
     payment_status: str

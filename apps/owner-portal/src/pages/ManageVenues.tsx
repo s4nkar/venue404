@@ -11,6 +11,7 @@ export default function ManageVenues() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    console.log("ManageVenues component loaded!")
     const fetchVenues = async () => {
       try {
         const client = createClient()
@@ -91,8 +92,7 @@ export default function ManageVenues() {
               : `/venues/${venue.id}/overview`
 
             return (
-            <Link key={venue.id} to={targetUrl} className="block group">
-              <Card className="overflow-hidden flex flex-col h-full transition-all group-hover:shadow-md group-hover:border-zinc-300">
+              <Card key={venue.id} className="overflow-hidden flex flex-col h-full transition-all hover:shadow-md hover:border-zinc-300">
                 {/* Image Header */}
                 <div className="h-48 bg-zinc-100 relative border-b border-zinc-200 flex items-center justify-center">
                 {coverPhoto ? (
@@ -139,16 +139,34 @@ export default function ManageVenues() {
               </div>
 
               {/* Action Footer */}
-              <div className="bg-zinc-50/50 p-3 border-t border-zinc-200 mt-auto">
-                <div className="block">
-                  <Button variant="secondary" className="w-full flex items-center justify-center gap-2 pointer-events-none">
-                    <Settings className="h-4 w-4" />
-                    Manage
-                  </Button>
-                </div>
+              <div className="bg-zinc-50/50 p-3 border-t border-zinc-200 mt-auto flex gap-2">
+                {venue.status === 'draft' && !isWizardCompleted ? (
+                  <Link to={targetUrl} className="flex-1">
+                    <Button variant="primary" className="w-full flex items-center justify-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      Continue Setup
+                    </Button>
+                  </Link>
+                ) : (
+                  <>
+                    <Link to={`/venues/${venue.id}/overview`} className="flex-1">
+                      <Button variant="secondary" className="w-full flex items-center justify-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        Manage Venue
+                      </Button>
+                    </Link>
+                    {venue.status === 'approved' && (
+                      <Link to={`/venues/${venue.id}/bookings`} className="flex-1">
+                        <Button variant="primary" className="w-full flex items-center justify-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Manage Bookings
+                        </Button>
+                      </Link>
+                    )}
+                  </>
+                )}
               </div>
             </Card>
-            </Link>
           )})}
         </div>
       )}
