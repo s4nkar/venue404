@@ -8,11 +8,6 @@ def create_advance_payment_intent(booking) -> str:
     return f"pi_advance_stub_{booking.id}"
 
 
-def create_balance_payment_intent(booking) -> str:
-    logger.info("[STUB] create balance payment intent booking=%s", booking.id)
-    return f"pi_balance_stub_{booking.id}"
-
-
 def cancel_payment_intent(payment_intent_id: str | None) -> None:
     if payment_intent_id:
         logger.info("[STUB] cancel payment intent %s", payment_intent_id)

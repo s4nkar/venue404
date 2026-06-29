@@ -48,12 +48,6 @@ from app.modules.booking.cancellation import (
     admin_force_cancel,
 )
 
-# Re-expose functions from payment module
-from app.modules.booking.payment import (
-    handle_advance_payment_captured,
-    handle_balance_payment_captured,
-)
-
 logger = logging.getLogger(__name__)
 
 
