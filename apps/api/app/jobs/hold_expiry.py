@@ -8,8 +8,10 @@ from app.modules.notification import service as notifications
 
 logger = logging.getLogger(__name__)
 
+BATCH = 100
 
-def run():
+
+def run() -> int:
     """Cancel bookings whose 24-hour advance payment window has expired."""
     now = datetime.now(timezone.utc)
     with with_session() as db:
@@ -19,7 +21,10 @@ def run():
                 Booking.status == BookingStatus.owner_accepted,
                 Booking.hold_expires_at.isnot(None),
                 Booking.hold_expires_at < now,
+                Booking.deleted_at.is_(None),
             )
+            .with_for_update(skip_locked=True)
+            .limit(BATCH)
             .all()
         )
         for b in rows:
@@ -37,3 +42,4 @@ def run():
             notifications.notify(db, b.user_id, "hold_expired",
                                  context={"venue_name": venue_name}, booking_id=b.id)
         logger.info("hold_expiry: expired %d booking(s)", len(rows))
+        return len(rows)

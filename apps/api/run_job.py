@@ -1,30 +1,33 @@
-# apps/api/run_all_jobs.py
+# apps/api/run_job.py
+# Manual / cron entrypoint for the background jobs. These are the SAME canonical
+# functions the in-process APScheduler runs (app/jobs/*); each manages its own
+# session (with_session: commit on success, rollback on error) and returns the
+# number of rows it processed.
 import sys
 from pathlib import Path
 
-# Force load all models
+# Force load all models so SQLAlchemy relationships resolve.
 sys.path.insert(0, str(Path(__file__).parent))
 
-import app.modules.venue.models
-import app.modules.profile.models
-import app.modules.booking.models
-import app.modules.booking._stubs
+import app.modules.venue.models  # noqa: F401
+import app.modules.profile.models  # noqa: F401
+import app.modules.booking.models  # noqa: F401
 
-from app.core.database import SessionLocal
-from app.modules.booking.jobs import (
-    run_hold_expiry_job,
-    run_request_expiry_job,
-    run_booking_completion_job,
-    run_balance_overdue_flag_job,
-    run_balance_overdue_autocancel_job,
+from app.jobs import (
+    hold_expiry,
+    stale_requests,
+    booking_completion,
+    payment_reminders,
+    balance_overdue,
 )
 
 JOBS = {
-    "hold_expiry": run_hold_expiry_job,
-    "request_expiry": run_request_expiry_job,
-    "completion": run_booking_completion_job,
-    "overdue_flag": run_balance_overdue_flag_job,
-    "overdue_autocancel": run_balance_overdue_autocancel_job,
+    "hold_expiry": hold_expiry.run,
+    "request_expiry": stale_requests.run,
+    "completion": booking_completion.run,
+    "payment_reminders": payment_reminders.run,
+    "overdue_flag": balance_overdue.run_flag,
+    "overdue_autocancel": balance_overdue.run_autocancel,
 }
 
 
@@ -36,21 +39,16 @@ def run_job(job_name: str):
     job_func = JOBS[job_name]
     print(f"🚀 Running {job_name}...")
 
-    db = SessionLocal()
     try:
-        count = job_func(db)
-        db.commit()   
+        count = job_func()
         print(f"✅ {job_name} completed. Processed: {count}")
         return True
     except Exception as e:
-        db.rollback()
         print(f"❌ Error in {job_name}: {e}")
         import traceback
 
         traceback.print_exc()
         return False
-    finally:
-        db.close()
 
 
 def run_all():
@@ -69,6 +67,6 @@ if __name__ == "__main__":
         run_job(sys.argv[1])
     else:
         print("Usage:")
-        print("  python run_all_jobs.py <job_name>")
-        print("  python run_all_jobs.py all")
+        print("  python run_job.py <job_name>")
+        print("  python run_job.py all")
         print("\nAvailable jobs:", list(JOBS.keys()))

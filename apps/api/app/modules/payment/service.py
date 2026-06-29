@@ -268,6 +268,22 @@ def fail_payment(db: Session, payment_intent_id: str) -> None:
     # reclaim it if no retry succeeds.
 
 
+def cancel_payment_intent(payment_intent_id: str | None) -> None:
+    """Cancel an uncaptured Stripe PaymentIntent (e.g. a pending advance whose
+    booking is being cancelled before payment succeeds).
+
+    Resilient like _record_refund: a Stripe failure (already-captured, already
+    -canceled, or network error) is logged and swallowed so it never aborts the
+    surrounding cancellation transaction.
+    """
+    if not payment_intent_id:
+        return
+    try:
+        get_stripe().PaymentIntent.cancel(payment_intent_id)
+    except Exception:  # noqa: BLE001 — Stripe/network failure must not abort the txn
+        logger.exception("Stripe cancel failed for payment intent %s", payment_intent_id)
+
+
 # --------------------------------------------------------------------------- #
 # Request-path: owner / admin refund (full)
 # --------------------------------------------------------------------------- #
