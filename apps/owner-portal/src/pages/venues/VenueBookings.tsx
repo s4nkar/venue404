@@ -93,12 +93,12 @@ export default function VenueBookings() {
 
       {/* Tabs */}
       <div className="border-b border-zinc-200 mb-6">
-        <nav className="-mb-px flex justify-between w-full overflow-x-auto no-scrollbar" aria-label="Tabs">
+        <nav className="-mb-px flex w-full overflow-x-auto no-scrollbar" aria-label="Tabs">
           {TABS.map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`whitespace-nowrap py-3 border-b-2 font-medium text-sm transition-all ${
+              className={`flex-1 whitespace-nowrap py-3 border-b-2 font-medium text-sm transition-all ${
                 tab === t.id
                   ? 'border-brand-500 text-brand-600'
                   : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'

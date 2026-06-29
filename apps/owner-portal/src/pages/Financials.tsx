@@ -1,32 +1,45 @@
 import { useState, useEffect } from 'react'
 import { Card, SectionHeader, PaymentStatusBadge, EmptyState, Skeleton } from '@venue404/ui'
 import { IndianRupee, Wallet } from 'lucide-react'
-import { createClient, bookingEndpoints } from '@venue404/api-client'
+import { createClient } from '@venue404/api-client'
+import { paymentEndpoints } from '@venue404/api-client/src/endpoints/payments'
 import { Link } from 'react-router-dom'
 
 export default function Financials() {
   const [tab, setTab] = useState('all')
   const [bookings, setBookings] = useState<any[]>([])
+  const [stats, setStats] = useState({ total_collected_paise: 0, pending_collection_paise: 0 })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchStats = async () => {
       try {
         const client = createClient()
-        const allBookings = await bookingEndpoints(client).getOwnerBookings()
-        
-        const sortedBookings = (allBookings || []).sort((a: any, b: any) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        )
-        setBookings(sortedBookings)
+        const data = await paymentEndpoints(client).getOwnerStats()
+        setStats(data)
       } catch (err) {
-        console.error("Failed to fetch financials", err)
+        console.error("Failed to fetch stats", err)
+      }
+    }
+    fetchStats()
+  }, [])
+
+  useEffect(() => {
+    const fetchBookings = async () => {
+      setLoading(true)
+      try {
+        const client = createClient()
+        const apiTab = tab === 'all' ? undefined : (tab === 'unpaid' ? 'unpaid_overdue' : tab)
+        const data = await paymentEndpoints(client).getOwnerBookings(apiTab)
+        setBookings(data || [])
+      } catch (err) {
+        console.error("Failed to fetch bookings", err)
       } finally {
         setLoading(false)
       }
     }
-    fetchData()
-  }, [])
+    fetchBookings()
+  }, [tab])
 
   const TABS = [
     { id: 'all', label: 'All Payments' },
@@ -36,31 +49,6 @@ export default function Financials() {
     { id: 'refunded', label: 'Refunded' },
   ]
 
-  const filteredBookings = bookings.filter(b => {
-    if (tab !== 'all' && b.payment_status !== tab) {
-      if (tab === 'refunded' && !['refunded', 'partially_refunded'].includes(b.payment_status)) {
-        return false
-      } else if (tab !== 'refunded') {
-        return false
-      }
-    }
-    // Only show bookings that have a cost associated
-    return b.total_price > 0
-  })
-
-  // Summary Metrics Calculation
-  const totalRevenue = bookings
-    .filter(b => ['fully_paid', 'advance_paid', 'completed'].includes(b.status) && b.payment_status === 'fully_paid')
-    .reduce((sum, b) => sum + (b.quoted_price_paise || 0), 0)
-    
-  const advanceCollected = bookings
-    .filter(b => b.payment_status === 'advance_paid')
-    .reduce((sum, b) => sum + ((b.quoted_price_paise || 0) * 0.2), 0) // Assume 20% advance or real field if exists
-
-  const pendingCollection = bookings
-    .filter(b => ['unpaid', 'advance_paid'].includes(b.payment_status) && ['confirmed', 'completed'].includes(b.status))
-    .reduce((sum, b) => sum + (b.payment_status === 'advance_paid' ? (b.quoted_price_paise || 0) * 0.8 : (b.quoted_price_paise || 0)), 0)
-
   return (
     <div className="space-y-6 pb-8">
       <SectionHeader 
@@ -68,35 +56,60 @@ export default function Financials() {
         description="Track your earnings, pending balances, and refunds." 
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card className="p-5 border-emerald-200 bg-emerald-50/30">
-          <div className="flex items-center gap-2 text-emerald-700 font-medium mb-2">
-            <Wallet className="h-4 w-4" /> Total Collected
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <Card className="relative overflow-hidden p-6 border-zinc-200/60 shadow-sm hover:shadow-md transition-shadow duration-300 group">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transform group-hover:scale-110 transition-transform duration-500">
+            <Wallet className="w-32 h-32 text-emerald-900" />
           </div>
-          <div className="text-3xl font-bold text-zinc-900">₹{(totalRevenue + advanceCollected) / 100}</div>
+          <div className="flex items-center gap-4 mb-4 relative z-10">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner">
+              <Wallet className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-zinc-500 font-medium text-sm uppercase tracking-wider">Total Collected</h3>
+              <p className="text-xs text-zinc-400 mt-0.5">All-time revenue</p>
+            </div>
+          </div>
+          <div className="text-4xl font-bold text-zinc-900 tracking-tight relative z-10">
+            ₹{(stats.total_collected_paise / 100).toLocaleString('en-IN')}
+          </div>
         </Card>
-        <Card className="p-5 border-amber-200 bg-amber-50/30">
-          <div className="flex items-center gap-2 text-amber-700 font-medium mb-2">
-            <IndianRupee className="h-4 w-4" /> Pending Collection
+        
+        <Card className="relative overflow-hidden p-6 border-zinc-200/60 shadow-sm hover:shadow-md transition-shadow duration-300 group">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transform group-hover:scale-110 transition-transform duration-500">
+            <IndianRupee className="w-32 h-32 text-amber-900" />
           </div>
-          <div className="text-3xl font-bold text-zinc-900">₹{pendingCollection / 100}</div>
+          <div className="flex items-center gap-4 mb-4 relative z-10">
+            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shadow-inner">
+              <IndianRupee className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-zinc-500 font-medium text-sm uppercase tracking-wider">Pending Collection</h3>
+              <p className="text-xs text-zinc-400 mt-0.5">To be paid by users</p>
+            </div>
+          </div>
+          <div className="text-4xl font-bold text-zinc-900 tracking-tight relative z-10">
+            ₹{(stats.pending_collection_paise / 100).toLocaleString('en-IN')}
+          </div>
         </Card>
       </div>
 
-      <div className="flex gap-2 border-b border-zinc-200 pb-2 overflow-x-auto">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${
-              tab === t.id 
-                ? 'bg-zinc-100 text-zinc-900' 
-                : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="border-b border-zinc-200 mb-6">
+        <nav className="-mb-px flex w-full overflow-x-auto no-scrollbar" aria-label="Tabs">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex-1 whitespace-nowrap py-3 border-b-2 font-medium text-sm transition-all ${
+                tab === t.id 
+                  ? 'border-brand-500 text-brand-600' 
+                  : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
       </div>
 
       {loading ? (
@@ -117,25 +130,31 @@ export default function Financials() {
             </Card>
           ))}
         </div>
-      ) : filteredBookings.length === 0 ? (
+      ) : bookings.length === 0 ? (
         <EmptyState 
-          icon={<IndianRupee className="h-10 w-10 text-zinc-400" />}
+          icon={<IndianRupee className="h-10 w-10 text-zinc-300" />}
           title="No payments found"
-          description="Try adjusting your filters."
+          description="Try adjusting your filters to see past or pending payments."
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {filteredBookings.map(booking => (
+          {bookings.map(booking => (
             <Link key={booking.id} to={`/bookings/${booking.id}`} className="block group">
-              <Card className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 transition-colors group-hover:border-zinc-300 group-hover:shadow-sm">
-                <div>
-                  <h4 className="font-medium text-zinc-900">{booking.venue_name || 'Unknown Venue'}</h4>
-                  <p className="text-sm text-zinc-500 mt-1">Booking #{booking.id.split('-')[0]} • {booking.user_full_name || 'User'}</p>
+              <Card className="p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all hover:border-brand-300 hover:shadow-md bg-white">
+                <div className="flex flex-col">
+                  <h4 className="font-semibold text-zinc-900 text-lg group-hover:text-brand-600 transition-colors">{booking.venue_name || 'Unknown Venue'}</h4>
+                  <div className="flex items-center gap-2 text-sm text-zinc-500 mt-1">
+                    <span className="font-medium text-zinc-700">#{booking.id.split('-')[0]}</span>
+                    <span>•</span>
+                    <span>{booking.user_full_name || 'Guest'}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
                   <div className="text-right">
-                    <div className="font-semibold text-zinc-900">₹{booking.quoted_price_paise ? booking.quoted_price_paise / 100 : 0}</div>
-                    <div className="text-xs text-zinc-500 mt-1">Total Amount</div>
+                    <div className="font-bold text-zinc-900 text-lg">
+                      ₹{booking.quoted_price_paise ? (booking.quoted_price_paise / 100).toLocaleString('en-IN') : 0}
+                    </div>
+                    <div className="text-xs font-medium uppercase tracking-wider text-zinc-400 mt-0.5">Total Amount</div>
                   </div>
                   <PaymentStatusBadge status={booking.payment_status} />
                 </div>

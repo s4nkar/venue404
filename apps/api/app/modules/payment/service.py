@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 
 from app.core.config import settings
 from app.core.stripe_client import get_stripe
@@ -28,13 +29,14 @@ from app.modules.auth.dependencies import AuthContext
 from app.modules.booking.models import (
     Booking, BookingStatus, PaymentStatus, BookingSlot, BookingStatusHistory,
 )
+from app.modules.booking.service import _booking_out
 from app.modules.booking.state_machine import can_transition
 from app.modules.venue.models import Venue
 from app.modules.payment.models import (
     Payment, Refund, LedgerEntry, PaymentAttemptStatus, RefundStatus,
 )
 from app.modules.payment.schemas import (
-    PaymentIntentResponse, PaymentResponse, RefundResponse,
+    PaymentIntentResponse, PaymentResponse, RefundResponse, OwnerFinancialStatsResponse,
 )
 from app.modules.notification import service as notifications
 
@@ -371,6 +373,56 @@ def list_payments_for_booking(db: Session, booking_id: str, current_user: AuthCo
         )
         for p in rows
     ]
+
+
+def get_owner_financial_stats(db: Session, current_user: AuthContext) -> OwnerFinancialStatsResponse:
+    if not current_user.is_owner():
+        raise ForbiddenError("Must be a venue owner")
+    
+    # Total collected: sum of amount_paid_paise for bookings in venues owned by this user
+    total_collected = db.query(func.sum(Booking.amount_paid_paise)) \
+        .join(Venue, Booking.venue_id == Venue.id) \
+        .filter(Venue.owner_id == current_user.user_id) \
+        .scalar() or 0
+        
+    # Pending collection: sum of balance_due_paise for active bookings where full payment isn't done
+    active_statuses = [BookingStatus.confirmed, BookingStatus.owner_accepted, BookingStatus.completed]
+    pending_collection = db.query(func.sum(Booking.balance_due_paise)) \
+        .join(Venue, Booking.venue_id == Venue.id) \
+        .filter(
+            Venue.owner_id == current_user.user_id,
+            Booking.status.in_(active_statuses),
+            Booking.payment_status.in_([PaymentStatus.unpaid, PaymentStatus.advance_paid])
+        ) \
+        .scalar() or 0
+        
+    return OwnerFinancialStatsResponse(
+        total_collected_paise=total_collected,
+        pending_collection_paise=pending_collection
+    )
+
+
+def list_owner_financial_bookings(db: Session, current_user: AuthContext, payment_status: str | None = None) -> list[Booking]:
+    if not current_user.is_owner():
+        raise ForbiddenError("Must be a venue owner")
+        
+    query = db.query(Booking).join(Venue, Booking.venue_id == Venue.id).filter(Venue.owner_id == current_user.user_id)
+    
+    if payment_status:
+        # map "overdue" or custom tabs to real statuses if needed, otherwise exact match
+        if payment_status == "unpaid_overdue":
+            query = query.filter(Booking.payment_status.in_([PaymentStatus.unpaid]))
+        else:
+            try:
+                enum_val = PaymentStatus(payment_status)
+                query = query.filter(Booking.payment_status == enum_val)
+            except ValueError:
+                pass
+            
+    # Order by most recent bookings
+    query = query.order_by(Booking.created_at.desc())
+    
+    return [_booking_out(booking) for booking in query.all()]
 
 
 # --------------------------------------------------------------------------- #

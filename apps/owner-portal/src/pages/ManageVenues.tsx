@@ -45,20 +45,22 @@ export default function ManageVenues() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex gap-2 border-b border-zinc-200 pb-2 overflow-x-auto">
-        {['all', 'approved', 'pending_approval', 'draft', 'rejected', 'suspended'].map(status => (
-          <button
-            key={status}
-            onClick={() => setFilter(status)}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${
-              filter === status 
-                ? 'bg-zinc-100 text-zinc-900' 
-                : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'
-            }`}
-          >
-            {status === 'all' ? 'All Venues' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-          </button>
-        ))}
+      <div className="border-b border-zinc-200 mb-6">
+        <nav className="-mb-px flex w-full overflow-x-auto no-scrollbar" aria-label="Tabs">
+          {['all', 'approved', 'pending_approval', 'draft', 'rejected', 'suspended'].map(status => (
+            <button
+              key={status}
+              onClick={() => setFilter(status)}
+              className={`flex-1 whitespace-nowrap py-3 border-b-2 font-medium text-sm transition-all ${
+                filter === status 
+                  ? 'border-brand-500 text-brand-600' 
+                  : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+              }`}
+            >
+              {status === 'all' ? 'All Venues' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </button>
+          ))}
+        </nav>
       </div>
 
       {/* Venues Grid */}

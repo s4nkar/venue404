@@ -28,6 +28,11 @@ export type RefundResult = {
   status: string
 }
 
+export type OwnerFinancialStats = {
+  total_collected_paise: number
+  pending_collection_paise: number
+}
+
 export const paymentEndpoints = (client: ReturnType<typeof createClient>) => ({
   /** Create a Stripe PaymentIntent for a booking's token advance or balance. */
   createPaymentIntent: (bookingId: string, params: CreatePaymentIntentRequest) =>
@@ -38,4 +43,10 @@ export const paymentEndpoints = (client: ReturnType<typeof createClient>) => ({
   /** All payment attempts for a booking. */
   getByBooking: (bookingId: string) =>
     client.get<Payment[]>(`/api/payments/${bookingId}`),
+  /** Get aggregated financial stats for the owner */
+  getOwnerStats: () =>
+    client.get<OwnerFinancialStats>('/api/payments/owner/stats'),
+  /** Get bookings for the owner filtered by payment status */
+  getOwnerBookings: (paymentStatus?: string) =>
+    client.get<any[]>(`/api/payments/owner/bookings${paymentStatus ? `?payment_status=${paymentStatus}` : ''}`),
 })

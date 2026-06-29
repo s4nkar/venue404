@@ -38,3 +38,8 @@ class RefundResponse(BaseModel):
     booking_id: str
     refunded_paise: int
     status: str
+
+
+class OwnerFinancialStatsResponse(BaseModel):
+    total_collected_paise: int
+    pending_collection_paise: int
