@@ -8,9 +8,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.availability.service import validate_booking_request
-from app.modules.booking._stubs import (
-    create_advance_payment_intent,
-)
 from app.modules.notification import service as notifications
 from app.modules.notification.types import NotificationType
 from app.modules.booking.helpers import (
@@ -198,7 +195,8 @@ def owner_accept_booking(db: Session, booking_id: UUID, owner_id: UUID) -> Booki
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Slot already blocked") from exc
         raise
 
-    booking.stripe_advance_payment_intent_id = create_advance_payment_intent(booking)
+    # The real advance PaymentIntent (and stripe_advance_payment_intent_id) is created
+    # by payment.service.create_payment_intent when the customer pays the advance.
     db.add(_history(booking, old_status, BookingStatus.owner_accepted, changed_by=owner_id))
     db.flush()
     db.refresh(booking)
