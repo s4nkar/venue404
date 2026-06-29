@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Card, SectionHeader, PaymentStatusBadge, EmptyState } from '@venue404/ui'
+import { Card, SectionHeader, PaymentStatusBadge, EmptyState, Skeleton } from '@venue404/ui'
 import { IndianRupee, Wallet } from 'lucide-react'
 import { createClient, bookingEndpoints } from '@venue404/api-client'
 import { Link } from 'react-router-dom'
@@ -100,7 +100,23 @@ export default function Financials() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-zinc-500">Loading financials...</div>
+        <div className="flex flex-col gap-3">
+          {[1, 2, 3, 4, 5].map(i => (
+            <Card key={i} className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="w-full sm:w-1/2">
+                <Skeleton className="h-5 w-1/2 mb-2" />
+                <Skeleton className="h-4 w-1/3" />
+              </div>
+              <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
+                <div className="text-right">
+                  <Skeleton className="h-5 w-20 mb-1 ml-auto" />
+                  <Skeleton className="h-3 w-16 ml-auto" />
+                </div>
+                <Skeleton className="h-6 w-24 rounded-full" />
+              </div>
+            </Card>
+          ))}
+        </div>
       ) : filteredBookings.length === 0 ? (
         <EmptyState 
           icon={<IndianRupee className="h-10 w-10 text-zinc-400" />}

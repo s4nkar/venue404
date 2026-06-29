@@ -337,6 +337,14 @@ def owner_extend_deadline(
     )
     return _booking_out(booking)
 
+def update_owner_notes(db: Session, booking_id: UUID, owner_id: UUID, notes: str | None) -> BookingOut:
+    booking = _booking_or_404(db, booking_id, for_update=True)
+    _assert_booking_owner(booking, owner_id)
+    booking.owner_notes = notes
+    db.flush()
+    db.refresh(booking)
+    return _booking_out(booking)
+
 
 def create_booking(user_id: UUID, body: BookingRequestIn, db: Session) -> BookingOut:
     return create_booking_request(db, user_id, body)

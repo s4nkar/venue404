@@ -1,11 +1,21 @@
+import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/AuthContext'
-import { MetricCard, SectionHeader, StatusBadge, Card } from '@venue404/ui'
+import { MetricCard, SectionHeader, StatusBadge, Card, Skeleton } from '@venue404/ui'
 import { CalendarDays, IndianRupee, Clock, ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export default function Dashboard() {
   const { user } = useAuth()
   const userName = user?.profile?.full_name?.split(' ')[0] || 'Owner'
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Simulate API fetch for the mock data
+    const timer = setTimeout(() => {
+      setLoading(false)
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [])
 
   // MOCK DATA for now until API client is fully wired
   const stats = {
@@ -25,6 +35,34 @@ export default function Dashboard() {
     { id: '201', venue: 'Skyline Rooftop', date: 'Aug 17, 2026', time: '18:00 - 23:00', guests: 150, status: 'fully_paid' },
     { id: '202', venue: 'Grand Ballroom', date: 'Aug 20, 2026', time: 'Full Day', guests: 300, status: 'advance_paid' },
   ]
+
+  if (loading) {
+    return (
+      <div className="space-y-8 pb-8 pt-4">
+        <section>
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-5 w-96" />
+        </section>
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-28 w-full rounded-xl" />)}
+        </section>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-4">
+            <Skeleton className="h-6 w-48 mb-2" />
+            <div className="flex flex-col gap-3">
+              {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+            </div>
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-6 w-48 mb-2" />
+            <div className="flex flex-col gap-3">
+              {[1,2].map(i => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8 pb-8">

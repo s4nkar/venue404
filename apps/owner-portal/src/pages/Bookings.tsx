@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, StatusBadge, SectionHeader, PaymentStatusBadge, EmptyState } from '@venue404/ui'
+import { Card, StatusBadge, SectionHeader, PaymentStatusBadge, EmptyState, Skeleton } from '@venue404/ui'
 import { Search, Calendar, MapPin, IndianRupee } from 'lucide-react'
 import { createClient, venueEndpoints, bookingEndpoints } from '@venue404/api-client'
 
@@ -123,7 +123,28 @@ export default function Bookings() {
 
       {/* List */}
       {loading ? (
-        <div className="text-center py-12 text-zinc-500">Loading bookings...</div>
+        <div className="flex flex-col gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="p-0 overflow-hidden">
+              <div className="p-4 sm:p-5 flex flex-col sm:flex-row justify-between gap-4">
+                <div className="flex flex-col space-y-3 w-full sm:w-2/3">
+                  <div>
+                    <Skeleton className="h-6 w-1/3 mb-2" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                  <div className="flex items-center gap-4 pt-1">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                </div>
+                <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2">
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
       ) : filteredBookings.length === 0 ? (
         <EmptyState 
           icon={<Calendar className="h-10 w-10 text-zinc-400" />}

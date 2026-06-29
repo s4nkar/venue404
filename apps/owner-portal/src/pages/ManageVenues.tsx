@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, StatusBadge, Button, SectionHeader } from '@venue404/ui'
+import { Card, StatusBadge, Button, SectionHeader, Skeleton } from '@venue404/ui'
 import { Plus, MapPin, Users, Calendar, Settings, Image as ImageIcon } from 'lucide-react'
 import { createClient } from '@venue404/api-client'
 import { venueEndpoints } from '@venue404/api-client'
@@ -11,7 +11,6 @@ export default function ManageVenues() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    console.log("ManageVenues component loaded!")
     const fetchVenues = async () => {
       try {
         const client = createClient()
@@ -64,7 +63,24 @@ export default function ManageVenues() {
 
       {/* Venues Grid */}
       {loading ? (
-        <div className="text-center py-12 text-zinc-500">Loading venues...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i} className="overflow-hidden flex flex-col h-[380px]">
+              <Skeleton className="h-48 w-full rounded-none" />
+              <div className="p-5 flex-1 flex flex-col space-y-4">
+                <Skeleton className="h-6 w-3/4" />
+                <div className="flex gap-4">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              </div>
+              <div className="bg-zinc-50/50 p-3 border-t border-zinc-200 mt-auto flex gap-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </Card>
+          ))}
+        </div>
       ) : filteredVenues.length === 0 ? (
         <Card>
           <div className="p-12 text-center">

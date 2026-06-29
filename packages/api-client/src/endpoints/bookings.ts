@@ -26,5 +26,7 @@ export const bookingEndpoints = (client: ReturnType<typeof createClient>) => ({
     client.post<any>(`/api/bookings/${bookingId}/cancel-forfeit`, {}),
   cancelGoodwill: (bookingId: string) =>
     client.post<any>(`/api/bookings/${bookingId}/cancel-goodwill`, {}),
+  updateOwnerNotes: (bookingId: string, notes: string | null) =>
+    client.patch<any>(`/api/bookings/${bookingId}/owner-notes`, { notes }),
 })
 

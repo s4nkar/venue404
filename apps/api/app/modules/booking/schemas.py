@@ -37,6 +37,8 @@ class BookingOut(BaseModel):
     venue_cover_photo_url: str | None = None
     user_id: UUID
     user_full_name: str | None = None
+    user_email: str | None = None
+    user_phone: str | None = None
     booking_type: str
     status: str
     payment_status: str
@@ -93,6 +95,10 @@ class OwnerRejectIn(BaseModel):
 
 class ExtendDeadlineIn(BaseModel):
     new_due_date: date
+
+
+class UpdateOwnerNotesIn(BaseModel):
+    notes: str | None
 
 
 BookingResponse = BookingOut
