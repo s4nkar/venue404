@@ -6,10 +6,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.modules.booking._stubs import (
-    cancel_payment_intent,
-    initiate_refund,
-)
+from app.modules.payment import service as payment_service
 from app.modules.notification import service as notifications
 from app.modules.notification.types import NotificationType
 from app.modules.booking.helpers import (
@@ -177,13 +174,15 @@ def user_cancel_booking(db: Session, booking_id: UUID, user_id: UUID) -> Booking
     elif old_status == BookingStatus.owner_accepted:
         # Cancel pending PaymentIntent
         if booking.stripe_advance_payment_intent_id:
-            cancel_payment_intent(booking.stripe_advance_payment_intent_id)
+            payment_service.cancel_payment_intent(booking.stripe_advance_payment_intent_id)
     else:  # confirmed
         refund = _compute_refund(
             booking, _load_policy(db, booking.venue_id), booking.cancelled_at
         )
         if refund.refund_amount_paise > 0:
-            initiate_refund(booking, refund.refund_amount_paise)
+            payment_service.refund_for_cancellation(
+                db, booking, refund.refund_amount_paise, "user_cancellation"
+            )
         booking.refund_amount_paise = refund.refund_amount_paise
 
         if refund.refund_amount_paise == 0:
@@ -261,7 +260,7 @@ def owner_cancel_goodwill(db: Session, booking_id: UUID, owner_id: UUID) -> Book
         booking.advance_due_paise * (float(booking.overdue_advance_refund_pct) / 100)
     )
     if refund_amount > 0:
-        initiate_refund(booking, refund_amount)
+        payment_service.refund_for_cancellation(db, booking, refund_amount, "owner_goodwill")
 
     booking.status = BookingStatus.user_cancelled
     booking.cancelled_at = _now()
