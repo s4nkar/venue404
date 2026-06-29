@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session
 from app.modules.availability.service import validate_booking_request
 from app.modules.booking._stubs import (
     create_advance_payment_intent,
-    create_notification,
 )
+from app.modules.notification import service as notifications
+from app.modules.notification.types import NotificationType
 from app.modules.booking.helpers import (
     _now,
     _history,
@@ -126,12 +127,13 @@ def create_booking_request(
     db.flush()
     db.refresh(booking)
 
-    create_notification(
-        venue.owner_id,
-        booking.id,
-        "booking_requested",
-        "New booking request",
-        "A customer requested your venue.",
+    notifications.notify(
+        db, venue.owner_id, NotificationType.NEW_REQUEST_OWNER,
+        context={"venue_name": venue.name}, booking_id=booking.id,
+    )
+    notifications.notify(
+        db, user_id, NotificationType.REQUEST_RECEIVED,
+        context={"venue_name": venue.name}, booking_id=booking.id,
     )
     return _booking_out(booking)
 
@@ -207,12 +209,9 @@ def owner_accept_booking(db: Session, booking_id: UUID, owner_id: UUID) -> Booki
     db.flush()
     db.refresh(booking)
 
-    create_notification(
-        booking.user_id,
-        booking.id,
-        "booking_accepted",
-        "Booking accepted",
-        f"The venue owner accepted your request. Please pay the advance within {USER_PAYMENT_HOLD_HOURS} hours.",
+    notifications.notify(
+        db, booking.user_id, NotificationType.REQUEST_ACCEPTED,
+        context={"venue_name": booking.venue.name}, booking_id=booking.id,
     )
     return _booking_out(booking)
 
@@ -235,12 +234,9 @@ def owner_reject_booking(
     db.flush()
     db.refresh(booking)
 
-    create_notification(
-        booking.user_id,
-        booking.id,
-        "booking_rejected",
-        "Booking rejected",
-        reason,
+    notifications.notify(
+        db, booking.user_id, NotificationType.BOOKING_REJECTED,
+        context={"venue_name": booking.venue.name}, booking_id=booking.id,
     )
     return _booking_out(booking)
 
@@ -285,7 +281,10 @@ def owner_extend_deadline(
     ))
     db.flush()
     db.refresh(booking)
-    create_notification(booking.user_id, booking.id, "balance_deadline_extended", "Balance deadline extended", "Your balance payment deadline was extended.")
+    notifications.notify(
+        db, booking.user_id, NotificationType.BALANCE_DEADLINE_EXTENDED,
+        context={"venue_name": booking.venue.name}, booking_id=booking.id,
+    )
     return _booking_out(booking)
 
 

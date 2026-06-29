@@ -1,5 +1,4 @@
 import logging
-from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -21,19 +20,3 @@ def cancel_payment_intent(payment_intent_id: str | None) -> None:
 
 def initiate_refund(booking, amount_paise: int) -> None:
     logger.info("[STUB] refund %s paise booking=%s", amount_paise, booking.id)
-
-
-def create_notification(
-    user_id: UUID,
-    booking_id: UUID,
-    notification_type: str,
-    title: str,
-    body: str,
-) -> None:
-    logger.info(
-        "[STUB] notify user=%s booking=%s type=%s title=%s",
-        user_id,
-        booking_id,
-        notification_type,
-        title,
-    )
