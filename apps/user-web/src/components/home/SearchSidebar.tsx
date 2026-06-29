@@ -1,4 +1,6 @@
-import { CATEGORIES } from '../../constants'
+import { useEffect, useState } from 'react'
+import { createClient, venueEndpoints } from '@venue404/api-client'
+import type { VenueCategory } from '@venue404/api-client'
 
 type Props = {
   venueType: string
@@ -18,9 +20,22 @@ export function SearchSidebar({
   onClearFilters,
   hasFilters,
 }: Props) {
+  // FIX #SearchSidebar: pull categories from the same API CategorySection uses,
+  // instead of the hardcoded CATEGORIES constant which can drift out of sync
+  const [categories, setCategories] = useState<VenueCategory[]>([])
+  const [loadingCategories, setLoadingCategories] = useState(true)
+
+  useEffect(() => {
+    const client = createClient()
+    venueEndpoints(client)
+      .getVenueCategories()
+      .then(setCategories)
+      .catch(() => {})
+      .finally(() => setLoadingCategories(false))
+  }, [])
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-zinc-900">Advanced filters</h3>
         {hasFilters && (
@@ -33,7 +48,6 @@ export function SearchSidebar({
         )}
       </div>
 
-      {/* Capacity */}
       <div>
         <p className="mb-2.5 text-sm font-medium text-zinc-800">Capacity</p>
         <input
@@ -46,40 +60,53 @@ export function SearchSidebar({
         />
       </div>
 
-      {/* Venue Type — pill multi-select */}
       <div>
         <p className="mb-2.5 text-sm font-medium text-zinc-800">Venue Type</p>
-        <div className="flex flex-wrap gap-2">
-          {CATEGORIES.map((c) => {
-            const active = venueType === c.venue_type
-            return (
-              <button
-                key={c.venue_type}
-                type="button"
-                onClick={() => onVenueTypeChange(active ? '' : c.venue_type)}
-                className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-all ${
-                  active
-                    ? 'border-zinc-900 bg-zinc-900 text-white'
-                    : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50'
-                }`}
-              >
-                {c.label}
-              </button>
-            )
-          })}
-        </div>
+        {loadingCategories ? (
+          <div className="flex flex-wrap gap-2 animate-pulse">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-8 w-20 rounded-full bg-zinc-100" />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {categories.map((c) => {
+              const active = venueType === c.slug
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onVenueTypeChange(active ? '' : c.slug)}
+                  className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-all ${
+                    active
+                      ? 'border-zinc-900 bg-zinc-900 text-white'
+                      : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50'
+                  }`}
+                >
+                  {c.icon && <span className="mr-1">{c.icon}</span>}
+                  {c.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Deep Research card */}
       <div className="rounded-2xl bg-zinc-900 p-5">
         <div className="mb-2 flex items-center gap-2">
           <svg className="h-4 w-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 10V3L4 14h7v7l9-11h-7z"
+            />
           </svg>
           <span className="text-sm font-bold text-white">Deep Research</span>
         </div>
         <p className="mb-4 text-xs leading-relaxed text-zinc-400">
-          Can't find the right venue? Our researchers will source every option — not just what's listed.
+          Can't find the right venue? Our researchers will source every option — not just what's
+          listed.
         </p>
         <button
           type="button"

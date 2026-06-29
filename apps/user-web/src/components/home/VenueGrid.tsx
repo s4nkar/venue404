@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import type { SearchResult } from '../../types'
 import { VENUE_TYPE_LABELS } from '../../constants'
@@ -12,10 +12,14 @@ type SortKey = 'recommended' | 'price_asc' | 'price_desc' | 'capacity_desc'
 function sortVenues(venues: SearchResult[], sort: SortKey): SearchResult[] {
   const copy = [...venues]
   switch (sort) {
-    case 'price_asc': return copy.sort((a, b) => (a.starting_price_paise ?? 0) - (b.starting_price_paise ?? 0))
-    case 'price_desc': return copy.sort((a, b) => (b.starting_price_paise ?? 0) - (a.starting_price_paise ?? 0))
-    case 'capacity_desc': return copy.sort((a, b) => (b.capacity ?? 0) - (a.capacity ?? 0))
-    default: return copy
+    case 'price_asc':
+      return copy.sort((a, b) => (a.starting_price_paise ?? 0) - (b.starting_price_paise ?? 0))
+    case 'price_desc':
+      return copy.sort((a, b) => (b.starting_price_paise ?? 0) - (a.starting_price_paise ?? 0))
+    case 'capacity_desc':
+      return copy.sort((a, b) => (b.capacity ?? 0) - (a.capacity ?? 0))
+    default:
+      return copy
   }
 }
 
@@ -34,8 +38,6 @@ type Props = {
   onCapacityChange: (value: string) => void
 }
 
-// ─── Breadcrumbs ──────────────────────────────────────────────────────────────
-
 function Breadcrumbs() {
   const [params] = useSearchParams()
   const city = params.get('city')
@@ -53,7 +55,9 @@ function Breadcrumbs() {
         <span key={i} className="flex items-center gap-1.5">
           {i > 0 && <span className="text-zinc-300">&rsaquo;</span>}
           {crumb.href ? (
-            <Link to={crumb.href} className="transition-colors hover:text-zinc-700">{crumb.label}</Link>
+            <Link to={crumb.href} className="transition-colors hover:text-zinc-700">
+              {crumb.label}
+            </Link>
           ) : (
             <span className="font-medium text-zinc-700">{crumb.label}</span>
           )}
@@ -63,8 +67,10 @@ function Breadcrumbs() {
   )
 }
 
-// ─── Results count heading ─────────────────────────────────────────────────────
-
+// FIX #originally reported bug: this heading reads straight from URL params,
+// which is correct — the "1 result for 'm'" bug was actually caused by the
+// hasFilters/draft-state desync in Home.tsx (now fixed there). No change
+// needed here once Home.tsx only commits searchParams on submit.
 function ResultsHeading({ total, loading }: { total: number | null; loading: boolean }) {
   const [params] = useSearchParams()
   const city = params.get('city')
@@ -72,7 +78,9 @@ function ResultsHeading({ total, loading }: { total: number | null; loading: boo
   const q = params.get('q')
 
   const typeLabel = venueType ? (VENUE_TYPE_LABELS[venueType] ?? venueType) : ''
-  const parts = [typeLabel ? `${typeLabel} venues` : 'venues', city ? `in ${city}` : ''].filter(Boolean)
+  const parts = [typeLabel ? `${typeLabel} venues` : 'venues', city ? `in ${city}` : ''].filter(
+    Boolean
+  )
   const suffix = parts.join(' ')
   const label = q && !typeLabel ? `results for "${q}"` : suffix
 
@@ -81,15 +89,15 @@ function ResultsHeading({ total, loading }: { total: number | null; loading: boo
   return (
     <h2 className="mb-6 text-2xl font-bold text-zinc-900 sm:text-3xl">
       {(total ?? 0) > 0 ? (
-        <>{total} {label}</>
+        <>
+          {total} {label}
+        </>
       ) : (
         <>No {label} found</>
       )}
     </h2>
   )
 }
-
-// ─── Mobile filter toggle ─────────────────────────────────────────────────────
 
 function FilterToggle({ onClick, count }: { onClick: () => void; count: number }) {
   return (
@@ -98,7 +106,12 @@ function FilterToggle({ onClick, count }: { onClick: () => void; count: number }
       className="lg:hidden flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50"
     >
       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
+        />
       </svg>
       Filters
       {count > 0 && (
@@ -110,14 +123,22 @@ function FilterToggle({ onClick, count }: { onClick: () => void; count: number }
   )
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
-
 function EmptyState({ onClearFilters }: { onClearFilters: () => void }) {
   return (
     <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-200 py-24 text-center">
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100">
-        <svg className="h-6 w-6 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        <svg
+          className="h-6 w-6 text-zinc-300"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+          />
         </svg>
       </div>
       <p className="text-sm font-semibold text-zinc-800">No venues found</p>
@@ -134,37 +155,65 @@ function EmptyState({ onClearFilters }: { onClearFilters: () => void }) {
   )
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
 export function VenueGrid({
-  venues, total, loading, error,
-  hasFilters, venueType, capacity,
-  onVenueClick, onRetry, onClearFilters,
-  onVenueTypeChange, onCapacityChange,
+  venues,
+  total,
+  loading,
+  error,
+  hasFilters,
+  venueType,
+  capacity,
+  onVenueClick,
+  onRetry,
+  onClearFilters,
+  onVenueTypeChange,
+  onCapacityChange,
 }: Props) {
+  const [searchParams] = useSearchParams()
   const [sort, setSort] = useState<SortKey>('recommended')
   const [page, setPage] = useState(1)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+
+  // FIX #3: reset to page 1 whenever the *committed* search query changes
+  // (new q/city/venue_type/capacity submitted) — previously only sort/filter
+  // wrapper functions reset the page, so a fresh search from the hero could
+  // leave you stranded on an out-of-range page with an empty grid.
+  useEffect(() => {
+    setPage(1)
+  }, [searchParams.toString()])
 
   const activeFilterCount = [venueType, capacity].filter(Boolean).length
   const sorted = useMemo(() => sortVenues(venues, sort), [venues, sort])
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
   const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  function handleSort(next: SortKey) { setSort(next); setPage(1) }
+  function handleSort(next: SortKey) {
+    setSort(next)
+    setPage(1)
+  }
 
   const sidebarProps = {
-    venueType, capacity,
-    onVenueTypeChange: (t: string) => { onVenueTypeChange(t); setPage(1) },
-    onCapacityChange: (v: string) => { onCapacityChange(v); setPage(1) },
-    onClearFilters,
+    venueType,
+    capacity,
+    onVenueTypeChange: (t: string) => {
+      onVenueTypeChange(t)
+      setPage(1)
+      setMobileFiltersOpen(false) // FIX #7: auto-close drawer after picking a filter
+    },
+    onCapacityChange: (v: string) => {
+      onCapacityChange(v)
+      setPage(1)
+    },
+    onClearFilters: () => {
+      onClearFilters()
+      setMobileFiltersOpen(false)
+    },
     hasFilters,
     totalResults: total,
   }
 
   return (
     <div className="bg-white">
-      {/* Breadcrumb strip */}
       <div className="border-b border-zinc-100 bg-white px-6 py-3.5">
         <div className="mx-auto max-w-7xl px-6">
           <Breadcrumbs />
@@ -173,23 +222,20 @@ export function VenueGrid({
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="flex gap-8">
-
-          {/* Desktop sidebar */}
           <aside className="hidden lg:block w-60 shrink-0">
             <div className="sticky top-6">
               <SearchSidebar {...sidebarProps} />
             </div>
           </aside>
 
-          {/* Results column */}
           <div className="flex-1 min-w-0">
-
-            {/* Count heading */}
             <ResultsHeading total={total} loading={loading} />
 
-            {/* Top bar: mobile filter + sort */}
             <div className="mb-5 flex items-center justify-between gap-3">
-              <FilterToggle onClick={() => setMobileFiltersOpen(v => !v)} count={activeFilterCount} />
+              <FilterToggle
+                onClick={() => setMobileFiltersOpen((v) => !v)}
+                count={activeFilterCount}
+              />
 
               <div className="relative flex items-center gap-2 ml-auto">
                 <span className="hidden text-xs text-zinc-400 sm:block">Sort</span>
@@ -203,60 +249,68 @@ export function VenueGrid({
                   <option value="price_desc">Price: High → Low</option>
                   <option value="capacity_desc">Largest first</option>
                 </select>
-                <svg className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <svg
+                  className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
                 </svg>
               </div>
             </div>
 
-            {/* Mobile filter drawer */}
             {mobileFiltersOpen && (
               <div className="mb-6 lg:hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
                 <SearchSidebar {...sidebarProps} />
               </div>
             )}
 
-            {/* Error */}
             {!loading && error && (
               <div className="rounded-2xl border border-red-100 bg-red-50 p-10 text-center">
                 <p className="text-sm font-medium text-red-600">{error}</p>
-                <button onClick={onRetry} className="mt-4 rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+                <button
+                  onClick={onRetry}
+                  className="mt-4 rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                >
                   Try again
                 </button>
               </div>
             )}
 
-            {/* Grid */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-
-              {/* Loading skeletons */}
               {loading && Array.from({ length: 9 }).map((_, i) => <VenueCardSkeleton key={i} />)}
 
-              {/* Empty */}
               {!loading && !error && venues.length === 0 && (
                 <EmptyState onClearFilters={onClearFilters} />
               )}
 
-              {/* Cards */}
-              {!loading && !error && paged.map((venue) => (
-                <VenueCard
-                  key={venue.id}
-                  venue={venue}
-                  onClick={() => onVenueClick(venue.id)}
-                />
-              ))}
+              {!loading &&
+                !error &&
+                paged.map((venue) => (
+                  <VenueCard key={venue.id} venue={venue} onClick={() => onVenueClick(venue.id)} />
+                ))}
             </div>
 
-            {/* Pagination */}
             {!loading && totalPages > 1 && (
               <div className="mt-12 flex items-center justify-center gap-2">
                 <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                   className="flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-600 shadow-sm transition-colors hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
                   </svg>
                 </button>
 
@@ -265,15 +319,23 @@ export function VenueGrid({
                   const isActive = p === page
                   const show = isActive || Math.abs(p - page) <= 1 || p === 1 || p === totalPages
                   if (!show) {
-                    if (p === 2 || p === totalPages - 1) return <span key={p} className="text-sm text-zinc-400">…</span>
+                    if (p === 2 || p === totalPages - 1)
+                      return (
+                        <span key={p} className="text-sm text-zinc-400">
+                          …
+                        </span>
+                      )
                     return null
                   }
                   return (
                     <button
                       key={p}
                       onClick={() => setPage(p)}
-                      className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-zinc-900 text-white' : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
-                        }`}
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-zinc-900 text-white'
+                          : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
+                      }`}
                     >
                       {p}
                     </button>
@@ -281,12 +343,17 @@ export function VenueGrid({
                 })}
 
                 <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
                   className="flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-600 shadow-sm transition-colors hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
                   </svg>
                 </button>
               </div>

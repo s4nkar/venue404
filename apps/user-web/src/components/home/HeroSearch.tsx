@@ -1,6 +1,7 @@
 import { CATEGORIES, VENUE_TYPE_LABELS } from '../../constants'
 
-const INPUT_BASE = 'bg-transparent border-0 outline-none ring-0 shadow-none text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none w-full'
+const INPUT_BASE =
+  'bg-transparent border-0 outline-none ring-0 shadow-none text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none w-full'
 
 type Props = {
   q: string
@@ -18,33 +19,92 @@ type Props = {
 
 // ─── Dark category/filter hero ────────────────────────────────────────────────
 
-function FilterHero({ venueType, city, capacity, onCityChange, onCapacityChange, onSubmit }: Pick<Props,
-  'venueType' | 'city' | 'capacity' | 'onCityChange' | 'onCapacityChange' | 'onSubmit'
+function FilterHero({
+  q,
+  venueType,
+  city,
+  capacity,
+  onQChange,
+  onCityChange,
+  onCapacityChange,
+  onSubmit,
+}: Pick<
+  Props,
+  | 'q'
+  | 'venueType'
+  | 'city'
+  | 'capacity'
+  | 'onQChange'
+  | 'onCityChange'
+  | 'onCapacityChange'
+  | 'onSubmit'
 >) {
   const typeLabel = venueType ? (VENUE_TYPE_LABELS[venueType] ?? venueType) : ''
-  const titleParts = [typeLabel ? `${typeLabel} Venues` : '', city ? `in ${city}` : ''].filter(Boolean)
+  const titleParts = [typeLabel ? `${typeLabel} Venues` : '', city ? `in ${city}` : ''].filter(
+    Boolean
+  )
   const title = titleParts.length > 0 ? titleParts.join(' ') : 'Venue Search'
 
   return (
     <section className="bg-gradient-to-br from-[#0b1c19] via-[#0f2920] to-[#163326] py-12 sm:py-16">
       <div className="mx-auto max-w-3xl px-6 text-center">
-
         {/* Title */}
         <h1 className="text-3xl font-bold text-white sm:text-4xl lg:text-5xl">{title}</h1>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-zinc-400 sm:text-base">
-          Find the perfect venue to make your event one to remember. Whatever your
-          capacity or budget, we're here to help.
+          Find the perfect venue to make your event one to remember. Whatever your capacity or
+          budget, we're here to help.
         </p>
 
-        {/* Search pill */}
+        {/* Search pill — now 3 fields: Keyword / Area / People */}
         <form
           onSubmit={onSubmit}
-          className="mx-auto mt-8 flex h-[60px] max-w-2xl items-stretch overflow-hidden rounded-2xl bg-white shadow-2xl"
+          className="mx-auto mt-8 flex h-[60px] max-w-3xl items-stretch overflow-hidden rounded-2xl bg-white shadow-2xl"
         >
+          {/* Keyword */}
+          <div className="flex flex-1 items-center gap-3 px-5">
+            <svg
+              className="h-4 w-4 shrink-0 text-zinc-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">
+                Keyword
+              </p>
+              <input
+                type="text"
+                value={q}
+                onChange={(e) => onQChange(e.target.value)}
+                placeholder="Venue name or type"
+                className={INPUT_BASE}
+              />
+            </div>
+          </div>
+
+          <div className="my-3.5 w-px bg-zinc-100" />
+
           {/* City / Area */}
           <div className="flex flex-1 items-center gap-3 px-5">
-            <svg className="h-4 w-4 shrink-0 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <svg
+              className="h-4 w-4 shrink-0 text-zinc-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
             </svg>
             <div className="flex-1 min-w-0">
               <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">Area</p>
@@ -63,8 +123,18 @@ function FilterHero({ venueType, city, capacity, onCityChange, onCapacityChange,
 
           {/* Capacity */}
           <div className="flex flex-1 items-center gap-3 px-5">
-            <svg className="h-4 w-4 shrink-0 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            <svg
+              className="h-4 w-4 shrink-0 text-zinc-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+              />
             </svg>
             <div className="flex-1 min-w-0">
               <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">People</p>
@@ -85,7 +155,12 @@ function FilterHero({ venueType, city, capacity, onCityChange, onCapacityChange,
             className="flex shrink-0 items-center gap-2 bg-brand px-7 text-sm font-bold text-white transition-colors hover:bg-brand-hover"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
             <span className="hidden sm:block">Search {typeLabel || 'venues'}</span>
             <span className="sm:hidden">Search</span>
@@ -94,8 +169,18 @@ function FilterHero({ venueType, city, capacity, onCityChange, onCapacityChange,
 
         {/* Deep Research link */}
         <p className="mt-4 text-sm text-zinc-500">
-          <svg className="mr-1.5 inline h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg
+            className="mr-1.5 inline h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
           Can't find the right venue?{' '}
           <button type="button" className="text-zinc-300 transition-colors hover:text-white">
@@ -128,37 +213,50 @@ function FilterHero({ venueType, city, capacity, onCityChange, onCapacityChange,
 // ─── Landing hero (no filters) ────────────────────────────────────────────────
 
 function HeroFull({
-  q, city, venueType,
-  hasFilters, onQChange, onCityChange,
-  onSubmit, onCategoryClick, onClearFilters,
+  q,
+  city,
+  venueType,
+  hasFilters,
+  onQChange,
+  onCityChange,
+  onSubmit,
+  onCategoryClick,
+  onClearFilters,
 }: Omit<Props, 'capacity' | 'onCapacityChange'>) {
   return (
     <>
       <section className="bg-white pb-10 pt-16 sm:pt-24">
         <div className="mx-auto max-w-4xl px-6 text-center">
-
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/5 px-4 py-1.5 text-xs font-semibold text-brand">
             <span className="h-1.5 w-1.5 rounded-full bg-brand animate-pulse" />
             Venue discovery &amp; booking · India
           </div>
 
           <h1 className="text-4xl font-bold leading-tight tracking-tight text-zinc-900 sm:text-5xl lg:text-[3.25rem]">
-            Venue booking,{' '}
-            <span className="text-brand">accelerated.</span>
+            Venue booking, <span className="text-brand">accelerated.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-zinc-500">
-            Instant availability and transparent pricing from verified venues across India —
-            from intimate studios to grand banquet halls.
+            Instant availability and transparent pricing from verified venues across India — from
+            intimate studios to grand banquet halls.
           </p>
 
-          {/* Search bar */}
           <form
             onSubmit={onSubmit}
             className="mx-auto mt-9 flex h-14 max-w-2xl items-stretch overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/60 transition-shadow focus-within:border-brand/40 focus-within:shadow-brand/10"
           >
             <div className="flex flex-1 items-center gap-3 px-5">
-              <svg className="h-4 w-4 shrink-0 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                className="h-4 w-4 shrink-0 text-zinc-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
               <input
                 type="text"
@@ -170,8 +268,18 @@ function HeroFull({
             </div>
 
             <div className="hidden sm:flex items-center gap-2.5 border-l border-zinc-100 px-5">
-              <svg className="h-3.5 w-3.5 shrink-0 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <svg
+                className="h-3.5 w-3.5 shrink-0 text-zinc-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
               </svg>
               <input
                 type="text"
@@ -182,12 +290,14 @@ function HeroFull({
               />
             </div>
 
-            <button type="submit" className="shrink-0 bg-brand px-7 text-sm font-semibold text-white transition-colors hover:bg-brand-hover">
+            <button
+              type="submit"
+              className="shrink-0 bg-brand px-7 text-sm font-semibold text-white transition-colors hover:bg-brand-hover"
+            >
               Find venues
             </button>
           </form>
 
-          {/* Category chips */}
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             {CATEGORIES.map((c) => {
               const active = venueType === c.venue_type
@@ -214,7 +324,12 @@ function HeroFull({
                 className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-100 transition-colors"
               >
                 <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
                 Clear
               </button>
@@ -223,7 +338,6 @@ function HeroFull({
         </div>
       </section>
 
-      {/* Trust strip */}
       <div className="border-y border-zinc-100 bg-zinc-50/70">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-x-8 gap-y-2.5 px-6 py-3.5">
           {[
@@ -245,13 +359,17 @@ function HeroFull({
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
+export { FilterHero, HeroFull }
+
 export function HeroSearch(props: Props) {
   if (props.hasFilters) {
     return (
       <FilterHero
+        q={props.q}
         venueType={props.venueType}
         city={props.city}
         capacity={props.capacity}
+        onQChange={props.onQChange}
         onCityChange={props.onCityChange}
         onCapacityChange={props.onCapacityChange}
         onSubmit={props.onSubmit}
