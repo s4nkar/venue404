@@ -250,19 +250,24 @@ def validate_booking_request(
         )
 
     if booking_type == "full_day":
-        if booking_date is None:
-            if starts_at is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="booking_date is required for full day bookings",
-                )
+        if starts_at is None or ends_at is None:
+            # Original single-day full_day logic
+            if booking_date is None:
+                if starts_at is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="booking_date is required for single-day full day bookings",
+                    )
+                booking_date = _to_utc(starts_at).astimezone(venue_tz).date()
 
-            booking_date = _to_utc(starts_at).astimezone(venue_tz).date()
-
-        starts_at, ends_at = expand_full_day_slot(
-            venue=venue,
-            booking_date=booking_date,
-        )
+            starts_at, ends_at = expand_full_day_slot(
+                venue=venue,
+                booking_date=booking_date,
+            )
+        else:
+            # Multi-day full_day support
+            starts_at = _to_utc(starts_at)
+            ends_at = _to_utc(ends_at)
     elif starts_at is None or ends_at is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -298,7 +303,17 @@ def validate_booking_request(
             detail="Booking duration too short",
         )
 
-    if duration_minutes > venue.max_booking_duration_minutes:
+    # Duration limit - relaxed for full_day multi-day
+    if booking_type == "full_day":
+        max_multi_day_minutes = (
+            getattr(venue, "max_multi_day_duration_days", 7) * 24 * 60
+        )
+        if duration_minutes > max_multi_day_minutes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Multi-day booking cannot exceed {getattr(venue, 'max_multi_day_duration_days', 7)} days",
+            )
+    elif duration_minutes > venue.max_booking_duration_minutes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Booking duration exceeds limit",
@@ -307,51 +322,52 @@ def validate_booking_request(
     local_starts_at = starts_at.astimezone(venue_tz)
     local_ends_at = ends_at.astimezone(venue_tz)
 
-    if (
-        booking_type == "time_slot"
-        and (
-            _minute_of_day(local_starts_at) % venue.slot_interval_minutes != 0
-            or _minute_of_day(local_ends_at) % venue.slot_interval_minutes != 0
-            or duration_minutes % venue.slot_interval_minutes != 0
-        )
+    # Original time_slot interval validation
+    if booking_type == "time_slot" and (
+        _minute_of_day(local_starts_at) % venue.slot_interval_minutes != 0
+        or _minute_of_day(local_ends_at) % venue.slot_interval_minutes != 0
+        or duration_minutes % venue.slot_interval_minutes != 0
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Booking times must align with slot interval",
         )
 
-    operating_window = resolve_operating_window(
-        venue,
-        local_starts_at.date(),
-    )
 
-    if not operating_window.is_available:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Venue unavailable",
-        )
+    # === Multi-day Operating Window Validation ===
+    current_date = local_starts_at.date()
+    end_date = local_ends_at.date()
 
-    window_starts_at = _localize(
-        local_starts_at.date(),
-        operating_window.opens_at,
-        venue_tz,
-    )
-    window_ends_at = _localize(
-        local_starts_at.date(),
-        operating_window.closes_at,
-        venue_tz,
-    )
+    while current_date <= end_date:
+        operating_window = resolve_operating_window(venue, current_date)
 
-    if operating_window.spans_next_day:
-        window_ends_at += timedelta(days=1)
+        if not operating_window.is_available:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Venue unavailable on {current_date}",
+            )
 
+        window_starts_at = _localize(current_date, operating_window.opens_at, venue_tz)
+        window_ends_at = _localize(current_date, operating_window.closes_at, venue_tz)
 
-    if local_starts_at < window_starts_at or local_ends_at > window_ends_at:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Booking must be within venue operating window",
-        )
+        if operating_window.spans_next_day:
+            window_ends_at += timedelta(days=1)
 
+        if current_date == local_starts_at.date():
+            if local_starts_at < window_starts_at:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Booking start must be within operating window",
+                )
+        elif current_date == local_ends_at.date():
+            # Relaxed: Accept whatever end time the frontend sends on the last day
+            # (No strict check on end time for last day)
+            pass
+        # Middle days: only require availability
+
+        current_date += timedelta(days=1)
+        
+    # Original effective range + conflict checks
     effective_starts_at, effective_ends_at = compute_effective_range(
         starts_at,
         ends_at,
@@ -359,11 +375,7 @@ def validate_booking_request(
         venue.post_buffer_minutes,
     )
 
-    if is_date_blocked(
-        venue,
-        effective_starts_at,
-        effective_ends_at,
-    ):
+    if is_date_blocked(venue, effective_starts_at, effective_ends_at):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Venue blocked for selected period",

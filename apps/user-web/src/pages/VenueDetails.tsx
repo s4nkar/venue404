@@ -91,7 +91,7 @@ function useVenueBooking(venue: VenueResponse) {
   const [selectedEnd, setSelectedEnd] = useState<string | null>(null)
   const [slotError, setSlotError] = useState<string | null>(null)
 
-  // Auto-set booking type based on venue config
+  // Auto-set booking type
   useEffect(() => {
     if (isTimeSlotVenue && !isFullDayVenue) setBookingType('time_slot')
     else if (isFullDayVenue && !isTimeSlotVenue) setBookingType('full_day')
@@ -99,15 +99,22 @@ function useVenueBooking(venue: VenueResponse) {
 
   // Full-day: compute operating window datetimes (supports same-day & multi-day)
   useEffect(() => {
-    if (bookingType === 'full_day' && startDate) {
+    if (bookingType === 'full_day' && startDate && endDate) {
       const openH = venue.open_time.slice(0, 5)
       const closeH = venue.close_time.slice(0, 5)
+
       const computedStart = `${startDate}T${openH}:00`
-      const computedEnd = endDate ? `${endDate}T${closeH}:00` : `${startDate}T${closeH}:00` // same-day fallback
+      const computedEnd = `${endDate}T${closeH}:00`
+
+
       setSelectedStart(computedStart)
       setSelectedEnd(computedEnd)
+    } else if (bookingType === 'full_day' && startDate) {
+      const openH = venue.open_time.slice(0, 5)
+      const closeH = venue.close_time.slice(0, 5)
+      setSelectedStart(`${startDate}T${openH}:00`)
+      setSelectedEnd(`${startDate}T${closeH}:00`)
     } else if (bookingType === 'time_slot' && startDate) {
-      setEndDate(startDate) // force single day
       setSelectedStart(null)
       setSelectedEnd(null)
     } else {
@@ -150,20 +157,29 @@ function useVenueBooking(venue: VenueResponse) {
         setSlotError('This slot is no longer available.')
         return
       }
+
       navigate('/checkout', {
         state: {
           venueId: venue.id,
           venueName: venue.name,
           venueCoverImage: venue.photos?.find((p) => p.is_cover)?.image_url ?? null,
           bookingType,
+
+          userStartsAt: toUtcIso(selectedStart),
+          userEndsAt: toUtcIso(selectedEnd),
+
           startsAt: validation.effective_starts_at,
           endsAt: validation.effective_ends_at,
+
           bookingDate: toUtcIso(startDate),
           quote: quoteQuery.data,
         },
       })
     },
-    onError: (err: any) => setSlotError(err?.message ?? 'Unable to book.'),
+    onError: (err: any) => {
+      console.error('Validation error:', err)
+      setSlotError(err?.message ?? 'Unable to book.')
+    },
   })
 
   const handleBookingTypeChange = (next: BookingType) => {
@@ -176,19 +192,18 @@ function useVenueBooking(venue: VenueResponse) {
     setSlotError(null)
   }
 
-const handleRangeChange = (start: string | null, end: string | null) => {
-  let finalStart = start
-  let finalEnd = end
+  const handleRangeChange = (start: string | null, end: string | null) => {
+    let finalStart = start
+    let finalEnd = end
 
-  // Enforce chronological order
-  if (finalStart && finalEnd && finalStart > finalEnd) {
-    [finalStart, finalEnd] = [finalEnd, finalStart]
+    if (finalStart && finalEnd && finalStart > finalEnd) {
+      [finalStart, finalEnd] = [finalEnd, finalStart]
+    }
+
+    setStartDate(finalStart)
+    setEndDate(finalEnd)
+    setSlotError(null)
   }
-
-  setStartDate(finalStart)
-  setEndDate(bookingType === 'time_slot' ? finalStart : finalEnd)
-  setSlotError(null)
-}
 
   const handleSlotSelect = (start: string, end: string | null) => {
     setSelectedStart(start)

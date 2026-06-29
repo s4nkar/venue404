@@ -77,9 +77,9 @@ def create_booking_request(
         booking_date=payload.booking_date,
         guest_count=payload.guest_count,
     )
+    starts_at = payload.starts_at
+    ends_at = payload.ends_at
 
-    starts_at = validation.effective_starts_at + timedelta(minutes=venue.pre_buffer_minutes)
-    ends_at = validation.effective_ends_at - timedelta(minutes=venue.post_buffer_minutes)
     quote = get_pricing_quote_for_slot(
         db=db,
         venue_id=venue.id,

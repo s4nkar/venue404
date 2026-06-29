@@ -9,6 +9,7 @@ import Register from './pages/Register'
 import RegisterSuccess from './pages/RegisterSuccess'
 import Checkout from './pages/Checkout'
 import BookingDetails from './pages/BookingDetails'
+import Payment from './pages/Payment'
 import Profile from './pages/Profile'
 import Notifications from './pages/Notifications'
 import PaymentResult from './pages/PaymentResult'
@@ -44,6 +45,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <BookingDetails />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/payment/:bookingId',
+    element: (
+      <ProtectedRoute>
+        <Payment />
       </ProtectedRoute>
     ),
   },
