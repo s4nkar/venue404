@@ -2,12 +2,12 @@ import { Link } from 'react-router-dom'
 import { Logo } from '@venue404/ui'
 
 const VENUE_TYPES = [
-  { label: 'Wedding Halls',    href: '/?venue_type=wedding_hall' },
-  { label: 'Banquet Halls',    href: '/?venue_type=banquet_hall' },
-  { label: 'Event Spaces',     href: '/?venue_type=event_space' },
-  { label: 'Rooftops',         href: '/?venue_type=rooftop' },
-  { label: 'Conference Rooms', href: '/?venue_type=conference_room' },
-  { label: 'Outdoor Lawns',    href: '/?venue_type=lawn' },
+  { label: 'Wedding Halls', href: '/venues?venue_type=wedding_hall' },
+  { label: 'Banquet Halls', href: '/venues?venue_type=banquet_hall' },
+  { label: 'Event Spaces', href: '/venues?venue_type=event_space' },
+  { label: 'Rooftops', href: '/venues?venue_type=rooftop' },
+  { label: 'Conference Rooms', href: '/venues?venue_type=conference_room' },
+  { label: 'Outdoor Lawns', href: '/venues?venue_type=lawn' },
 ]
 
 const ACCOUNT_LINKS = [

@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import Home from './pages/Home'
+import Landing from './pages/Landing'
+import Search from './pages/Search'
 import VenueDetails from './pages/VenueDetails'
 import MyBookings from './pages/MyBookings'
 import Login from './pages/Login'
@@ -9,13 +10,15 @@ import Register from './pages/Register'
 import RegisterSuccess from './pages/RegisterSuccess'
 import Checkout from './pages/Checkout'
 import BookingDetails from './pages/BookingDetails'
+import Payment from './pages/Payment'
 import Profile from './pages/Profile'
 import Notifications from './pages/Notifications'
 import PaymentResult from './pages/PaymentResult'
 
 export const router = createBrowserRouter([
   // public routes
-  { path: '/', element: <Home /> },
+  { path: '/', element: <Landing /> },
+  { path: '/venues', element: <Search /> },
   { path: '/venues/:id', element: <VenueDetails /> },
   { path: '/login', element: <Login /> },
   { path: '/login/success', element: <LoginSuccess /> },
@@ -44,6 +47,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <BookingDetails />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/payment/:bookingId',
+    element: (
+      <ProtectedRoute>
+        <Payment />
       </ProtectedRoute>
     ),
   },

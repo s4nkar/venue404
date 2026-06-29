@@ -43,7 +43,15 @@ function TrendingCard({ venue, onClick }: { venue: SearchResult; onClick: () => 
   return (
     <article
       onClick={onClick}
-      className="group cursor-pointer overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className="group cursor-pointer overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
     >
       {/* Photo */}
       <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
@@ -56,10 +64,22 @@ function TrendingCard({ venue, onClick }: { venue: SearchResult; onClick: () => 
           />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2.5 bg-gradient-to-br from-zinc-100 to-zinc-50">
-            <svg className="h-9 w-9 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            <svg
+              className="h-9 w-9 text-zinc-300"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+              />
             </svg>
-            <p className="px-6 text-center text-xs leading-relaxed text-zinc-400 line-clamp-2">{venue.name}</p>
+            <p className="px-6 text-center text-xs leading-relaxed text-zinc-400 line-clamp-2">
+              {venue.name}
+            </p>
           </div>
         )}
 

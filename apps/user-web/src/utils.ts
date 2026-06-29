@@ -62,3 +62,39 @@ export function toUtcIso(value?: string | null) {
 
   return new Date(value).toISOString()
 }
+
+// === NEW TIMEZONE-AWARE HELPERS (Safe to add) ===
+export function formatDateTz(iso: string, timezone: string = 'Asia/Kolkata'): string {
+  const date = new Date(iso)
+  return date.toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: timezone,
+  })
+}
+
+export function formatTimeTz(iso: string, timezone: string = 'Asia/Kolkata'): string {
+  const date = new Date(iso)
+  return date.toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: timezone,
+  })
+}
+
+export function formatDateRangeTz(
+  startIso: string,
+  endIso: string,
+  timezone: string = 'Asia/Kolkata'
+): string {
+  const startFormatted = formatDateTz(startIso, timezone)
+  const endFormatted = formatDateTz(endIso, timezone)
+
+  return startFormatted === endFormatted 
+    ? startFormatted 
+    : `${startFormatted} — ${endFormatted}`
+}
+

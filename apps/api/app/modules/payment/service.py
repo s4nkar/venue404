@@ -245,10 +245,6 @@ def confirm_balance_payment(db: Session, payment: Payment, booking: Booking) -> 
         user_id=booking.user_id, entry_type="charge", amount_paise=payment.amount_paise,
         direction="credit", stripe_pi_ref=payment.stripe_payment_intent_id,
     ))
-    db.add(BookingStatusHistory(
-        booking_id=booking.id, old_status=BookingStatus.confirmed,
-        new_status=BookingStatus.confirmed, reason="balance_payment_succeeded",
-    ))
 
     venue_name = venue.name if venue else "your venue"
     notifications.notify(db, booking.user_id, "balance_paid",
@@ -270,6 +266,22 @@ def fail_payment(db: Session, payment_intent_id: str) -> None:
     payment.status = PaymentAttemptStatus.failed
     # Booking stays in its current state; the hold-expiry / balance-overdue jobs
     # reclaim it if no retry succeeds.
+
+
+def cancel_payment_intent(payment_intent_id: str | None) -> None:
+    """Cancel an uncaptured Stripe PaymentIntent (e.g. a pending advance whose
+    booking is being cancelled before payment succeeds).
+
+    Resilient like _record_refund: a Stripe failure (already-captured, already
+    -canceled, or network error) is logged and swallowed so it never aborts the
+    surrounding cancellation transaction.
+    """
+    if not payment_intent_id:
+        return
+    try:
+        get_stripe().PaymentIntent.cancel(payment_intent_id)
+    except Exception:  # noqa: BLE001 — Stripe/network failure must not abort the txn
+        logger.exception("Stripe cancel failed for payment intent %s", payment_intent_id)
 
 
 # --------------------------------------------------------------------------- #
