@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Card, SectionHeader, Button, Input } from '@venue404/ui'
+import { Card, SectionHeader, Button, Input, Skeleton } from '@venue404/ui'
 import { ArrowLeft, ArrowRight, Loader2, Save, Trash2, Clock, Ban } from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
 import { TimeSelect } from '../../components/TimeSelect'
@@ -208,7 +208,37 @@ export default function VenueCalendarManagement() {
   }
 
   if (loading) {
-    return <div className="py-12 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-brand" /></div>
+    return (
+      <div className="space-y-6 pb-12 max-w-5xl mx-auto pt-4">
+        <Skeleton className="h-4 w-32 mb-6" />
+        <div className="mb-6">
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        <div className="flex gap-4 border-b border-zinc-200 mb-6 pb-2">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-6 w-32" />
+        </div>
+        <div className="bg-zinc-50 rounded-xl border border-zinc-200 overflow-hidden">
+          <div className="grid grid-cols-12 gap-4 p-4 border-b border-zinc-200">
+            <Skeleton className="col-span-3 h-5 w-full" />
+            <Skeleton className="col-span-2 h-5 w-full" />
+            <Skeleton className="col-span-3 h-5 w-full" />
+            <Skeleton className="col-span-3 h-5 w-full" />
+            <Skeleton className="col-span-1 h-5 w-full" />
+          </div>
+          {[1,2,3,4,5,6,7].map(i => (
+            <div key={i} className="grid grid-cols-12 gap-4 p-4 items-center border-b border-zinc-100 bg-white">
+              <Skeleton className="col-span-3 h-5 w-24" />
+              <div className="col-span-2 flex justify-center"><Skeleton className="h-4 w-4 rounded" /></div>
+              <Skeleton className="col-span-3 h-9 w-full rounded-md" />
+              <Skeleton className="col-span-3 h-9 w-full rounded-md" />
+              <div className="col-span-1 flex justify-center"><Skeleton className="h-4 w-4 rounded" /></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (

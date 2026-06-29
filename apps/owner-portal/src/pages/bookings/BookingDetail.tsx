@@ -1,0 +1,1032 @@
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { Card, Button, StatusBadge, PaymentStatusBadge, Modal, Skeleton } from '@venue404/ui'
+import { createClient, bookingEndpoints } from '@venue404/api-client'
+import { Calendar, MapPin, User, Clock, ArrowLeft, Check, X, AlertTriangle, History, AlignLeft, Info, Receipt, MessageSquare, Lock } from 'lucide-react'
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function toDateStringLocal(d: Date) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function addMonthsLocal(d: Date, m: number) {
+  const nd = new Date(d)
+  nd.setMonth(nd.getMonth() + m)
+  return nd
+}
+
+function MonthGrid({ 
+  year, 
+  month, 
+  selectedDate, 
+  minDate,
+  maxDate,
+  onSelect 
+}: { 
+  year: number, 
+  month: number, 
+  selectedDate: string,
+  minDate?: string,
+  maxDate?: string,
+  onSelect: (d: string) => void 
+}) {
+  const firstDay = new Date(year, month, 1)
+  const startPad = firstDay.getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const grid: (string | null)[] = []
+  for (let i = 0; i < startPad; i++) grid.push(null)
+  for (let d = 1; d <= daysInMonth; d++) grid.push(toDateStringLocal(new Date(year, month, d)))
+  while (grid.length % 7 !== 0) grid.push(null)
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 mb-2">
+        {DAY_LABELS.map(l => <div key={l} className="text-center text-xs font-medium text-zinc-400 py-1">{l}</div>)}
+      </div>
+      <div className="grid grid-cols-7 gap-y-1">
+        {grid.map((dateStr, i) => {
+          if (!dateStr) return <div key={i} className="h-10" />
+          
+          const d = parseInt(dateStr.split('-')[2], 10)
+          const isDisabled = (minDate && dateStr < minDate) || (maxDate && dateStr > maxDate)
+          const isSelected = dateStr === selectedDate
+
+          let btnClass = "h-9 w-9 mx-auto rounded-full text-sm font-medium transition-colors flex items-center justify-center "
+          if (isSelected) btnClass += "bg-zinc-900 text-white shadow-sm"
+          else if (isDisabled) btnClass += "text-zinc-300 cursor-not-allowed line-through"
+          else btnClass += "text-zinc-700 hover:bg-zinc-100 cursor-pointer"
+
+          return (
+            <div key={dateStr} className="text-center py-0.5">
+              <button 
+                disabled={isDisabled} 
+                onClick={() => onSelect(dateStr)}
+                className={btnClass}
+                type="button"
+              >
+                {d}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function DoubleMonthCalendar({ 
+  value, 
+  onChange, 
+  minDate,
+  maxDate
+}: { 
+  value: string, 
+  onChange: (v: string) => void, 
+  minDate?: string,
+  maxDate?: string
+}) {
+  const [viewDate, setViewDate] = useState(() => {
+    const d = value ? new Date(value) : new Date()
+    d.setDate(1)
+    d.setHours(0,0,0,0)
+    return d
+  })
+
+  const year1 = viewDate.getFullYear()
+  const month1 = viewDate.getMonth()
+  const next = addMonthsLocal(viewDate, 1)
+  const year2 = next.getFullYear()
+  const month2 = next.getMonth()
+
+  const label1 = viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })
+  const label2 = next.toLocaleString('default', { month: 'long', year: 'numeric' })
+
+  const minViewDate = minDate ? new Date(minDate) : new Date(0)
+  minViewDate.setDate(1)
+  minViewDate.setHours(0,0,0,0)
+  const canGoPrev = viewDate > minViewDate
+
+  return (
+    <div className="select-none bg-white p-2 sm:p-4 w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+        {/* Month 1 */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <button 
+              type="button"
+              onClick={() => setViewDate(addMonthsLocal(viewDate, -1))}
+              disabled={!canGoPrev}
+              className="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-full disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <div className="text-sm font-semibold text-zinc-900">{label1}</div>
+            <div className="w-8 h-8" />
+          </div>
+          <MonthGrid year={year1} month={month1} selectedDate={value} minDate={minDate} maxDate={maxDate} onSelect={onChange} />
+        </div>
+
+        {/* Month 2 */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-8 h-8" />
+            <div className="text-sm font-semibold text-zinc-900">{label2}</div>
+            <button 
+              type="button"
+              onClick={() => setViewDate(addMonthsLocal(viewDate, 1))}
+              className="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-full transition-colors"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+          <MonthGrid year={year2} month={month2} selectedDate={value} minDate={minDate} maxDate={maxDate} onSelect={onChange} />
+        </div>
+      </div>
+      
+      <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-start gap-5">
+         <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-400">
+           <span className="h-3.5 w-3.5 rounded-full bg-zinc-900"></span> Selected
+         </span>
+         <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-400">
+           <span className="h-3.5 w-3.5 rounded-full bg-zinc-200"></span> Unavailable
+         </span>
+      </div>
+    </div>
+  )
+}
+
+export default function BookingDetail() {
+  const { bookingId } = useParams<{ bookingId: string }>()
+  const navigate = useNavigate()
+  const [booking, setBooking] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState('overview')
+  const [actionLoading, setActionLoading] = useState(false)
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+  const [extendModalOpen, setExtendModalOpen] = useState(false)
+  const [newDeadlineDate, setNewDeadlineDate] = useState('')
+  const [isEditingNotes, setIsEditingNotes] = useState(false)
+  const [draftNotes, setDraftNotes] = useState('')
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelType, setCancelType] = useState<'forfeit' | 'goodwill' | null>(null)
+
+  const fetchBooking = async () => {
+    if (!bookingId) return
+    try {
+      const client = createClient()
+      const data = await bookingEndpoints(client).getBooking(bookingId)
+      setBooking(data)
+    } catch (err) {
+      console.error("Failed to fetch booking detail", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchBooking()
+  }, [bookingId])
+
+  const handleAction = async (action: 'accept' | 'reject' | 'cancelForfeit' | 'cancelGoodwill' | 'extendBalanceDeadline' | 'updateOwnerNotes', payload?: any) => {
+    if (!bookingId) return
+    setActionLoading(true)
+    try {
+      const client = createClient()
+      if (action === 'accept') {
+        await bookingEndpoints(client).acceptBooking(bookingId)
+      } else if (action === 'reject') {
+        await bookingEndpoints(client).rejectBooking(bookingId, payload?.reason || 'No reason provided')
+        setRejectModalOpen(false)
+      } else if (action === 'cancelForfeit') {
+        await bookingEndpoints(client).cancelForfeit(bookingId)
+      } else if (action === 'cancelGoodwill') {
+        await bookingEndpoints(client).cancelGoodwill(bookingId)
+      } else if (action === 'extendBalanceDeadline') {
+        await bookingEndpoints(client).extendBalanceDeadline(bookingId, payload?.new_deadline)
+      } else if (action === 'updateOwnerNotes') {
+        await bookingEndpoints(client).updateOwnerNotes(bookingId, payload?.notes || null)
+        setIsEditingNotes(false)
+      }
+      await fetchBooking()
+    } catch (err) {
+      console.error(`Failed to ${action} booking`, err)
+      alert(`Error performing action: ${err}`)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="w-full min-h-[101vh] space-y-8 pb-12 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b border-zinc-200 pb-6">
+          <div className="flex items-start gap-4 w-full md:w-1/2">
+            <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+            <div className="space-y-3 w-full">
+              <Skeleton className="h-8 w-1/2" />
+              <Skeleton className="h-4 w-3/4" />
+              <div className="flex gap-2 pt-1">
+                <Skeleton className="h-6 w-24 rounded-full" />
+                <Skeleton className="h-6 w-24 rounded-full" />
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
+        
+        {/* Tabs Skeleton */}
+        <div className="flex gap-4">
+           {[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-24" />)}
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="p-6 space-y-5">
+            <Skeleton className="h-6 w-1/3 mb-4" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-5 w-32" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-5 w-32" />
+              </div>
+            </div>
+            <Skeleton className="h-32 w-full mt-4" />
+          </Card>
+          <div className="space-y-6">
+            <Card className="p-6">
+               <Skeleton className="h-6 w-1/3 mb-4" />
+               <div className="flex items-start gap-4">
+                 <Skeleton className="h-12 w-12 rounded-full" />
+                 <div className="space-y-2 flex-1">
+                   <Skeleton className="h-5 w-1/2" />
+                   <Skeleton className="h-4 w-2/3" />
+                 </div>
+               </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!booking) {
+    return <div className="text-center py-20 text-zinc-500">Booking not found.</div>
+  }
+
+  return (
+    <div className="w-full min-h-[101vh] flex flex-col pb-12 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Header & Actions Layout */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mt-8 mb-6">
+        <div className="flex items-start sm:items-center gap-4">
+          <button onClick={() => navigate(-1)} className="p-2 bg-white border border-zinc-200 shadow-sm hover:bg-zinc-50 rounded-full transition-colors text-zinc-600 shrink-0">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <h1 className="text-2xl font-bold text-zinc-900 tracking-tight leading-none">
+                Booking <span className="text-zinc-500 font-medium">#{booking.id.split('-')[0]}</span>
+              </h1>
+              <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
+                <StatusBadge 
+                  label={booking.status.replace(/_/g, ' ').toUpperCase()} 
+                  variant={
+                    booking.status === 'confirmed' ? 'success' :
+                    booking.status === 'requested' || booking.status === 'owner_accepted' ? 'pending' :
+                    booking.status.includes('cancelled') || booking.status.includes('expired') || booking.status === 'owner_rejected' ? 'danger' :
+                    'neutral'
+                  }
+                />
+                <PaymentStatusBadge status={booking.payment_status} />
+              </div>
+            </div>
+            <p className="text-sm text-zinc-500 mt-2 sm:mt-1.5">
+              For <span className="font-medium text-zinc-900">{booking.venue_name}</span> • Created on {new Date(booking.created_at || Date.now()).toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+
+        {/* Top Right Action Bar */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {booking.status === 'requested' && (
+            <>
+              <Button variant="secondary" className="text-rose-600 border-rose-200 hover:bg-rose-50" onClick={() => setRejectModalOpen(true)} disabled={actionLoading}>
+                <X className="h-4 w-4 mr-2" /> Reject
+              </Button>
+              <Button variant="primary" className="bg-brand-600 hover:bg-brand-700" onClick={() => handleAction('accept')} disabled={actionLoading}>
+                <Check className="h-4 w-4 mr-2" /> Accept Request
+              </Button>
+            </>
+          )}
+          {(booking.status === 'confirmed' || booking.status === 'owner_accepted') && (
+            <Button variant="secondary" className="text-rose-600 border-rose-200 hover:bg-rose-50" onClick={() => { setCancelType(null); setCancelModalOpen(true); }} disabled={actionLoading}>
+              <X className="h-4 w-4 mr-2" /> Cancel Booking
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Dynamic Lifecycle Alerts */}
+      <div className="space-y-3 mb-6">
+        {booking.status === 'requested' && booking.owner_action_deadline && (
+          <div className="bg-amber-50 border border-amber-200/60 text-amber-800 px-5 py-3.5 rounded-xl flex items-center gap-3 shadow-sm">
+            <Clock className="h-5 w-5 text-amber-600 shrink-0" />
+            <div className="text-sm font-medium">
+              Action Required: Please accept or reject this request by <span className="font-bold">{new Date(booking.owner_action_deadline).toLocaleString()}</span>.
+            </div>
+          </div>
+        )}
+        
+        {booking.status === 'owner_accepted' && booking.hold_expires_at && (
+          <div className="bg-blue-50/80 border border-blue-200/60 text-blue-800 px-5 py-3.5 rounded-xl flex items-center gap-3 shadow-sm">
+            <Clock className="h-5 w-5 text-blue-600 shrink-0" />
+            <div className="text-sm font-medium">
+              Waiting for advance payment. This hold automatically expires at <span className="font-bold">{new Date(booking.hold_expires_at).toLocaleString()}</span>.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Tabs Navigation */}
+      <div className="border-b border-zinc-200 mt-4 mb-8">
+        <nav className="-mb-px flex w-full overflow-x-auto no-scrollbar" aria-label="Tabs">
+          {[
+            { id: 'overview', label: 'Overview', icon: Info },
+            { id: 'financials', label: 'Financials', icon: Receipt },
+            { id: 'timeline', label: 'Timeline', icon: History },
+            { id: 'notes', label: 'Notes', icon: AlignLeft },
+          ].map(t => {
+            const Icon = t.icon
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex-1 min-w-fit flex items-center justify-center gap-2 whitespace-nowrap pt-2 pb-3 px-2 border-b-2 font-medium text-sm transition-all ${
+                  tab === t.id 
+                    ? 'border-brand-500 text-brand-600' 
+                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {t.label}
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      <div className="animate-in fade-in duration-300">        {tab === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 items-start">
+            {/* Main Column */}
+            <div className="space-y-6">
+              {/* Stats Row */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card className="p-5 flex flex-col justify-center border-zinc-200 shadow-sm rounded-xl">
+                  <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1.5">Booking Type</div>
+                  <div className="text-sm font-bold text-zinc-900 capitalize">{booking.booking_type?.replace('_', ' ')}</div>
+                </Card>
+                <Card className="p-5 flex flex-col justify-center border-zinc-200 shadow-sm rounded-xl">
+                  <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1.5">Event Type</div>
+                  <div className="text-sm font-bold text-zinc-900">{booking.event_type || 'Not specified'}</div>
+                </Card>
+                <Card className="p-5 flex flex-col justify-center border-zinc-200 shadow-sm rounded-xl">
+                  <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1.5">Guest Count</div>
+                  <div className="text-sm font-bold text-zinc-900">{booking.guest_count} guests</div>
+                </Card>
+              </div>
+
+              {/* Timeline Card */}
+              <Card className="p-0 overflow-hidden border-zinc-200 shadow-sm rounded-xl">
+                {(() => {
+                  if (!booking.starts_at || !booking.ends_at) return (
+                    <div className="p-8 text-center text-zinc-500 text-sm">Event times are not available.</div>
+                  );
+
+                  const eventStart = new Date(booking.starts_at);
+                  const eventEnd = new Date(booking.ends_at);
+                  const opStart = booking.effective_starts_at ? new Date(booking.effective_starts_at) : eventStart;
+                  const opEnd = booking.effective_ends_at ? new Date(booking.effective_ends_at) : eventEnd;
+
+                  const setupMins = Math.round((eventStart.getTime() - opStart.getTime()) / 60000);
+                  const teardownMins = Math.round((opEnd.getTime() - eventEnd.getTime()) / 60000);
+                  const eventDurationMins = Math.round((eventEnd.getTime() - eventStart.getTime()) / 60000);
+
+                  const isSameDay = eventStart.toDateString() === eventEnd.toDateString();
+
+                  const formatTime = (d: Date) => new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).format(d);
+                  const formatDate = (d: Date) => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(d);
+                  const formatDateTime = (d: Date) => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true }).format(d);
+                  
+                  const formatNodeTime = (d: Date) => isSameDay ? formatTime(d) : formatDateTime(d);
+
+                  const formatDuration = (m: number) => {
+                    const d = Math.floor(m / (24 * 60));
+                    const h = Math.floor((m % (24 * 60)) / 60);
+                    const mins = m % 60;
+                    let parts = [];
+                    if (d > 0) parts.push(`${d}d`);
+                    if (h > 0) parts.push(`${h}h`);
+                    if (mins > 0) parts.push(`${mins}m`);
+                    return parts.join(' ') || '0m';
+                  };
+
+                  return (
+                    <div className="flex flex-col">
+                      <div className="p-6 bg-zinc-50/50 border-b border-zinc-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-zinc-900 font-bold">
+                          <Calendar className="h-5 w-5 text-zinc-700" />
+                          {formatDate(eventStart)} {!isSameDay && ` - ${formatDate(eventEnd)}`}
+                        </div>
+                        <div className="text-xs font-bold text-zinc-600 bg-white border border-zinc-200 px-3 py-1.5 rounded-lg shadow-sm">
+                          Total: {formatDuration(setupMins + eventDurationMins + teardownMins)}
+                        </div>
+                      </div>
+
+                      <div className="p-8 pb-12">
+                        <div className="relative space-y-8 before:absolute before:left-0 before:top-2 before:bottom-2 before:ml-[5px] before:w-px before:bg-zinc-200">
+                          {/* Setup */}
+                          {setupMins > 0 && (
+                            <div className="relative flex items-start group">
+                              <div className="absolute left-0 mt-1.5 w-3 h-3 rounded-full border-2 border-white bg-amber-400 z-10 shadow-sm ring-1 ring-zinc-200" />
+                              <div className="w-full pl-8 flex justify-between items-start gap-4">
+                                <div>
+                                  <div className="text-sm font-bold text-zinc-900">Setup</div>
+                                  <div className="text-xs text-zinc-500 mt-1">{formatDuration(setupMins)} buffer</div>
+                                </div>
+                                <div className="text-sm text-zinc-600 font-semibold text-right">{formatNodeTime(opStart)}</div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Event */}
+                          <div className="relative flex items-start group z-10">
+                            <div className="absolute left-0 -ml-[1px] mt-8 w-3.5 h-3.5 rounded-full border-[3px] border-white bg-zinc-800 shadow-sm ring-1 ring-zinc-300" />
+                            <div className="w-full pl-8">
+                               <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm transition-all hover:border-zinc-300">
+                                  <div className="flex justify-between items-center mb-5">
+                                    <div className="font-bold text-zinc-900 text-base">Main Event</div>
+                                    <div className="text-xs font-bold text-zinc-700 bg-zinc-100 px-2.5 py-1 rounded-md">{formatDuration(eventDurationMins)} duration</div>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                      <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Starts</div>
+                                      <div className="text-sm font-bold text-zinc-900 mt-1.5">{formatNodeTime(eventStart)}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Ends</div>
+                                      <div className="text-sm font-bold text-zinc-900 mt-1.5">{formatNodeTime(eventEnd)}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                            </div>
+                          </div>
+
+                          {/* Teardown */}
+                          {teardownMins > 0 && (
+                            <div className="relative flex items-start group">
+                              <div className="absolute left-0 mt-1.5 w-3 h-3 rounded-full border-2 border-white bg-amber-400 z-10 shadow-sm ring-1 ring-zinc-200" />
+                              <div className="w-full pl-8 flex justify-between items-start gap-4">
+                                <div>
+                                  <div className="text-sm font-bold text-zinc-900">Teardown</div>
+                                  <div className="text-xs text-zinc-500 mt-1">{formatDuration(teardownMins)} buffer</div>
+                                </div>
+                                <div className="text-sm text-zinc-600 font-semibold text-right">{formatNodeTime(opEnd)}</div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </Card>
+            </div>
+
+            {/* Sidebar Column */}
+            <div className="space-y-6">
+              {/* Venue Snapshot */}
+              <div className="flex flex-col">
+                <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 pl-1">Venue Snapshot</h3>
+                <Card className="p-0 overflow-hidden border-zinc-200 shadow-sm rounded-xl">
+                  {booking.venue_cover_photo_url && (
+                    <div className="h-32 w-full bg-zinc-100 relative">
+                      <img src={booking.venue_cover_photo_url} alt="Venue" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                    </div>
+                  )}
+                  <div className="p-5">
+                    <div className="text-base font-bold text-zinc-900">{booking.venue_name}</div>
+                    <div className="text-sm text-zinc-500 flex items-center mt-1.5 font-medium">
+                      <MapPin className="h-3.5 w-3.5 mr-1" /> {booking.venue_city || 'City not specified'}
+                    </div>
+                    <Link to={`/venues/${booking.venue_id}/overview`} className="text-sm text-brand-600 hover:text-brand-700 font-semibold mt-4 inline-block">
+                      View Venue Details →
+                    </Link>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Customer Profile */}
+              <div className="flex flex-col">
+                <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 pl-1">Customer Profile</h3>
+                <Card className="p-5 overflow-hidden border-zinc-200 shadow-sm rounded-xl">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 bg-zinc-100 text-zinc-600 rounded-full flex items-center justify-center shrink-0 border border-zinc-200 shadow-sm">
+                      <User className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-base font-bold text-zinc-900 truncate">{booking.user_full_name}</div>
+                      {booking.user_email && <div className="text-sm text-zinc-500 mt-0.5 truncate">{booking.user_email}</div>}
+                      {booking.user_phone && <div className="text-sm text-zinc-500 mt-0.5">{booking.user_phone}</div>}
+                      {(!booking.user_email && !booking.user_phone) && (
+                        <div className="text-xs text-zinc-400 mt-1 font-mono bg-zinc-50 px-2 py-0.5 rounded border border-zinc-100 inline-block">ID: {booking.user_id}</div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'financials' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* Left Column: Ledger */}
+            <Card className="p-0 overflow-hidden border-zinc-200 shadow-sm rounded-xl flex flex-col">
+              <div className="p-6 bg-zinc-50/50 border-b border-zinc-100 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-lg text-zinc-900">Financial Ledger</h3>
+                  <p className="text-xs text-zinc-500 mt-1">Breakdown of pricing and payouts</p>
+                </div>
+                <div className="p-2.5 bg-white rounded-xl shadow-sm border border-zinc-200/60">
+                  <Receipt className="h-5 w-5 text-zinc-400" />
+                </div>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-zinc-500 font-medium">Base Quoted Price</span>
+                    <span className="font-semibold text-zinc-900">{booking.display?.quoted_price || `₹${(booking.quoted_price_paise || 0)/100}`}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-zinc-500 font-medium">Platform Commission ({booking.platform_commission_pct}%)</span>
+                    <span className="font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">-{booking.display?.platform_fee || `₹${(booking.platform_fee_paise || 0)/100}`}</span>
+                  </div>
+
+                  <div className="border-t-2 border-dashed border-zinc-200 pt-4 mt-2 flex justify-between items-center">
+                    <span className="font-bold text-zinc-900 text-base">Net Owner Payout</span>
+                    <span className="text-2xl font-black text-emerald-600 tracking-tight">{booking.display?.owner_payout || `₹${(booking.owner_payout_paise || 0)/100}`}</span>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-zinc-100">
+                  <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-4">Payment Milestones</h4>
+                  
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 p-4 bg-zinc-50 rounded-lg border border-zinc-100/80 transition-colors hover:bg-zinc-100/50">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-zinc-900 text-sm">Advance Deposit</span>
+                          <span className="text-[10px] font-bold bg-zinc-200/60 text-zinc-600 px-1.5 py-0.5 rounded uppercase tracking-wider">{booking.advance_pct}%</span>
+                        </div>
+                        {booking.stripe_advance_payment_intent_id ? (
+                          <div className="text-xs text-zinc-400 font-mono">Ref: {booking.stripe_advance_payment_intent_id}</div>
+                        ) : (
+                          <div className="text-xs text-zinc-500">Required to confirm booking</div>
+                        )}
+                      </div>
+                      <span className="font-bold text-zinc-900 text-base">{booking.display?.advance_due || `₹${(booking.advance_due_paise || 0)/100}`}</span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 p-4 bg-zinc-50 rounded-lg border border-zinc-100/80 transition-colors hover:bg-zinc-100/50">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-zinc-900 text-sm">Balance Due</span>
+                          <span className="text-[10px] font-bold bg-zinc-200/60 text-zinc-600 px-1.5 py-0.5 rounded uppercase tracking-wider">{100 - booking.advance_pct}%</span>
+                        </div>
+                        {booking.stripe_balance_payment_intent_id ? (
+                          <div className="text-xs text-zinc-400 font-mono">Ref: {booking.stripe_balance_payment_intent_id}</div>
+                        ) : booking.balance_due_date ? (
+                          <div className="text-xs font-semibold text-brand-600 bg-brand-50 inline-block px-2 py-0.5 rounded-md">Due: {new Date(booking.balance_due_date).toLocaleDateString()}</div>
+                        ) : null}
+                      </div>
+                      <span className="font-bold text-zinc-900 text-base">{booking.display?.balance_due || `₹${(booking.balance_due_paise || 0)/100}`}</span>
+                    </div>
+                  </div>
+                  {booking.balance_due_date && new Date() > new Date(booking.balance_due_date) && booking.payment_status !== 'paid' && (
+                    <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-start gap-3 mt-6 text-rose-800">
+                      <AlertTriangle className="h-5 w-5 shrink-0 text-rose-600" />
+                      <div>
+                        <h4 className="font-semibold">Payment Overdue</h4>
+                        <p className="text-sm mt-1 opacity-90">
+                          The balance payment was due on {new Date(booking.balance_due_date).toLocaleDateString()}.
+                          {booking.balance_overdue_at && ` Marked overdue at ${new Date(booking.balance_overdue_at).toLocaleString()}.`}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            {/* Right Column: Summaries & Alerts */}
+            <div className="space-y-6">
+              <Card className="p-0 overflow-hidden border-zinc-200 shadow-sm rounded-xl">
+                <div className="p-6 bg-zinc-50/50 border-b border-zinc-100">
+                  <h3 className="font-bold text-lg text-zinc-900">Transaction Summary</h3>
+                  <p className="text-xs text-zinc-500 mt-1">Real-time payment status</p>
+                </div>
+                
+                <div className="p-6 grid grid-cols-2 gap-4">
+                  <div className="p-5 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-center flex flex-col items-center justify-center">
+                    <div className="text-[10px] text-emerald-700/80 font-bold uppercase tracking-widest mb-1.5">Amount Paid</div>
+                    <div className="text-3xl font-black text-emerald-700 tracking-tight">₹{((booking.amount_paid_paise || 0) / 100).toLocaleString('en-IN')}</div>
+                  </div>
+                  
+                  <div className="p-5 bg-rose-500/10 rounded-lg border border-rose-500/20 text-center flex flex-col items-center justify-center">
+                    <div className="text-[10px] text-rose-700/80 font-bold uppercase tracking-widest mb-1.5">Refunded</div>
+                    <div className="text-3xl font-black text-rose-700 tracking-tight">₹{((booking.refund_amount_paise || 0) / 100).toLocaleString('en-IN')}</div>
+                  </div>
+                </div>
+              </Card>
+
+              {booking.payment_status === 'unpaid' && booking.status !== 'requested' && (
+                <Card className="p-0 overflow-hidden bg-amber-50/50 border-amber-200 shadow-sm rounded-xl">
+                  <div className="flex h-full">
+                    <div className="w-1.5 bg-amber-400 shrink-0"></div>
+                    <div className="p-6 flex-1">
+                      <div className="flex items-start gap-4">
+                        <div className="p-2.5 bg-amber-100 text-amber-700 rounded-lg shrink-0">
+                          <AlertTriangle className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-bold text-amber-900 text-base">Payment Overdue</h4>
+                          <p className="text-sm text-amber-700 mt-1 leading-relaxed">
+                            The user has not completed the required payments. They have used <span className="font-bold">{booking.deadline_extension_count}</span> deadline extension(s) so far.
+                          </p>
+                          <div className="mt-5">
+                            <Button 
+                              variant="secondary" 
+                              className="w-full sm:w-auto h-10 px-5 bg-white text-amber-800 border-amber-200 hover:bg-amber-100 hover:border-amber-300 font-semibold shadow-sm transition-all rounded-xl" 
+                              onClick={() => setExtendModalOpen(true)}
+                            >
+                              Extend Deadline
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'timeline' && (
+          <div className="max-w-2xl mx-auto">
+            <div className="rounded-lg border border-zinc-100 bg-white p-6 shadow-sm">
+              <div className="space-y-8">
+                <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                  Booking Timeline
+                </div>
+
+                <div className="space-y-0">
+                  {(() => {
+                    const now = new Date()
+                    const eventStarted = booking.starts_at ? now >= new Date(booking.starts_at) : false
+                    const advancePaid = booking.payment_status === 'partially_paid' || booking.payment_status === 'paid'
+                    
+                    const acceptedStatuses = ['owner_accepted', 'confirmed', 'completed']
+                    const confirmedStatuses = ['confirmed', 'completed']
+
+                    const steps = [
+                      { label: 'Requested', completed: true, desc: 'Booking request submitted.' },
+                      { label: 'Accepted', completed: acceptedStatuses.includes(booking.status), desc: 'Venue owner accepted the request.' },
+                      { label: 'Advance Paid', completed: advancePaid, desc: 'Advance payment received.' },
+                      { label: 'Confirmed', completed: confirmedStatuses.includes(booking.status), desc: booking.confirmed_at ? `Confirmed on ${new Date(booking.confirmed_at).toLocaleString()}` : 'Booking reservation confirmed.' },
+                      { label: 'Event Day', completed: eventStarted, desc: 'Event date has arrived.' },
+                      { label: 'Completed', completed: booking.status === 'completed', desc: 'Booking lifecycle completed.' },
+                    ]
+
+                    const currentStepIndex = steps.findIndex((step) => !step.completed)
+
+                    return steps.map((step, index) => {
+                      const isCompleted = step.completed
+                      const isCurrent = index === currentStepIndex
+                      const isLast = index === steps.length - 1
+
+                      return (
+                        <div key={step.label} className="flex gap-4">
+                          {/* Timeline rail */}
+                          <div className="flex flex-col items-center">
+                            <div
+                              className={[
+                                'h-4 w-4 rounded-full transition-all',
+                                isCompleted ? 'bg-[#2B5C4E]' : isCurrent ? 'bg-[#E2ECE9] ring-4 ring-[#E9F0EE]' : 'bg-zinc-200',
+                              ].join(' ')}
+                            />
+
+                            {!isLast && (
+                              <div
+                                className={[
+                                  'min-h-[48px] w-px flex-1',
+                                  isCompleted ? 'bg-[#B3C8C1]' : 'bg-zinc-200',
+                                ].join(' ')}
+                              />
+                            )}
+                          </div>
+
+                          {/* Content */}
+                          <div className="pb-8">
+                            <div
+                              className={[
+                                'font-medium',
+                                isCompleted ? 'text-zinc-900' : 'text-zinc-500',
+                              ].join(' ')}
+                            >
+                              {step.label}
+                            </div>
+                            <div className="mt-1 text-sm text-zinc-500">{step.desc}</div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+
+                {booking.cancelled_at && (
+                  <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 mt-6">
+                    <div className="text-sm font-medium text-rose-800">Booking Cancelled</div>
+                    <div className="mt-1 text-xs text-rose-700">Cancelled on {new Date(booking.cancelled_at).toLocaleString()}</div>
+                  </div>
+                )}
+                {booking.expired_at && (
+                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 mt-6">
+                    <div className="text-sm font-medium text-zinc-700">Booking Expired</div>
+                    <div className="mt-1 text-xs text-zinc-500">Expired on {new Date(booking.expired_at).toLocaleString()} due to inactivity or non-payment.</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'notes' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+            {/* User Notes */}
+            <Card className="p-6 h-full flex flex-col relative overflow-hidden border-zinc-200 shadow-sm rounded-xl">
+              <div className="absolute top-0 left-0 w-1 h-full bg-zinc-300"></div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2.5 bg-zinc-100 text-zinc-600 rounded-lg shadow-inner border border-zinc-200/50">
+                  <MessageSquare className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-zinc-900 text-base">Customer Request</h3>
+                  <p className="text-xs text-zinc-500 font-medium mt-0.5">Notes provided during booking</p>
+                </div>
+              </div>
+              <div className="flex-1 flex flex-col">
+                {booking.user_notes ? (
+                  <div className="flex-1 bg-zinc-50/50 rounded-lg p-5 text-zinc-700 text-sm whitespace-pre-wrap border border-zinc-100 leading-relaxed relative group transition-colors hover:bg-zinc-50">
+                    <span className="absolute -left-1 -top-3 text-5xl text-zinc-200 leading-none select-none font-serif opacity-50 group-hover:opacity-80 transition-opacity">"</span>
+                    <div className="relative z-10 pt-1">
+                      {booking.user_notes}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 py-10 border-2 border-dashed border-zinc-100 rounded-lg bg-zinc-50/30">
+                    <MessageSquare className="h-8 w-8 mb-3 opacity-20" />
+                    <span className="text-sm font-medium text-zinc-500">No specific requests</span>
+                    <span className="text-xs mt-1">The customer did not leave any notes.</span>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* Owner Internal Notes */}
+            <Card className="p-6 h-full flex flex-col relative overflow-hidden border-amber-200 bg-amber-50/30 shadow-sm rounded-xl">
+              <div className="absolute top-0 left-0 w-1 h-full bg-amber-400"></div>
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-100 text-amber-700 rounded-lg shadow-inner border border-amber-200/50">
+                    <Lock className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-amber-900 text-base">Internal Notes</h3>
+                    <p className="text-xs text-amber-700/70 font-medium mt-0.5">Private to your team</p>
+                  </div>
+                </div>
+                {!isEditingNotes && (
+                  <Button variant="secondary" className="h-8 px-3.5 text-xs font-semibold bg-white text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300 transition-colors shadow-sm" onClick={() => {
+                    setDraftNotes(booking.owner_notes || '')
+                    setIsEditingNotes(true)
+                  }}>
+                    {booking.owner_notes ? 'Edit Notes' : 'Add Note'}
+                  </Button>
+                )}
+              </div>
+              
+              <div className="flex-1 flex flex-col">
+                {isEditingNotes ? (
+                  <div className="space-y-3 flex-1 flex flex-col animate-in fade-in zoom-in-95 duration-200">
+                    <textarea 
+                      className="w-full rounded-lg border border-amber-300/60 bg-white/80 p-4 text-sm text-amber-950 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all shadow-inner flex-1 min-h-[160px] resize-none"
+                      placeholder="Add private notes, reminders, or special arrangements..."
+                      value={draftNotes}
+                      onChange={(e) => setDraftNotes(e.target.value)}
+                      disabled={actionLoading}
+                      autoFocus
+                    />
+                    <div className="flex justify-end gap-2 pt-1">
+                      <Button variant="secondary" className="h-9 px-4 text-xs font-semibold bg-white border-amber-200 text-amber-700 hover:bg-amber-50" onClick={() => setIsEditingNotes(false)} disabled={actionLoading}>Cancel</Button>
+                      <Button variant="primary" className="h-9 px-4 text-xs font-semibold bg-amber-600 hover:bg-amber-700 border-none text-white shadow-sm" onClick={() => handleAction('updateOwnerNotes', { notes: draftNotes })} disabled={actionLoading}>Save Internal Notes</Button>
+                    </div>
+                  </div>
+                ) : (
+                  booking.owner_notes ? (
+                    <div className="flex-1 bg-white/70 rounded-lg p-5 text-amber-950 text-sm whitespace-pre-wrap border border-amber-200/50 shadow-sm leading-relaxed">
+                      {booking.owner_notes}
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-amber-700/50 py-10 border-2 border-dashed border-amber-200/60 rounded-lg bg-amber-50/50">
+                      <AlignLeft className="h-8 w-8 mb-3 opacity-40" />
+                      <span className="text-sm font-medium text-amber-800/60">No internal notes yet</span>
+                      <span className="text-xs mt-1">Add reminders or staff instructions here.</span>
+                    </div>
+                  )
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
+
+      {/* Reject Modal */}
+      {rejectModalOpen && (
+        <Modal 
+          open={rejectModalOpen} 
+          onClose={() => setRejectModalOpen(false)}
+        >
+          <div className="p-8">
+            <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mb-5 border border-rose-100 shadow-sm">
+              <X className="h-6 w-6" />
+            </div>
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-zinc-900">Reject Booking Request</h2>
+              <p className="text-sm text-zinc-500 mt-1.5 leading-relaxed">Please provide a reason for rejecting this booking. The user will be notified.</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-zinc-700">Reason for rejection <span className="text-rose-500">*</span></label>
+              <textarea 
+                className="w-full border border-zinc-200 rounded-xl p-4 text-sm focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-inner bg-zinc-50/50 resize-none"
+                rows={4}
+                placeholder="e.g. Venue is under maintenance, dates unavailable..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-6 mt-8 border-t border-zinc-100">
+               <Button variant="secondary" onClick={() => setRejectModalOpen(false)}>Cancel</Button>
+               <Button variant="primary" className="bg-rose-600 hover:bg-rose-700 text-white border-none shadow-sm" onClick={() => handleAction('reject', { reason: rejectReason })}>Reject Request</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Extend Deadline Modal */}
+      {extendModalOpen && (
+        <Modal 
+          open={extendModalOpen} 
+          onClose={() => setExtendModalOpen(false)}
+          className="max-w-3xl"
+        >
+          <div className="p-8">
+            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mb-5 border border-amber-100 shadow-sm">
+              <Calendar className="h-6 w-6" />
+            </div>
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-zinc-900">Extend Balance Deadline</h2>
+              <p className="text-sm text-zinc-500 mt-1.5 leading-relaxed">Select a new due date for the balance payment. This gives the customer more time to pay.</p>
+            </div>
+            
+            <div className="bg-zinc-50/50 p-2 rounded-lg border border-zinc-100">
+              <DoubleMonthCalendar 
+                value={newDeadlineDate}
+                minDate={new Date().toISOString().split('T')[0]}
+                maxDate={booking.starts_at ? new Date(new Date(booking.starts_at).getTime() - 86400000).toISOString().split('T')[0] : undefined}
+                onChange={setNewDeadlineDate}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-6 mt-8 border-t border-zinc-100">
+               <Button variant="secondary" onClick={() => setExtendModalOpen(false)}>Cancel</Button>
+               <Button variant="primary" className="bg-amber-600 hover:bg-amber-700 text-white border-none shadow-sm" onClick={() => {
+                 if (newDeadlineDate) {
+                   handleAction('extendBalanceDeadline', { new_deadline: newDeadlineDate })
+                   setExtendModalOpen(false)
+                 }
+               }} disabled={!newDeadlineDate}>Confirm Extension</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Cancel Modal */}
+      {cancelModalOpen && (
+        <Modal 
+          open={cancelModalOpen} 
+          onClose={() => setCancelModalOpen(false)}
+          className="max-w-xl"
+        >
+          <div className="p-8">
+            <div className="w-12 h-12 bg-zinc-100 text-zinc-600 rounded-full flex items-center justify-center mb-5 border border-zinc-200/50 shadow-sm">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-zinc-900">Cancel Booking</h2>
+              <p className="text-sm text-zinc-500 mt-1.5 leading-relaxed">Choose how you want to process this cancellation. This action cannot be undone.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button 
+                type="button"
+                onClick={() => setCancelType('forfeit')}
+                className={`text-left p-5 rounded-lg border-2 transition-all ${
+                  cancelType === 'forfeit' 
+                    ? 'border-brand-500 bg-brand-50/50 shadow-sm' 
+                    : 'border-zinc-200 bg-zinc-50/30 hover:border-brand-200 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-bold text-zinc-900">Standard Cancel</span>
+                  {cancelType === 'forfeit' && (
+                    <div className="w-5 h-5 bg-brand-500 rounded-full flex items-center justify-center">
+                      <Check className="h-3.5 w-3.5 text-white" />
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-500 leading-relaxed font-medium">
+                  Enforces your cancellation policy. The customer forfeits their deposit or paid amount. You keep the money.
+                </p>
+              </button>
+              
+              <button 
+                type="button"
+                onClick={() => setCancelType('goodwill')}
+                className={`text-left p-5 rounded-lg border-2 transition-all ${
+                  cancelType === 'goodwill' 
+                    ? 'border-rose-500 bg-rose-50/50 shadow-sm' 
+                    : 'border-zinc-200 bg-zinc-50/30 hover:border-rose-200 hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-bold text-zinc-900">Goodwill Cancel</span>
+                  {cancelType === 'goodwill' && (
+                    <div className="w-5 h-5 bg-rose-500 rounded-full flex items-center justify-center">
+                      <Check className="h-3.5 w-3.5 text-white" />
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-500 leading-relaxed font-medium">
+                  Waives the cancellation penalty. The customer receives a full refund of their payment as a gesture of goodwill.
+                </p>
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-6 mt-8 border-t border-zinc-100">
+               <Button variant="secondary" onClick={() => setCancelModalOpen(false)}>Cancel</Button>
+               <Button 
+                 variant="primary" 
+                 className={`${cancelType === 'goodwill' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-brand-600 hover:bg-brand-700'} text-white border-none shadow-sm transition-colors`} 
+                 onClick={() => {
+                   if (cancelType) {
+                     handleAction(cancelType === 'forfeit' ? 'cancelForfeit' : 'cancelGoodwill')
+                     setCancelModalOpen(false)
+                   }
+                 }} 
+                 disabled={!cancelType || actionLoading}
+               >
+                 Confirm Cancellation
+               </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}

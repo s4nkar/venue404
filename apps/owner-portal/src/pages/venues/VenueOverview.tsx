@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Card, SectionHeader, StatusBadge, Button, MetricCard } from '@venue404/ui'
+import { Card, SectionHeader, StatusBadge, Button, MetricCard, Skeleton } from '@venue404/ui'
 import { Settings, Users, IndianRupee, CalendarDays, ArrowLeft, Info, Loader2 } from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
 
@@ -28,7 +28,28 @@ export default function VenueOverview() {
   }, [venueId])
 
   if (loading) {
-    return <div className="text-center py-12 text-zinc-500">Loading overview...</div>
+    return (
+      <div className="space-y-6 pb-8 pt-4">
+        <Skeleton className="h-4 w-32 mb-6" />
+        <Skeleton className="h-16 w-full rounded-xl" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+          <Skeleton className="h-10 w-40 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
+        <Card className="p-6 mt-6">
+           <Skeleton className="h-6 w-48 mb-2" />
+           <Skeleton className="h-4 w-full max-w-md" />
+        </Card>
+      </div>
+    )
   }
 
   if (!venue) {
@@ -104,6 +125,14 @@ export default function VenueOverview() {
           <h1 className="text-2xl font-bold text-zinc-900">{venue.name}</h1>
           <p className="mt-1 text-sm text-zinc-500">{venue.city}, {venue.state}</p>
         </div>
+        {venue.status === 'approved' && (
+          <Link to={`/venues/${venueId}/bookings`} className="shrink-0 w-full sm:w-auto">
+            <Button variant="primary" className="bg-zinc-900 hover:bg-zinc-800 text-white w-full sm:w-auto flex items-center justify-center gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Manage Bookings
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Quick Stats */}

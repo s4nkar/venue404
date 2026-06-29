@@ -12,6 +12,7 @@ from app.modules.booking.schemas import (
     CancellationPreviewOut,
     ExtendDeadlineIn,
     OwnerRejectIn,
+    UpdateOwnerNotesIn,
 )
 
 router = APIRouter()
@@ -32,6 +33,17 @@ def list_my_bookings(
     db: Session = Depends(get_db),
 ):
     return service.list_user_bookings(db, auth.user_id)
+
+
+@router.get("/owner", response_model=list[BookingOut])
+def list_owner_bookings(
+    tab: str | None = None,
+    venue_id: str | None = None,
+    search: str | None = None,
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    return service.list_all_owner_bookings(db, auth.user_id, tab, venue_id, search)
 
 
 @router.get("/venues/{venue_id}/bookings", response_model=list[BookingOut])
@@ -124,3 +136,13 @@ def owner_cancel_goodwill(
     db: Session = Depends(get_db),
 ):
     return service.owner_cancel_goodwill(db, booking_id, auth.user_id)
+
+
+@router.patch("/{booking_id}/owner-notes", response_model=BookingOut)
+def update_owner_notes(
+    booking_id: UUID,
+    body: UpdateOwnerNotesIn,
+    auth: AuthContext = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    return service.update_owner_notes(db, booking_id, auth.user_id, body.notes)

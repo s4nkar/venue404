@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Card, SectionHeader, Button, Input, LocationPickerMap, InfoTooltip } from '@venue404/ui'
+import { Card, SectionHeader, Button, Input, LocationPickerMap, InfoTooltip, Skeleton } from '@venue404/ui'
 import { ArrowLeft } from 'lucide-react'
 import * as Icons from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
@@ -335,7 +335,31 @@ export default function VenueEdit() {
   }
 
   if (loading) {
-    return <div className="text-center py-12 text-zinc-500">Loading venue data...</div>
+    return (
+      <div className="max-w-4xl mx-auto pb-12 space-y-6 pt-4">
+        <Skeleton className="h-4 w-32 mb-6" />
+        <div className="mb-6">
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        <Card className="p-8 space-y-6">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-10 w-full rounded-md" />
+          <div className="space-y-1">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-10 w-full rounded-md" />
+          </div>
+          <div className="space-y-1">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-24 w-full rounded-md" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-16 w-full rounded-md" />
+            <Skeleton className="h-16 w-full rounded-md" />
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   if (!venue) {
