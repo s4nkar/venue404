@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card, SectionHeader, EmptyState, Skeleton } from '@venue404/ui'
-import { IndianRupee, Wallet, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, User, FileText, ArrowRightLeft } from 'lucide-react'
+import { IndianRupee, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, User, FileText, ArrowRightLeft } from 'lucide-react'
 import { createClient } from '@venue404/api-client'
 import { paymentEndpoints, type OwnerLedgerStats, type LedgerEntry } from '@venue404/api-client/src/endpoints/payments'
 import { Link } from 'react-router-dom'

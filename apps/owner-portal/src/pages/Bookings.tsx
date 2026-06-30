@@ -125,7 +125,7 @@ export default function Bookings() {
                 const el = document.getElementById('venue-dropdown')
                 if (el) el.classList.toggle('hidden')
               }}
-              onBlur={(e) => {
+              onBlur={() => {
                 // Delay hiding slightly so clicks register
                 setTimeout(() => {
                   const el = document.getElementById('venue-dropdown')
