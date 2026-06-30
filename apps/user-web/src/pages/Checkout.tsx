@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { createClient, bookingEndpoints } from '@venue404/api-client'

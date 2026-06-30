@@ -48,8 +48,6 @@ export function CalendarPicker({ selectedDate, onSelect, minDate }: Props) {
   
   const label1 = viewDate.toLocaleString('en-IN', { month: 'long', year: 'numeric' })
   const label2 = nextMonth.toLocaleString('en-IN', { month: 'long', year: 'numeric' })
-  
-  const canGoPrev = true // Or disable if needed, but usually we allow going back unless constrained
 
   const renderMonth = (grid: (string | null)[]) => (
     <div className="w-full">

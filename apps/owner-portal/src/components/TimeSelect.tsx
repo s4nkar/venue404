@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import type { ChangeEvent } from 'react'
 import { ChevronDown, Clock } from 'lucide-react'
 
 interface TimeSelectProps {
   label: string
   name: string
   value: string
-  onChange: (e: { target: { name: string; value: string } }) => void
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void
   required?: boolean
   helperText?: string
 }
@@ -97,7 +98,7 @@ export function TimeSelect({ label, name, value, onChange, required, helperText 
             <div
               key={opt.value}
               onClick={() => {
-                onChange({ target: { name, value: opt.value } })
+                onChange({ target: { name, value: opt.value } } as unknown as ChangeEvent<HTMLInputElement>)
                 setIsOpen(false)
               }}
               className={`px-3 py-2.5 cursor-pointer text-sm hover:bg-brand/5 hover:text-brand transition-colors ${

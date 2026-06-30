@@ -69,7 +69,6 @@ export function CancellationPolicyCard({ policy }: Props) {
   }
 
   const tiers = buildTiers(policy)
-  const noShowPct = parseFloat(policy.no_show_refund_pct)
 
   return (
     <div>

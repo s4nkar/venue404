@@ -6,6 +6,43 @@ push to `main` via each platform's native Git integration. CI
 branch protection on `main` requiring the **CI** checks, so only green code
 reaches `main` (the branch both platforms deploy).
 
+## CI gate & branch protection (how broken code is kept out of production)
+
+CI runs on every PR and push to `main`:
+- **frontend** job: `pnpm lint` then `pnpm build` (the build runs `tsc && vite build`
+  for all three React apps — this is what catches TypeScript/build errors).
+- **api** job: `pytest`.
+
+**Lint is advisory, build is the gate.** The `Lint` step is marked
+`continue-on-error: true` — it runs and reports issues but does **not** fail the
+job (the repo has a backlog of `no-explicit-any` style violations). The **Build**
+step is blocking: any type/build error fails the `frontend` job.
+
+> ⚠️ GitHub does **not** block merging a red PR by default. You must turn on the
+> rule below, otherwise a PR with build errors can still be merged and then fail
+> to deploy.
+
+**Enable the rule** — GitHub → repo **Settings → Branches → Add branch ruleset**
+(or *Branch protection rule*) targeting `main`:
+1. **Require a pull request before merging** (disallow direct pushes to `main`).
+2. **Require status checks to pass before merging** → add the CI checks:
+   **`frontend`** and **`api`** (these are the job names from `ci.yml`).
+   *(Do not add the advisory lint as a required check.)*
+3. *(Optional)* **Require branches to be up to date before merging.**
+4. *(Optional)* Also require the **Vercel** preview deployment checks, so a PR is
+   blocked if Vercel itself can't build an app.
+
+**What this gives you:**
+- The **Merge** button is disabled until the `frontend` (build) and `api` checks
+  are green → only buildable code reaches `main`.
+- Because Vercel/Render only deploy `main`, **a broken build can never go live**.
+- A failure is visible as a **red ✗ on the PR's checks**; if a build still fails
+  on the platform, it shows as a **failed deployment** in the Vercel/Render
+  dashboard while **production stays on the last good deploy**.
+- Lint problems show as advisory annotations on the run and don't block merges
+  (tighten to blocking later by removing `continue-on-error` once the backlog is
+  cleaned up).
+
 ## API (Render)
 
 The API is deployed as a **Render Web Service** defined as code in

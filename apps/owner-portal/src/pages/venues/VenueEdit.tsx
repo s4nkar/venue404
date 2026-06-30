@@ -4,7 +4,6 @@ import { Card, SectionHeader, Button, Input, LocationPickerMap, InfoTooltip, Ske
 import { ArrowLeft } from 'lucide-react'
 import * as Icons from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
-import { INDIAN_STATES } from '../../lib/constants'
 import { StateSelect } from '../../components/StateSelect'
 import { DurationInput } from '../../components/DurationInput'
 import { TimeSelect } from '../../components/TimeSelect'
@@ -416,18 +415,18 @@ export default function VenueEdit() {
 
               <div className="space-y-4 pt-4 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Location</h4>
-                <Input label="Address Line 1" name="address_line1" value={venue.address_line1 || ''} onChange={e => setVenue(prev => ({...prev, address_line1: e.target.value}))} required />
-                <Input label="Address Line 2" name="address_line2" value={venue.address_line2 || ''} onChange={e => setVenue(prev => ({...prev, address_line2: e.target.value}))} />
+                <Input label="Address Line 1" name="address_line1" value={venue.address_line1 || ''} onChange={e => setVenue((prev: any) => ({...prev, address_line1: e.target.value}))} required />
+                <Input label="Address Line 2" name="address_line2" value={venue.address_line2 || ''} onChange={e => setVenue((prev: any) => ({...prev, address_line2: e.target.value}))} />
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="City" name="city" value={venue.city || ''} onChange={e => setVenue(prev => ({...prev, city: e.target.value}))} required />
+                  <Input label="City" name="city" value={venue.city || ''} onChange={e => setVenue((prev: any) => ({...prev, city: e.target.value}))} required />
                   <StateSelect 
                     value={venue.state} 
-                    onChange={(val) => setVenue(prev => ({ ...prev, state: val }))} 
+                    onChange={(val) => setVenue((prev: any) => ({ ...prev, state: val }))} 
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <Input label="Country" name="country" value="India" disabled required />
-                  <Input label="Postal Code" name="postal_code" value={venue.postal_code || ''} onChange={e => setVenue(prev => ({...prev, postal_code: e.target.value}))} />
+                  <Input label="Postal Code" name="postal_code" value={venue.postal_code || ''} onChange={e => setVenue((prev: any) => ({...prev, postal_code: e.target.value}))} />
                 </div>
                 <div className="pt-2">
                   <label className="block text-sm font-medium text-zinc-700 mb-1">Pinpoint Location on Map</label>
@@ -435,7 +434,7 @@ export default function VenueEdit() {
                     latitude={venue.latitude}
                     longitude={venue.longitude}
                     onChange={(lat, lng, addr) => {
-                      setVenue(prev => {
+                      setVenue((prev: any) => {
                         const update = { ...prev, latitude: lat, longitude: lng }
                         if (addr) {
                           if (addr.address_line1) update.address_line1 = addr.address_line1
@@ -765,8 +764,8 @@ export default function VenueEdit() {
               <div className="space-y-6">
                 <h4 className="font-medium text-zinc-900">Base Schedule</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <TimeSelect label="Opening Time" name="open_time" value={venue.open_time || ''} onChange={e => setVenue(prev => ({...prev, open_time: e.target.value}))} required />
-                  <TimeSelect label="Closing Time" name="close_time" value={venue.close_time || ''} onChange={e => setVenue(prev => ({...prev, close_time: e.target.value}))} required />
+                  <TimeSelect label="Opening Time" name="open_time" value={venue.open_time || ''} onChange={e => setVenue((prev: any) => ({...prev, open_time: e.target.value}))} required />
+                  <TimeSelect label="Closing Time" name="close_time" value={venue.close_time || ''} onChange={e => setVenue((prev: any) => ({...prev, close_time: e.target.value}))} required />
                 </div>
                 <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
                   <input type="checkbox" name="spans_next_day" defaultChecked={venue.spans_next_day} className="rounded text-brand focus:ring-brand" />

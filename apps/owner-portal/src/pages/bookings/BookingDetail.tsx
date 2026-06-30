@@ -62,8 +62,8 @@ function MonthGrid({
 
           return (
             <div key={dateStr} className="text-center py-0.5">
-              <button 
-                disabled={isDisabled} 
+              <button
+                disabled={!!isDisabled}
                 onClick={() => onSelect(dateStr)}
                 className={btnClass}
                 type="button"

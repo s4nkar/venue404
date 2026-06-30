@@ -297,7 +297,7 @@ export default function VenueDetails() {
 function VenueContent({ venue }: { venue: VenueResponse }) {
   const b = useVenueBooking(venue)
 
-    const [scrollTrigger, setScrollTrigger] = useState(0)
+    const [, setScrollTrigger] = useState(0)
 
     function scrollToAvailability() {
       setScrollTrigger((n) => n + 1)
