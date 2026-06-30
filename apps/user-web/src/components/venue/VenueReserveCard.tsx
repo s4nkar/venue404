@@ -248,7 +248,7 @@ export function VenueReserveCard({
                 guests
               </p>
             </div>
-            <svg
+            {/* <svg
               className="h-4 w-4 text-zinc-400"
               fill="none"
               stroke="currentColor"
@@ -260,7 +260,7 @@ export function VenueReserveCard({
                 strokeWidth={2}
                 d="M19 9l-7 7-7-7"
               />
-            </svg>
+            </svg> */}
           </div>
         </div>
       </div>
