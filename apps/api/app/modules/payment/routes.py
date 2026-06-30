@@ -5,11 +5,30 @@ from app.core.database import get_db
 from app.modules.auth.dependencies import get_current_user, AuthContext
 from app.modules.payment.schemas import (
     CreatePaymentRequest, PaymentIntentResponse, PaymentResponse,
-    RefundRequest, RefundResponse,
+    RefundRequest, RefundResponse, OwnerFinancialStatsResponse,
 )
+from app.modules.booking.schemas import BookingOut
+from typing import Optional
 from app.modules.payment import service, webhooks
 
 router = APIRouter()
+
+
+@router.get("/owner/stats", response_model=OwnerFinancialStatsResponse)
+def get_owner_stats(
+    user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return service.get_owner_financial_stats(db, user)
+
+
+@router.get("/owner/bookings", response_model=list[BookingOut])
+def get_owner_bookings(
+    payment_status: Optional[str] = None,
+    user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return service.list_owner_financial_bookings(db, user, payment_status)
 
 
 @router.post("/", response_model=PaymentIntentResponse, status_code=201)

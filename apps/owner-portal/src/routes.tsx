@@ -5,6 +5,7 @@ import { OwnerLayout } from './components/OwnerLayout'
 import Dashboard from './pages/Dashboard'
 import ManageVenues from './pages/ManageVenues'
 import Bookings from './pages/Bookings'
+import Financials from './pages/Financials'
 
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -17,6 +18,8 @@ import CreateVenueWizard from './pages/venues/CreateVenueWizard'
 import VenueOverview from './pages/venues/VenueOverview'
 import VenueEdit from './pages/venues/VenueEdit'
 import VenueCalendarManagement from './pages/venues/VenueCalendarManagement'
+import VenueBookings from './pages/venues/VenueBookings'
+import BookingDetail from './pages/bookings/BookingDetail'
 
 // Placeholders for future pages
 const Placeholder = ({ title }: { title: string }) => (
@@ -53,17 +56,17 @@ export const router = createBrowserRouter([
       { path: 'venues/:venueId/overview', element: <VenueOverview /> },
       { path: 'venues/:venueId/edit/*', element: <VenueEdit /> },
       { path: 'venues/:venueId/calendar', element: <VenueCalendarManagement /> },
-      { path: 'venues/:venueId/bookings', element: <Placeholder title="Venue Bookings Queue" /> },
+      { path: 'venues/:venueId/bookings', element: <VenueBookings /> },
 
       // Bookings
       { path: 'bookings', element: <Bookings /> },
-      { path: 'bookings/:bookingId', element: <Placeholder title="Booking Detail" /> },
+      { path: 'bookings/:bookingId', element: <BookingDetail /> },
 
       // Financials
       {
         path: 'financials',
         children: [
-          { index: true, element: <Placeholder title="Financials Overview" /> },
+          { index: true, element: <Financials /> },
           { path: 'ledger', element: <Placeholder title="Ledger" /> },
           { path: 'payouts', element: <Placeholder title="Payouts" /> }
         ]
@@ -83,4 +86,13 @@ export const router = createBrowserRouter([
       }
     ]
   }
-])
+], {
+  future: {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true,
+    v7_fetcherPersist: true,
+    v7_normalizeFormMethod: true,
+    v7_partialHydration: true,
+    v7_skipActionErrorRevalidation: true,
+  }
+})

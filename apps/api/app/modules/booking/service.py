@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from app.modules.availability.service import validate_booking_request
 from app.modules.notification import service as notifications
@@ -33,6 +34,7 @@ from app.modules.booking.schemas import (
     ExtendDeadlineIn,
 )
 from app.modules.venue.models import Venue, VenueStatus
+from app.modules.profile.models import Profile
 from app.modules.venue.service import ( get_pricing_quote_for_slot,  _get_active_venue_or_404 )
 
 # Re-expose functions from cancellation module
@@ -144,6 +146,62 @@ def list_user_bookings(db: Session, user_id: UUID) -> list[BookingOut]:
         .order_by(Booking.created_at.desc())
         .all()
     )
+    return [_booking_out(booking) for booking in bookings]
+
+
+def list_all_owner_bookings(
+    db: Session, 
+    owner_id: UUID,
+    tab: str | None = None,
+    venue_id: str | None = None,
+    search: str | None = None
+) -> list[BookingOut]:
+    query = (
+        db.query(Booking)
+        .join(Venue, Booking.venue_id == Venue.id)
+        .join(Profile, Booking.user_id == Profile.id)
+        .filter(Venue.owner_id == owner_id, Booking.deleted_at.is_(None))
+    )
+
+    if venue_id and venue_id != "all":
+        query = query.filter(Booking.venue_id == venue_id)
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Venue.name.ilike(search_term),
+                Profile.full_name.ilike(search_term)
+            )
+        )
+
+    if tab and tab != "all":
+        if tab == "requested":
+            query = query.filter(Booking.status == BookingStatus.requested)
+        elif tab == "owner_accepted":
+            query = query.filter(Booking.status == BookingStatus.owner_accepted)
+        elif tab == "confirmed":
+            query = query.filter(Booking.status == BookingStatus.confirmed)
+        elif tab == "completed":
+            query = query.filter(Booking.status == BookingStatus.completed)
+        elif tab == "cancelled":
+            query = query.filter(
+                Booking.status.in_([
+                    BookingStatus.conflict_cancelled,
+                    BookingStatus.user_cancelled,
+                    BookingStatus.admin_cancelled,
+                    BookingStatus.owner_rejected,
+                    BookingStatus.balance_overdue_cancelled,
+                    BookingStatus.hold_expired,
+                    BookingStatus.request_expired
+                ])
+            )
+        elif tab == "overdue":
+            query = query.filter(
+                Booking.payment_status.in_([PaymentStatus.unpaid, PaymentStatus.advance_paid])
+            )
+
+    bookings = query.order_by(Booking.created_at.desc()).all()
     return [_booking_out(booking) for booking in bookings]
 
 
@@ -277,6 +335,14 @@ def owner_extend_deadline(
         db, booking.user_id, NotificationType.BALANCE_DEADLINE_EXTENDED,
         context={"venue_name": booking.venue.name}, booking_id=booking.id,
     )
+    return _booking_out(booking)
+
+def update_owner_notes(db: Session, booking_id: UUID, owner_id: UUID, notes: str | None) -> BookingOut:
+    booking = _booking_or_404(db, booking_id, for_update=True)
+    _assert_booking_owner(booking, owner_id)
+    booking.owner_notes = notes
+    db.flush()
+    db.refresh(booking)
     return _booking_out(booking)
 
 

@@ -10,6 +10,8 @@ export const venueEndpoints = (client: ReturnType<typeof createClient>) => ({
   bulkUpdateVenuePhotos: (id: string, body: unknown) => client.put<any>(`/api/venues/${id}/photos/bulk-update`, body),
   getMyVenues: () => client.get<any[]>('/api/venues/my/venues'),
   getMyVenue: (id: string) => client.get<any>(`/api/venues/my/venues/${id}`),
+  getVenueBookings: (id: string) => client.get<any[]>(`/api/venues/${id}/bookings`),
+  getPendingVenueBookings: (id: string) => client.get<any[]>(`/api/venues/${id}/bookings/pending`),
   updateCancellationPolicy: (id: string, body: unknown) => client.put<any>(`/api/venues/${id}/cancellation-policy`, body),
   getPlatformAmenities: () => client.get<any[]>('/api/venues/amenities'),
   updateVenueAmenities: (id: string, body: unknown) => client.put<any>(`/api/venues/${id}/amenities`, body),

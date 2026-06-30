@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, StatusBadge, Button, SectionHeader } from '@venue404/ui'
+import { Card, StatusBadge, Button, SectionHeader, Skeleton } from '@venue404/ui'
 import { Plus, MapPin, Users, Calendar, Settings, Image as ImageIcon } from 'lucide-react'
 import { createClient } from '@venue404/api-client'
 import { venueEndpoints } from '@venue404/api-client'
@@ -45,25 +45,44 @@ export default function ManageVenues() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex gap-2 border-b border-zinc-200 pb-2 overflow-x-auto">
-        {['all', 'approved', 'pending_approval', 'draft', 'rejected', 'suspended'].map(status => (
-          <button
-            key={status}
-            onClick={() => setFilter(status)}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${
-              filter === status 
-                ? 'bg-zinc-100 text-zinc-900' 
-                : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'
-            }`}
-          >
-            {status === 'all' ? 'All Venues' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-          </button>
-        ))}
+      <div className="border-b border-zinc-200 mb-6">
+        <nav className="-mb-px flex w-full overflow-x-auto no-scrollbar" aria-label="Tabs">
+          {['all', 'approved', 'pending_approval', 'draft', 'rejected', 'suspended'].map(status => (
+            <button
+              key={status}
+              onClick={() => setFilter(status)}
+              className={`flex-1 whitespace-nowrap py-3 border-b-2 font-medium text-sm transition-all ${
+                filter === status 
+                  ? 'border-brand-500 text-brand-600' 
+                  : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+              }`}
+            >
+              {status === 'all' ? 'All Venues' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </button>
+          ))}
+        </nav>
       </div>
 
       {/* Venues Grid */}
       {loading ? (
-        <div className="text-center py-12 text-zinc-500">Loading venues...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i} className="overflow-hidden flex flex-col h-[380px]">
+              <Skeleton className="h-48 w-full rounded-none" />
+              <div className="p-5 flex-1 flex flex-col space-y-4">
+                <Skeleton className="h-6 w-3/4" />
+                <div className="flex gap-4">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              </div>
+              <div className="bg-zinc-50/50 p-3 border-t border-zinc-200 mt-auto flex gap-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </Card>
+          ))}
+        </div>
       ) : filteredVenues.length === 0 ? (
         <Card>
           <div className="p-12 text-center">
@@ -91,8 +110,7 @@ export default function ManageVenues() {
               : `/venues/${venue.id}/overview`
 
             return (
-            <Link key={venue.id} to={targetUrl} className="block group">
-              <Card className="overflow-hidden flex flex-col h-full transition-all group-hover:shadow-md group-hover:border-zinc-300">
+              <Card key={venue.id} className="overflow-hidden flex flex-col h-full transition-all hover:shadow-md hover:border-zinc-300">
                 {/* Image Header */}
                 <div className="h-48 bg-zinc-100 relative border-b border-zinc-200 flex items-center justify-center">
                 {coverPhoto ? (
@@ -139,16 +157,34 @@ export default function ManageVenues() {
               </div>
 
               {/* Action Footer */}
-              <div className="bg-zinc-50/50 p-3 border-t border-zinc-200 mt-auto">
-                <div className="block">
-                  <Button variant="secondary" className="w-full flex items-center justify-center gap-2 pointer-events-none">
-                    <Settings className="h-4 w-4" />
-                    Manage
-                  </Button>
-                </div>
+              <div className="bg-zinc-50/50 p-3 border-t border-zinc-200 mt-auto flex gap-2">
+                {venue.status === 'draft' && !isWizardCompleted ? (
+                  <Link to={targetUrl} className="flex-1">
+                    <Button variant="primary" className="w-full flex items-center justify-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      Continue Setup
+                    </Button>
+                  </Link>
+                ) : (
+                  <>
+                    <Link to={`/venues/${venue.id}/overview`} className="flex-1">
+                      <Button variant="secondary" className="w-full flex items-center justify-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        Manage Venue
+                      </Button>
+                    </Link>
+                    {venue.status === 'approved' && (
+                      <Link to={`/venues/${venue.id}/bookings`} className="flex-1">
+                        <Button variant="primary" className="w-full flex items-center justify-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Manage Bookings
+                        </Button>
+                      </Link>
+                    )}
+                  </>
+                )}
               </div>
             </Card>
-            </Link>
           )})}
         </div>
       )}
