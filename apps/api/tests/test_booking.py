@@ -109,26 +109,25 @@ def test_refund_computation_policy_fee_non_refundable():
     assert result.tier_matched == "tier_2"
 
 
-def test_owner_accept_booking_idempotency():
+def test_owner_accept_booking_idempotency(monkeypatch):
+    import app.modules.booking.service as booking_service
+
     db = MagicMock()
     booking = MagicMock()
     booking.status = BookingStatus.owner_accepted
     booking.venue.owner_id = uuid4()
-    
-    booking.quoted_price_paise = 200000
-    booking.advance_due_paise = 60000
-    booking.balance_due_paise = 140000
-    booking.platform_fee_paise = 20000
-    booking.owner_payout_paise = 180000
-    booking.platform_commission_pct = 10.0
-    booking.advance_pct = 30.0
-
 
     db.query().filter().with_for_update().first.return_value = booking
 
-    # Calling accept on an already accepted booking should return current state and not crash or recreate intents
+    # _booking_out serializes a real Booking to a pydantic model; stub it so the
+    # test focuses on the idempotency control flow, not response serialization.
+    sentinel = object()
+    monkeypatch.setattr(booking_service, "_booking_out", lambda b: sentinel)
+
+    # Calling accept on an already accepted booking should return current state
+    # and NOT recreate intents or flush.
     result = owner_accept_booking(db, uuid4(), booking.venue.owner_id)
-    assert result is not None
+    assert result is sentinel
     db.flush.assert_not_called()
 
 
