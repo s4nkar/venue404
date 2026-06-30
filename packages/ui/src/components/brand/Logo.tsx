@@ -1,5 +1,7 @@
-import brandIcon from '../../../../assets/branding/icon.png'
 import { cn } from '../../lib/utils'
+
+// The icon is served at /favicon.png by the brandingPlugin in each app's vite.config
+const brandIcon = '/favicon.png'
 
 export function BrandMark({ className }: { className?: string }) {
   return (
