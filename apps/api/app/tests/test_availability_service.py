@@ -6,8 +6,9 @@ from app.modules.availability.service import (
     expand_full_day_slot,
     compute_effective_range,
 )
-from app.modules.venue.service import _compute_pricing_quote
+from app.modules.booking.models import BookingType
 from app.modules.venue.models import Venue
+import app.modules.venue.service as venue_service
 
 
 def make_venue(tz="Asia/Kolkata"):
@@ -45,12 +46,19 @@ def test_compute_effective_range():
     assert ee == ends + timedelta(minutes=20)
 
 
-def test_pricing_quote_hourly():
+def test_pricing_quote_hourly(monkeypatch):
     v = make_venue()
     tz = ZoneInfo(v.timezone)
     starts = datetime(2026, 6, 7, 10, 0, tzinfo=tz).astimezone(timezone.utc)
     ends = datetime(2026, 6, 7, 12, 30, tzinfo=tz).astimezone(timezone.utc)
-    q = _compute_pricing_quote(v, starts, ends, booking_type="time_slot")
+
+    # Pricing now resolves the venue from the DB; stub that lookup so we can
+    # exercise the (DB-free) pricing math on our in-memory venue.
+    monkeypatch.setattr(venue_service, "_get_active_venue_or_404", lambda db, venue_id: v)
+    q = venue_service.get_pricing_quote(
+        db=None, venue_id=None, starts_at=starts, ends_at=ends,
+        booking_type=BookingType.time_slot,
+    )
     # duration 2.5 hours * 10000 paise = 25000 paise
     assert q.quoted_price_paise == 25000
     assert q.advance_due_paise == int(25000 * 0.30)

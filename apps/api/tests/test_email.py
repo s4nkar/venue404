@@ -48,7 +48,16 @@ def test_smtp_fallback_is_used(monkeypatch):
 def test_resend_is_preferred_when_key_set(monkeypatch):
     monkeypatch.setattr(settings, "resend_api_key", "re_test")
     calls = {}
-    monkeypatch.setattr(email_mod, "_send_via_resend", lambda to, s, h: calls.setdefault("resend", (to, s)) or True)
-    monkeypatch.setattr(email_mod, "_send_via_smtp", lambda *a: calls.setdefault("smtp", True))
+
+    def fake_resend(to, s, h):
+        calls["resend"] = (to, s)
+        return True
+
+    def fake_smtp(*a):
+        calls["smtp"] = True
+        return True
+
+    monkeypatch.setattr(email_mod, "_send_via_resend", fake_resend)
+    monkeypatch.setattr(email_mod, "_send_via_smtp", fake_smtp)
     assert email_mod.send_email("x@y.com", "S", "<p>b</p>") is True
     assert "resend" in calls and "smtp" not in calls

@@ -3,19 +3,23 @@ from app.modules.booking.models import BookingStatus
 
 TERMINAL = [
     BookingStatus.completed,
-    BookingStatus.canceled,
     BookingStatus.hold_expired,
     BookingStatus.request_expired,
+    BookingStatus.conflict_cancelled,
+    BookingStatus.user_cancelled,
+    BookingStatus.admin_cancelled,
+    BookingStatus.owner_rejected,
+    BookingStatus.balance_overdue_cancelled,
 ]
 
 
-def test_eight_states():
-    assert len(list(BookingStatus)) == 8
+def test_status_count():
+    assert len(list(BookingStatus)) == 11
 
 
 def test_happy_path_request_accept_confirm_complete():
-    assert can_transition(BookingStatus.requested, BookingStatus.accepted)
-    assert can_transition(BookingStatus.accepted, BookingStatus.confirmed)
+    assert can_transition(BookingStatus.requested, BookingStatus.owner_accepted)
+    assert can_transition(BookingStatus.owner_accepted, BookingStatus.confirmed)
     assert can_transition(BookingStatus.confirmed, BookingStatus.completed)
 
 
@@ -25,13 +29,10 @@ def test_payment_required_before_confirm():
 
 
 def test_hold_and_conflict_paths():
-    assert can_transition(BookingStatus.accepted, BookingStatus.hold_expired)
-    assert can_transition(BookingStatus.accepted, BookingStatus.conflict_canceled)
-    assert can_transition(BookingStatus.requested, BookingStatus.conflict_canceled)
-
-
-def test_conflict_canceled_can_be_reactivated():
-    assert can_transition(BookingStatus.conflict_canceled, BookingStatus.requested)
+    assert can_transition(BookingStatus.owner_accepted, BookingStatus.hold_expired)
+    # conflict cancellation only applies to still-pending (requested) bookings
+    assert can_transition(BookingStatus.requested, BookingStatus.conflict_cancelled)
+    assert not can_transition(BookingStatus.owner_accepted, BookingStatus.conflict_cancelled)
 
 
 def test_terminal_states_have_no_exits():

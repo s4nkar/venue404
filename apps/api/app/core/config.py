@@ -21,6 +21,21 @@ class Settings(BaseSettings):
     # Used to build deep links inside notification emails
     frontend_base_url: str = "http://localhost:5173"
 
+    # Comma-separated list of allowed browser origins for CORS. Defaults to the
+    # local dev ports; in production set this to the deployed Vercel app URLs.
+    cors_origins: str = (
+        "http://localhost:3000,http://localhost:3001,http://localhost:3002,"
+        "http://localhost:5397,http://localhost:5398,http://localhost:5399"
+    )
+
+    # Shared secret guarding the machine-to-machine job-runner endpoint. Empty
+    # disables the endpoint (returns 503). Set to a long random value in prod.
+    job_runner_token: str = ""
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     # Booking economics (percent of venue price)
     token_advance_pct: int = 20
     platform_fee_pct: int = 5
