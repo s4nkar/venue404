@@ -38,7 +38,7 @@ from app.modules.payment.models import (
     Payment, Refund, LedgerEntry, PaymentAttemptStatus, RefundStatus,
 )
 from app.modules.payment.schemas import (
-    PaymentIntentResponse, PaymentResponse, RefundResponse, OwnerFinancialStatsResponse,
+    PaymentIntentResponse, PaymentResponse, RefundResponse, OwnerLedgerStatsResponse, LedgerEntryResponse
 )
 from app.modules.notification import service as notifications
 
@@ -377,80 +377,84 @@ def list_payments_for_booking(db: Session, booking_id: str, current_user: AuthCo
     ]
 
 
-def get_owner_financial_stats(db: Session, current_user: AuthContext) -> OwnerFinancialStatsResponse:
+def get_owner_ledger_stats(db: Session, current_user: AuthContext) -> OwnerLedgerStatsResponse:
     if not current_user.is_owner():
         raise ForbiddenError("Must be a venue owner")
     
-    # Total collected: sum of amount_paid_paise for bookings in venues owned by this user
-    total_collected = db.query(func.sum(Booking.amount_paid_paise)) \
-        .join(Venue, Booking.venue_id == Venue.id) \
-        .filter(Venue.owner_id == current_user.user_id) \
-        .scalar() or 0
-        
-    # Total refunds: sum of refund_amount_paise for bookings in venues owned by this user
-    total_refunds = db.query(func.sum(Booking.refund_amount_paise)) \
-        .join(Venue, Booking.venue_id == Venue.id) \
-        .filter(Venue.owner_id == current_user.user_id) \
-        .scalar() or 0
-        
-    net_revenue = total_collected - total_refunds
-        
-    # Pending collection: sum of balance_due_paise for active bookings where full payment isn't done
-    active_statuses = [BookingStatus.confirmed, BookingStatus.owner_accepted, BookingStatus.completed]
-    pending_collection = db.query(func.sum(Booking.balance_due_paise)) \
-        .join(Venue, Booking.venue_id == Venue.id) \
-        .filter(
-            Venue.owner_id == current_user.user_id,
-            Booking.status.in_(active_statuses),
-            Booking.payment_status.in_([PaymentStatus.unpaid, PaymentStatus.advance_paid])
-        ) \
-        .scalar() or 0
-        
-    return OwnerFinancialStatsResponse(
-        total_collected_paise=total_collected,
-        pending_collection_paise=pending_collection,
-        refunds_issued_paise=total_refunds,
-        net_revenue_paise=net_revenue
+    entries = db.query(
+        LedgerEntry.entry_type,
+        LedgerEntry.direction,
+        func.sum(LedgerEntry.amount_paise).label("total")
+    ).filter(
+        LedgerEntry.owner_id == current_user.user_id
+    ).group_by(
+        LedgerEntry.entry_type,
+        LedgerEntry.direction
+    ).all()
+
+    gross_volume = 0
+    platform_fees = 0
+    refunds_issued = 0
+    payouts_completed = 0
+
+    for entry_type, direction, total in entries:
+        val = int(total or 0)
+        if entry_type == "charge" and direction == "credit":
+            gross_volume += val
+        elif entry_type == "platform_fee" and direction == "debit":
+            platform_fees += val
+        elif entry_type == "refund" and direction == "debit":
+            refunds_issued += val
+        elif entry_type == "payout" and direction == "debit":
+            payouts_completed += val
+
+    net_revenue = gross_volume - platform_fees - refunds_issued
+    available_balance = net_revenue - payouts_completed
+
+    return OwnerLedgerStatsResponse(
+        gross_volume_paise=gross_volume,
+        platform_fees_paise=platform_fees,
+        refunds_issued_paise=refunds_issued,
+        net_revenue_paise=net_revenue,
+        payouts_completed_paise=payouts_completed,
+        available_balance_paise=available_balance
     )
 
 
-def list_owner_financial_bookings(db: Session, current_user: AuthContext, payment_status: str | None = None) -> list[Booking]:
+def list_owner_ledger_entries(db: Session, current_user: AuthContext, entry_type: str | None = None) -> list[LedgerEntryResponse]:
     if not current_user.is_owner():
         raise ForbiddenError("Must be a venue owner")
         
     query = (
-        db.query(Booking)
-        .options(
-            joinedload(Booking.slot),
-            joinedload(Booking.user),
-            joinedload(Booking.venue).selectinload(Venue.photos)
-        )
-        .join(Venue, Booking.venue_id == Venue.id)
-        .filter(Venue.owner_id == current_user.user_id)
+        db.query(LedgerEntry, Venue, Profile)
+        .outerjoin(Venue, LedgerEntry.venue_id == Venue.id)
+        .outerjoin(Profile, LedgerEntry.user_id == Profile.id)
+        .filter(LedgerEntry.owner_id == current_user.user_id)
     )
     
-    if payment_status:
-        # map custom tabs to real statuses if needed, otherwise exact match
-        if payment_status == "overdue":
-            now = datetime.now(timezone.utc)
-            query = query.filter(
-                Booking.payment_status.in_([PaymentStatus.unpaid, PaymentStatus.advance_paid]),
-                Booking.balance_overdue_at.isnot(None),
-                Booking.balance_overdue_at < now
-            )
-        elif payment_status == "refunded":
-            query = query.filter(Booking.payment_status.in_([PaymentStatus.refunded, PaymentStatus.partially_refunded]))
-        else:
-            try:
-                enum_val = PaymentStatus(payment_status)
-                query = query.filter(Booking.payment_status == enum_val)
-            except ValueError:
-                pass
+    if entry_type and entry_type != "all":
+        query = query.filter(LedgerEntry.entry_type == entry_type)
             
-    # Order by most recent bookings
-    query = query.order_by(Booking.created_at.desc())
-    
-    return [_booking_out(booking) for booking in query.all()]
+    query = query.order_by(LedgerEntry.created_at.desc())
+    results = query.all()
+
+    responses = []
+    for ledger, venue, profile in results:
+        responses.append(
+            LedgerEntryResponse(
+                id=str(ledger.id),
+                booking_id=str(ledger.booking_id),
+                venue_id=str(ledger.venue_id),
+                venue_name=venue.name if venue else None,
+                user_full_name=profile.full_name if profile else None,
+                entry_type=ledger.entry_type,
+                amount_paise=ledger.amount_paise,
+                direction=ledger.direction,
+                stripe_pi_ref=ledger.stripe_pi_ref,
+                created_at=ledger.created_at.isoformat()
+            )
+        )
+    return responses
 
 
 # --------------------------------------------------------------------------- #

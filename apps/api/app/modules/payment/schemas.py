@@ -40,8 +40,22 @@ class RefundResponse(BaseModel):
     status: str
 
 
-class OwnerFinancialStatsResponse(BaseModel):
-    total_collected_paise: int
-    pending_collection_paise: int
-    refunds_issued_paise: int = 0
-    net_revenue_paise: int = 0
+class OwnerLedgerStatsResponse(BaseModel):
+    gross_volume_paise: int
+    platform_fees_paise: int
+    refunds_issued_paise: int
+    net_revenue_paise: int
+    payouts_completed_paise: int
+    available_balance_paise: int
+
+class LedgerEntryResponse(BaseModel):
+    id: str
+    booking_id: str
+    venue_id: str
+    venue_name: str | None = None
+    user_full_name: str | None = None
+    entry_type: str
+    amount_paise: int
+    direction: str
+    stripe_pi_ref: str | None = None
+    created_at: str
