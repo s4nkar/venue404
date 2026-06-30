@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Card, Button, StatusBadge, PaymentStatusBadge, Modal, Skeleton } from '@venue404/ui'
 import { createClient, bookingEndpoints } from '@venue404/api-client'
-import { Calendar, MapPin, User, Clock, ArrowLeft, Check, X, AlertTriangle, History, AlignLeft, Info, Receipt, MessageSquare, Lock } from 'lucide-react'
+import { Calendar, MapPin, User, Clock, ArrowLeft, Check, CheckCircle2, X, AlertTriangle, History, AlignLeft, Info, Receipt, MessageSquare, Lock } from 'lucide-react'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -207,7 +207,7 @@ export default function BookingDetail() {
       } else if (action === 'cancelGoodwill') {
         await bookingEndpoints(client).cancelGoodwill(bookingId)
       } else if (action === 'extendBalanceDeadline') {
-        await bookingEndpoints(client).extendBalanceDeadline(bookingId, payload?.new_deadline)
+        await bookingEndpoints(client).extendBalanceDeadline(bookingId, payload?.new_due_date)
       } else if (action === 'updateOwnerNotes') {
         await bookingEndpoints(client).updateOwnerNotes(bookingId, payload?.notes || null)
         setIsEditingNotes(false)
@@ -609,7 +609,14 @@ export default function BookingDetail() {
                           <div className="text-xs text-zinc-500">Required to confirm booking</div>
                         )}
                       </div>
-                      <span className="font-bold text-zinc-900 text-base">{booking.display?.advance_due || `₹${(booking.advance_due_paise || 0)/100}`}</span>
+                      <div className="flex items-center gap-4 text-right">
+                        {(booking.amount_paid_paise || 0) >= (booking.advance_due_paise || 0) ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200/50"><CheckCircle2 className="w-3 h-3" /> Paid</span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-1 rounded-md border border-amber-200/50"><Clock className="w-3 h-3" /> Pending</span>
+                        )}
+                        <span className="font-bold text-zinc-900 text-base">{booking.display?.advance_due || `₹${(booking.advance_due_paise || 0)/100}`}</span>
+                      </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 p-4 bg-zinc-50 rounded-lg border border-zinc-100/80 transition-colors hover:bg-zinc-100/50">
@@ -624,7 +631,14 @@ export default function BookingDetail() {
                           <div className="text-xs font-semibold text-brand-600 bg-brand-50 inline-block px-2 py-0.5 rounded-md">Due: {new Date(booking.balance_due_date).toLocaleDateString()}</div>
                         ) : null}
                       </div>
-                      <span className="font-bold text-zinc-900 text-base">{booking.display?.balance_due || `₹${(booking.balance_due_paise || 0)/100}`}</span>
+                      <div className="flex items-center gap-4 text-right">
+                        {(booking.amount_paid_paise || 0) >= ((booking.advance_due_paise || 0) + (booking.balance_due_paise || 0)) ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200/50"><CheckCircle2 className="w-3 h-3" /> Paid</span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-1 rounded-md border border-amber-200/50"><Clock className="w-3 h-3" /> Pending</span>
+                        )}
+                        <span className="font-bold text-zinc-900 text-base">{booking.display?.balance_due || `₹${(booking.balance_due_paise || 0)/100}`}</span>
+                      </div>
                     </div>
                   </div>
                   {booking.balance_due_date && new Date() > new Date(booking.balance_due_date) && booking.payment_status !== 'paid' && (
@@ -664,7 +678,7 @@ export default function BookingDetail() {
                 </div>
               </Card>
 
-              {booking.payment_status === 'unpaid' && booking.status !== 'requested' && (
+              {booking.status === 'confirmed' && booking.payment_status === 'advance_paid' && booking.balance_overdue_at && (
                 <Card className="p-0 overflow-hidden bg-amber-50/50 border-amber-200 shadow-sm rounded-xl">
                   <div className="flex h-full">
                     <div className="w-1.5 bg-amber-400 shrink-0"></div>
@@ -937,7 +951,7 @@ export default function BookingDetail() {
                <Button variant="secondary" onClick={() => setExtendModalOpen(false)}>Cancel</Button>
                <Button variant="primary" className="bg-amber-600 hover:bg-amber-700 text-white border-none shadow-sm" onClick={() => {
                  if (newDeadlineDate) {
-                   handleAction('extendBalanceDeadline', { new_deadline: newDeadlineDate })
+                   handleAction('extendBalanceDeadline', { new_due_date: newDeadlineDate })
                    setExtendModalOpen(false)
                  }
                }} disabled={!newDeadlineDate}>Confirm Extension</Button>

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import or_
 
 from app.modules.availability.service import validate_booking_request
@@ -158,6 +158,11 @@ def list_all_owner_bookings(
 ) -> list[BookingOut]:
     query = (
         db.query(Booking)
+        .options(
+            joinedload(Booking.slot),
+            joinedload(Booking.user),
+            joinedload(Booking.venue).selectinload(Venue.photos)
+        )
         .join(Venue, Booking.venue_id == Venue.id)
         .join(Profile, Booking.user_id == Profile.id)
         .filter(Venue.owner_id == owner_id, Booking.deleted_at.is_(None))

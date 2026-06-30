@@ -20,8 +20,8 @@ export const bookingEndpoints = (client: ReturnType<typeof createClient>) => ({
     client.post<any>(`/api/bookings/${bookingId}/accept`, {}),
   rejectBooking: (bookingId: string, reason: string) =>
     client.post<any>(`/api/bookings/${bookingId}/reject`, { reason }),
-  extendBalanceDeadline: (bookingId: string, new_deadline: string) =>
-    client.post<any>(`/api/bookings/${bookingId}/extend-balance-deadline`, { new_deadline }),
+  extendBalanceDeadline: (bookingId: string, new_due_date: string) =>
+    client.post<any>(`/api/bookings/${bookingId}/extend-balance-deadline`, { new_due_date }),
   cancelForfeit: (bookingId: string) =>
     client.post<any>(`/api/bookings/${bookingId}/cancel-forfeit`, {}),
   cancelGoodwill: (bookingId: string) =>

@@ -1,13 +1,48 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, StatusBadge, Button, SectionHeader, Skeleton } from '@venue404/ui'
-import { Plus, MapPin, Users, Calendar, Settings, Image as ImageIcon } from 'lucide-react'
+import { Button, SectionHeader, Skeleton, EmptyState } from '@venue404/ui'
+import {
+  Plus,
+  MapPin,
+  Users,
+  Calendar,
+  Settings,
+  Image as ImageIcon,
+  ArrowRight,
+  AlertCircle,
+  Building2,
+} from 'lucide-react'
 import { createClient } from '@venue404/api-client'
 import { venueEndpoints } from '@venue404/api-client'
 
+// ─── constants ────────────────────────────────────────────────────────────────
+
+const TOTAL_STEPS = 8
+
+type StatusKey = 'approved' | 'pending_approval' | 'draft' | 'rejected' | 'suspended'
+
+const STATUS: Record<StatusKey, { label: string; dot: string; pill: string }> = {
+  approved:         { label: 'Live',          dot: 'bg-emerald-500', pill: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20' },
+  pending_approval: { label: 'Under Review',  dot: 'bg-amber-400',   pill: 'bg-amber-400/10  text-amber-700   ring-amber-400/20'   },
+  draft:            { label: 'Draft',         dot: 'bg-zinc-400',    pill: 'bg-zinc-100      text-zinc-600     ring-zinc-300/40'    },
+  rejected:         { label: 'Rejected',      dot: 'bg-red-500',     pill: 'bg-red-500/10    text-red-700      ring-red-500/20'     },
+  suspended:        { label: 'Suspended',     dot: 'bg-orange-400',  pill: 'bg-orange-400/10 text-orange-700   ring-orange-400/20'  },
+}
+
+const TABS = [
+  { id: 'all',              label: 'All Venues' },
+  { id: 'approved',         label: 'Live' },
+  { id: 'pending_approval', label: 'Under Review' },
+  { id: 'draft',            label: 'Draft' },
+  { id: 'rejected',         label: 'Rejected' },
+  { id: 'suspended',        label: 'Suspended' },
+]
+
+// ─── component ────────────────────────────────────────────────────────────────
+
 export default function ManageVenues() {
   const [filter, setFilter] = useState('all')
-  const [venues, setVenues] = useState<any[]>([])
+  const [venues, setVenues]   = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -15,9 +50,9 @@ export default function ManageVenues() {
       try {
         const client = createClient()
         const data = await venueEndpoints(client).getMyVenues()
-        setVenues(data)
+        setVenues(data || [])
       } catch (err) {
-        console.error("Failed to fetch venues", err)
+        console.error('Failed to fetch venues', err)
       } finally {
         setLoading(false)
       }
@@ -25,167 +60,228 @@ export default function ManageVenues() {
     fetchVenues()
   }, [])
 
-  const filteredVenues = filter === 'all' 
-    ? venues 
-    : venues.filter(v => v.status === filter)
+  const filteredVenues =
+    filter === 'all' ? venues : venues.filter(v => v.status === filter)
+
+  const counts: Record<string, number> = {
+    all:              venues.length,
+    approved:         venues.filter(v => v.status === 'approved').length,
+    pending_approval: venues.filter(v => v.status === 'pending_approval').length,
+    draft:            venues.filter(v => v.status === 'draft').length,
+    rejected:         venues.filter(v => v.status === 'rejected').length,
+    suspended:        venues.filter(v => v.status === 'suspended').length,
+  }
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6 pb-10">
+
+      {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <SectionHeader 
-          title="My Venues" 
-          description="Manage your listed properties and their settings." 
+        <SectionHeader
+          title="My Venues"
+          description="Manage your listed properties and their settings."
         />
-        <Link to="/venues/new">
+        <Link to="/venues/new" className="shrink-0">
           <Button variant="primary" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
-            Add new venue
+            Add New Venue
           </Button>
         </Link>
       </div>
 
-      {/* Filter Bar */}
-      <div className="border-b border-zinc-200 mb-6">
-        <nav className="-mb-px flex w-full overflow-x-auto no-scrollbar" aria-label="Tabs">
-          {['all', 'approved', 'pending_approval', 'draft', 'rejected', 'suspended'].map(status => (
+      {/* ── Tabs ── */}
+      <div className="border-b border-zinc-200">
+        <nav className="-mb-px flex w-full overflow-x-auto no-scrollbar">
+          {TABS.map(t => (
             <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`flex-1 whitespace-nowrap py-3 border-b-2 font-medium text-sm transition-all ${
-                filter === status 
-                  ? 'border-brand-500 text-brand-600' 
+              key={t.id}
+              onClick={() => setFilter(t.id)}
+              className={`flex-1 whitespace-nowrap py-3 border-b-2 font-medium text-sm transition-all flex items-center justify-center gap-1.5 ${
+                filter === t.id
+                  ? 'border-brand-500 text-brand-600'
                   : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
               }`}
             >
-              {status === 'all' ? 'All Venues' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              {t.label}
+              {counts[t.id] > 0 && (
+                <span className={`text-[11px] font-semibold rounded-full px-1.5 py-0.5 leading-none tabular-nums ${
+                  filter === t.id ? 'bg-brand-100 text-brand-700' : 'bg-zinc-100 text-zinc-500'
+                }`}>
+                  {counts[t.id]}
+                </span>
+              )}
             </button>
           ))}
         </nav>
       </div>
 
-      {/* Venues Grid */}
+      {/* ── Grid ── */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i} className="overflow-hidden flex flex-col h-[380px]">
-              <Skeleton className="h-48 w-full rounded-none" />
-              <div className="p-5 flex-1 flex flex-col space-y-4">
-                <Skeleton className="h-6 w-3/4" />
-                <div className="flex gap-4">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-20" />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="rounded-xl overflow-hidden border border-zinc-200 bg-white">
+              <Skeleton className="h-[200px] w-full rounded-none" />
+              <div className="p-4 space-y-3">
+                <Skeleton className="h-5 w-1/2" />
+                <div className="flex gap-3">
+                  <Skeleton className="h-3.5 w-20" />
+                  <Skeleton className="h-3.5 w-16" />
                 </div>
               </div>
-              <div className="bg-zinc-50/50 p-3 border-t border-zinc-200 mt-auto flex gap-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
+              <div className="px-4 pb-4 flex gap-2">
+                <Skeleton className="h-9 flex-1 rounded-lg" />
+                <Skeleton className="h-9 flex-1 rounded-lg" />
               </div>
-            </Card>
+            </div>
           ))}
         </div>
+
       ) : filteredVenues.length === 0 ? (
-        <Card>
-          <div className="p-12 text-center">
-            <h3 className="text-lg font-medium text-zinc-900">No venues found</h3>
-            <p className="mt-2 text-sm text-zinc-500">
-              {filter === 'all' 
-                ? "You haven't listed any venues yet. Create your first one." 
-                : `No venues with status '${filter}'.`}
-            </p>
-            {filter === 'all' && (
-              <Link to="/venues/new" className="mt-4 inline-block">
-                <Button variant="primary">Create Venue</Button>
-              </Link>
-            )}
-          </div>
-        </Card>
+        <EmptyState
+          icon={<Building2 className="h-10 w-10 text-zinc-300" />}
+          title={filter === 'all' ? 'No venues yet' : `No ${TABS.find(t => t.id === filter)?.label} venues`}
+          description={filter === 'all' ? 'Create your first venue to start accepting bookings.' : 'Try a different filter to see your venues.'}
+        />
+
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredVenues.map(venue => {
-            const coverPhoto = venue.photos?.find((p: any) => p.is_cover)?.image_url || venue.photos?.[0]?.image_url
-            
-            const isWizardCompleted = venue.last_completed_step >= 8
-            const targetUrl = venue.status === 'draft' && !isWizardCompleted
-              ? `/venues/new?id=${venue.id}&step=${(venue.last_completed_step || 0) + 1}`
-              : `/venues/${venue.id}/overview`
+            const s = STATUS[venue.status as StatusKey] ?? STATUS.draft
+            const coverPhoto =
+              venue.photos?.find((p: any) => p.is_cover)?.image_url ||
+              venue.photos?.[0]?.image_url
+            const step             = venue.last_completed_step || 0
+            const isDraftIncomplete = venue.status === 'draft' && step < TOTAL_STEPS
+            const continueUrl      = `/venues/new?id=${venue.id}&step=${step + 1}`
+            const isApproved       = venue.status === 'approved'
 
             return (
-              <Card key={venue.id} className="overflow-hidden flex flex-col h-full transition-all hover:shadow-md hover:border-zinc-300">
-                {/* Image Header */}
-                <div className="h-48 bg-zinc-100 relative border-b border-zinc-200 flex items-center justify-center">
-                {coverPhoto ? (
-                  <img src={coverPhoto} alt={venue.name} className="w-full h-full object-cover" />
-                ) : (
-                  <ImageIcon className="h-10 w-10 text-zinc-300" />
-                )}
-                <div className="absolute top-3 left-3 flex gap-2">
-                  {venue.venue_type && (
-                    <span className="bg-black/60 backdrop-blur-md text-white text-[10px] font-semibold px-2 py-1 rounded-md uppercase tracking-wider">
-                      {venue.venue_type.replace('_', ' ')}
-                    </span>
+              <div
+                key={venue.id}
+                className="card-enter group flex flex-col rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-zinc-300 transition-all duration-200"
+              >
+
+                {/* ── Photo ── */}
+                <Link
+                  to={isDraftIncomplete ? continueUrl : `/venues/${venue.id}/overview`}
+                  className="block relative h-[200px] bg-zinc-100 overflow-hidden shrink-0"
+                  tabIndex={-1}
+                >
+                  {coverPhoto ? (
+                    <img
+                      src={coverPhoto}
+                      alt={venue.name}
+                      className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500 ease-out"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-zinc-50">
+                      <ImageIcon className="h-8 w-8 text-zinc-300" />
+                      <span className="text-xs text-zinc-400">No photos yet</span>
+                    </div>
                   )}
-                </div>
-                <div className="absolute top-3 right-3">
-                  <StatusBadge 
-                    label={venue.status.replace('_', ' ').toUpperCase()} 
-                    variant={
-                      venue.status === 'approved' ? 'success' :
-                      venue.status === 'pending_approval' ? 'pending' :
-                      venue.status === 'draft' ? 'neutral' :
-                      venue.status === 'rejected' ? 'danger' : 'warning'
-                    }
-                  />
-                </div>
-              </div>
 
-              {/* Content */}
-              <div className="p-5 flex-1 flex flex-col">
-                <h3 className="text-lg font-semibold text-zinc-900 truncate">{venue.name}</h3>
-                
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-zinc-500">
-                  <div className="flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4 shrink-0" />
-                    <span>{venue.city}</span>
+                  {/* Status pill — top-right, frosted */}
+                  <div className="absolute top-3 right-3">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 backdrop-blur-sm ${s.pill}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${s.dot} ${isApproved ? 'animate-pulse' : ''}`} />
+                      {s.label}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Users className="h-4 w-4 shrink-0" />
-                    <span>Up to {venue.max_capacity}</span>
+
+                  {/* Category — top-left */}
+                  {venue.category?.label && (
+                    <div className="absolute top-3 left-3">
+                      <span className="inline-flex items-center rounded-full bg-black/40 backdrop-blur-sm px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
+                        {venue.category.label}
+                      </span>
+                    </div>
+                  )}
+                </Link>
+
+                {/* ── Content ── */}
+                <div className="flex flex-col flex-1 p-4 gap-3">
+
+                  {/* Name + meta */}
+                  <div>
+                    <h3 className="font-semibold text-zinc-900 text-[15px] leading-snug truncate">
+                      {venue.name}
+                    </h3>
+                    <div className="mt-1.5 flex items-center gap-3 text-xs text-zinc-400">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        {venue.city}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3 shrink-0" />
+                        Up to {venue.max_capacity}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
+                  {/* Draft progress bar */}
+                  {isDraftIncomplete && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs text-zinc-400">
+                        <span>Setup progress</span>
+                        <span className="font-medium text-zinc-600">
+                          {Math.round((step / TOTAL_STEPS) * 100)}%
+                        </span>
+                      </div>
+                      <div className="h-1 w-full rounded-full bg-zinc-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-amber-400"
+                          style={{ width: `${Math.min((step / TOTAL_STEPS) * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
-              </div>
+                  {/* Rejection reason */}
+                  {venue.status === 'rejected' && venue.rejection_reason && (
+                    <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-100 px-3 py-2">
+                      <AlertCircle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-px" />
+                      <p className="text-xs text-red-600 leading-relaxed">
+                        {venue.rejection_reason}
+                      </p>
+                    </div>
+                  )}
 
-              {/* Action Footer */}
-              <div className="bg-zinc-50/50 p-3 border-t border-zinc-200 mt-auto flex gap-2">
-                {venue.status === 'draft' && !isWizardCompleted ? (
-                  <Link to={targetUrl} className="flex-1">
-                    <Button variant="primary" className="w-full flex items-center justify-center gap-2">
-                      <Settings className="h-4 w-4" />
-                      Continue Setup
-                    </Button>
-                  </Link>
-                ) : (
-                  <>
-                    <Link to={`/venues/${venue.id}/overview`} className="flex-1">
-                      <Button variant="secondary" className="w-full flex items-center justify-center gap-2">
-                        <Settings className="h-4 w-4" />
-                        Manage Venue
-                      </Button>
-                    </Link>
-                    {venue.status === 'approved' && (
-                      <Link to={`/venues/${venue.id}/bookings`} className="flex-1">
-                        <Button variant="primary" className="w-full flex items-center justify-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          Manage Bookings
+                  {/* Spacer pushes buttons to bottom */}
+                  <div className="flex-1" />
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
+                    {isDraftIncomplete ? (
+                      <Link to={continueUrl} className="flex-1">
+                        <Button variant="primary" className="w-full gap-1.5 text-sm">
+                          Continue Setup
+                          <ArrowRight className="h-3.5 w-3.5" />
                         </Button>
                       </Link>
+                    ) : (
+                      <>
+                        <Link to={`/venues/${venue.id}/overview`} className="flex-1">
+                          <Button variant="secondary" className="w-full gap-1.5 text-sm">
+                            <Settings className="h-3.5 w-3.5" />
+                            Manage
+                          </Button>
+                        </Link>
+                        {isApproved && (
+                          <Link to={`/bookings?venue_id=${venue.id}`} className="flex-1">
+                            <Button variant="primary" className="w-full gap-1.5 text-sm">
+                              <Calendar className="h-3.5 w-3.5" />
+                              Bookings
+                            </Button>
+                          </Link>
+                        )}
+                      </>
                     )}
-                  </>
-                )}
+                  </div>
+
+                </div>
               </div>
-            </Card>
-          )})}
+            )
+          })}
         </div>
       )}
     </div>

@@ -28,9 +28,26 @@ export type RefundResult = {
   status: string
 }
 
-export type OwnerFinancialStats = {
-  total_collected_paise: number
-  pending_collection_paise: number
+export type OwnerLedgerStats = {
+  gross_volume_paise: number
+  platform_fees_paise: number
+  refunds_issued_paise: number
+  net_revenue_paise: number
+  payouts_completed_paise: number
+  available_balance_paise: number
+}
+
+export type LedgerEntry = {
+  id: string
+  booking_id: string
+  venue_id: string
+  venue_name: string | null
+  user_full_name: string | null
+  entry_type: string
+  amount_paise: number
+  direction: string
+  stripe_pi_ref: string | null
+  created_at: string
 }
 
 export const paymentEndpoints = (client: ReturnType<typeof createClient>) => ({
@@ -45,8 +62,8 @@ export const paymentEndpoints = (client: ReturnType<typeof createClient>) => ({
     client.get<Payment[]>(`/api/payments/${bookingId}`),
   /** Get aggregated financial stats for the owner */
   getOwnerStats: () =>
-    client.get<OwnerFinancialStats>('/api/payments/owner/stats'),
-  /** Get bookings for the owner filtered by payment status */
-  getOwnerBookings: (paymentStatus?: string) =>
-    client.get<any[]>(`/api/payments/owner/bookings${paymentStatus ? `?payment_status=${paymentStatus}` : ''}`),
+    client.get<OwnerLedgerStats>('/api/payments/owner/stats'),
+  /** Get ledger entries for the owner */
+  getOwnerLedger: (entryType?: string) =>
+    client.get<LedgerEntry[]>(`/api/payments/owner/ledger${entryType ? `?entry_type=${entryType}` : ''}`),
 })

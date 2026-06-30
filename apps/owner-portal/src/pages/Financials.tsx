@@ -1,168 +1,306 @@
 import { useState, useEffect } from 'react'
-import { Card, SectionHeader, PaymentStatusBadge, EmptyState, Skeleton } from '@venue404/ui'
-import { IndianRupee, Wallet } from 'lucide-react'
+import { Card, SectionHeader, EmptyState, Skeleton } from '@venue404/ui'
+import { IndianRupee, Wallet, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, User, FileText, ArrowRightLeft } from 'lucide-react'
 import { createClient } from '@venue404/api-client'
-import { paymentEndpoints } from '@venue404/api-client/src/endpoints/payments'
+import { paymentEndpoints, type OwnerLedgerStats, type LedgerEntry } from '@venue404/api-client/src/endpoints/payments'
 import { Link } from 'react-router-dom'
+
+function formatDateTime(isoString: string): string {
+  if (!isoString) return '—'
+  const date = new Date(isoString)
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: 'numeric', minute: '2-digit'
+  })
+}
+
+function inr(paise: number): string {
+  return '₹' + (paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const COL = 'px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-zinc-400'
+const CELL = 'px-4 py-4 text-sm text-zinc-700 align-middle'
 
 export default function Financials() {
   const [tab, setTab] = useState('all')
-  const [bookings, setBookings] = useState<any[]>([])
-  const [stats, setStats] = useState({ total_collected_paise: 0, pending_collection_paise: 0 })
-  const [loading, setLoading] = useState(true)
+  const [entries, setEntries] = useState<LedgerEntry[]>([])
+  const [stats, setStats] = useState<OwnerLedgerStats>({
+    gross_volume_paise: 0,
+    platform_fees_paise: 0,
+    refunds_issued_paise: 0,
+    net_revenue_paise: 0,
+    payouts_completed_paise: 0,
+    available_balance_paise: 0,
+  })
+  const [loadingStats, setLoadingStats] = useState(true)
+  const [loadingLedger, setLoadingLedger] = useState(true)
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const client = createClient()
         const data = await paymentEndpoints(client).getOwnerStats()
-        setStats(data)
+        if (data) setStats(data)
       } catch (err) {
-        console.error("Failed to fetch stats", err)
+        console.error('Failed to fetch stats', err)
+      } finally {
+        setLoadingStats(false)
       }
     }
     fetchStats()
   }, [])
 
   useEffect(() => {
-    const fetchBookings = async () => {
-      setLoading(true)
+    const fetchLedger = async () => {
+      setLoadingLedger(true)
       try {
         const client = createClient()
-        const apiTab = tab === 'all' ? undefined : (tab === 'unpaid' ? 'unpaid_overdue' : tab)
-        const data = await paymentEndpoints(client).getOwnerBookings(apiTab)
-        setBookings(data || [])
+        const apiTab = tab === 'all' ? undefined : tab
+        const data = await paymentEndpoints(client).getOwnerLedger(apiTab)
+        setEntries(data || [])
       } catch (err) {
-        console.error("Failed to fetch bookings", err)
+        console.error('Failed to fetch ledger entries', err)
       } finally {
-        setLoading(false)
+        setLoadingLedger(false)
       }
     }
-    fetchBookings()
+    fetchLedger()
   }, [tab])
 
   const TABS = [
-    { id: 'all', label: 'All Payments' },
-    { id: 'unpaid', label: 'Unpaid / Overdue' },
-    { id: 'advance_paid', label: 'Advance Paid' },
-    { id: 'fully_paid', label: 'Fully Paid' },
-    { id: 'refunded', label: 'Refunded' },
+    { id: 'all', label: 'All Transactions' },
+    { id: 'charge', label: 'Charges' },
+    { id: 'platform_fee', label: 'Platform Fees' },
+    { id: 'refund', label: 'Refunds' },
   ]
 
+  const getEntryTypeConfig = (type: string, direction: string) => {
+    if (type === 'charge' && direction === 'credit') return { bg: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20', label: 'Charge' }
+    if (type === 'platform_fee' && direction === 'debit') return { bg: 'bg-amber-50 text-amber-700 ring-amber-600/20', label: 'Platform Fee' }
+    if (type === 'refund' && direction === 'debit') return { bg: 'bg-red-50 text-red-700 ring-red-600/10', label: 'Refund' }
+    if (type === 'payout' && direction === 'debit') return { bg: 'bg-blue-50 text-blue-700 ring-blue-600/20', label: 'Payout' }
+    return { bg: 'bg-zinc-100 text-zinc-700 ring-zinc-500/10', label: type }
+  }
+
   return (
-    <div className="space-y-6 pb-8">
-      <SectionHeader 
-        title="Payments & Payouts" 
-        description="Track your earnings, pending balances, and refunds." 
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-        <Card className="relative overflow-hidden p-6 border-zinc-200/60 shadow-sm hover:shadow-md transition-shadow duration-300 group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transform group-hover:scale-110 transition-transform duration-500">
-            <Wallet className="w-32 h-32 text-emerald-900" />
-          </div>
-          <div className="flex items-center gap-4 mb-4 relative z-10">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner">
-              <Wallet className="h-6 w-6" />
-            </div>
-            <div>
-              <h3 className="text-zinc-500 font-medium text-sm uppercase tracking-wider">Total Collected</h3>
-              <p className="text-xs text-zinc-400 mt-0.5">All-time revenue</p>
-            </div>
-          </div>
-          <div className="text-4xl font-bold text-zinc-900 tracking-tight relative z-10">
-            ₹{(stats.total_collected_paise / 100).toLocaleString('en-IN')}
-          </div>
-        </Card>
-        
-        <Card className="relative overflow-hidden p-6 border-zinc-200/60 shadow-sm hover:shadow-md transition-shadow duration-300 group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transform group-hover:scale-110 transition-transform duration-500">
-            <IndianRupee className="w-32 h-32 text-amber-900" />
-          </div>
-          <div className="flex items-center gap-4 mb-4 relative z-10">
-            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shadow-inner">
-              <IndianRupee className="h-6 w-6" />
-            </div>
-            <div>
-              <h3 className="text-zinc-500 font-medium text-sm uppercase tracking-wider">Pending Collection</h3>
-              <p className="text-xs text-zinc-400 mt-0.5">To be paid by users</p>
-            </div>
-          </div>
-          <div className="text-4xl font-bold text-zinc-900 tracking-tight relative z-10">
-            ₹{(stats.pending_collection_paise / 100).toLocaleString('en-IN')}
-          </div>
-        </Card>
-      </div>
-
-      <div className="border-b border-zinc-200 mb-6">
-        <nav className="-mb-px flex w-full overflow-x-auto no-scrollbar" aria-label="Tabs">
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex-1 whitespace-nowrap py-3 border-b-2 font-medium text-sm transition-all ${
-                tab === t.id 
-                  ? 'border-brand-500 text-brand-600' 
-                  : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {loading ? (
-        <div className="flex flex-col gap-3">
-          {[1, 2, 3, 4, 5].map(i => (
-            <Card key={i} className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-              <div className="w-full sm:w-1/2">
-                <Skeleton className="h-5 w-1/2 mb-2" />
-                <Skeleton className="h-4 w-1/3" />
-              </div>
-              <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
-                <div className="text-right">
-                  <Skeleton className="h-5 w-20 mb-1 ml-auto" />
-                  <Skeleton className="h-3 w-16 ml-auto" />
-                </div>
-                <Skeleton className="h-6 w-24 rounded-full" />
-              </div>
-            </Card>
-          ))}
-        </div>
-      ) : bookings.length === 0 ? (
-        <EmptyState 
-          icon={<IndianRupee className="h-10 w-10 text-zinc-300" />}
-          title="No payments found"
-          description="Try adjusting your filters to see past or pending payments."
+    <div className="space-y-8 pb-12 max-w-[1400px] mx-auto">
+      <div className="flex items-center justify-between">
+        <SectionHeader
+          title="Financial Ledger"
+          description="Real-time transaction history and financial metrics."
         />
-      ) : (
-        <div className="flex flex-col gap-3">
-          {bookings.map(booking => (
-            <Link key={booking.id} to={`/bookings/${booking.id}`} className="block group">
-              <Card className="p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all hover:border-brand-300 hover:shadow-md bg-white">
-                <div className="flex flex-col">
-                  <h4 className="font-semibold text-zinc-900 text-lg group-hover:text-brand-600 transition-colors">{booking.venue_name || 'Unknown Venue'}</h4>
-                  <div className="flex items-center gap-2 text-sm text-zinc-500 mt-1">
-                    <span className="font-medium text-zinc-700">#{booking.id.split('-')[0]}</span>
-                    <span>•</span>
-                    <span>{booking.user_full_name || 'Guest'}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
-                  <div className="text-right">
-                    <div className="font-bold text-zinc-900 text-lg">
-                      ₹{booking.quoted_price_paise ? (booking.quoted_price_paise / 100).toLocaleString('en-IN') : 0}
-                    </div>
-                    <div className="text-xs font-medium uppercase tracking-wider text-zinc-400 mt-0.5">Total Amount</div>
-                  </div>
-                  <PaymentStatusBadge status={booking.payment_status} />
-                </div>
-              </Card>
-            </Link>
-          ))}
+        <div className="flex gap-3">
+            {/* Future placement for Request Payout or Export CSV buttons */}
         </div>
-      )}
+      </div>
+
+      {/* Industrial Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        {/* Main Metric: Net Earnings */}
+        <Card className="lg:col-span-2 relative overflow-hidden p-6 border-zinc-200/60 shadow-sm bg-zinc-950 text-white">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <IndianRupee className="w-40 h-40" />
+          </div>
+          <div className="flex items-center gap-3 mb-6 relative z-10">
+            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 shrink-0">
+              <IndianRupee className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-zinc-400 font-medium text-xs uppercase tracking-wider">Net Earnings</h3>
+              <p className="text-[11px] text-zinc-500 mt-0.5">Total earnings after deductions</p>
+            </div>
+          </div>
+          <div className="text-4xl md:text-5xl font-light tracking-tight relative z-10 mb-4">
+            {loadingStats ? <Skeleton className="h-12 w-48 bg-zinc-800" /> : inr(stats.net_revenue_paise)}
+          </div>
+        </Card>
+
+        {/* Gross Sales */}
+        <Card className="relative overflow-hidden p-6 border-zinc-200/60 shadow-sm flex flex-col">
+          <div className="absolute -bottom-4 -right-4 p-4 opacity-[0.03] pointer-events-none text-zinc-900">
+            <ArrowUpRight className="w-32 h-32" />
+          </div>
+          <div className="flex items-center gap-3 mb-6 relative z-10">
+            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-inner shrink-0">
+              <ArrowUpRight className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-zinc-500 font-medium text-xs uppercase tracking-wider">Gross Sales</h3>
+              <p className="text-[11px] text-zinc-400 mt-0.5">Total booking value</p>
+            </div>
+          </div>
+          <div className="text-3xl font-semibold text-zinc-900 tracking-tight relative z-10">
+            {loadingStats ? <Skeleton className="h-8 w-32" /> : inr(stats.gross_volume_paise)}
+          </div>
+        </Card>
+
+        {/* Deductions Stack */}
+        <div className="grid grid-rows-2 gap-4 col-span-1">
+             {/* Platform Fees */}
+            <Card className="relative p-4 border-zinc-200/60 shadow-sm flex items-center justify-between">
+                <div>
+                    <h3 className="text-zinc-500 font-medium text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                        <ArrowDownRight className="w-3 h-3 text-amber-500" /> Service Fees
+                    </h3>
+                    <div className="text-lg font-semibold text-zinc-800 tracking-tight mt-1">
+                        {loadingStats ? <Skeleton className="h-6 w-24" /> : inr(stats.platform_fees_paise)}
+                    </div>
+                </div>
+            </Card>
+
+             {/* Refunds */}
+             <Card className="relative p-4 border-zinc-200/60 shadow-sm flex items-center justify-between">
+                <div>
+                    <h3 className="text-zinc-500 font-medium text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                        <TrendingDown className="w-3 h-3 text-red-500" /> Refunds Issued
+                    </h3>
+                    <div className="text-lg font-semibold text-zinc-800 tracking-tight mt-1">
+                        {loadingStats ? <Skeleton className="h-6 w-24" /> : inr(stats.refunds_issued_paise)}
+                    </div>
+                </div>
+            </Card>
+        </div>
+
+      </div>
+
+      {/* Ledger Section */}
+      <div className="space-y-6">
+        
+        {/* Tabs */}
+        <div className="border-b border-zinc-200">
+          <nav className="-mb-px flex w-full overflow-x-auto no-scrollbar" aria-label="Tabs">
+            {TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex-1 whitespace-nowrap py-3 border-b-2 font-medium text-sm transition-all ${
+                  tab === t.id
+                    ? 'border-brand-500 text-brand-600'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Table */}
+        {loadingLedger ? (
+          <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+            <table className="w-full text-left">
+                <thead className="bg-zinc-50 border-b border-zinc-200">
+                <tr>
+                    {['Date / ID', 'Type', 'Description', 'Reference', 'Amount'].map(h => (
+                    <th key={h} className={COL}>{h}</th>
+                    ))}
+                </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                {[1, 2, 3, 4, 5].map(i => (
+                    <tr key={i}>
+                    <td className={CELL}><Skeleton className="h-4 w-32 mb-2" /><Skeleton className="h-3 w-24" /></td>
+                    <td className={CELL}><Skeleton className="h-6 w-24 rounded-full" /></td>
+                    <td className={CELL}><Skeleton className="h-4 w-40 mb-2" /><Skeleton className="h-3 w-32" /></td>
+                    <td className={CELL}><Skeleton className="h-4 w-24" /></td>
+                    <td className={CELL}><Skeleton className="h-5 w-20" /></td>
+                    </tr>
+                ))}
+                </tbody>
+            </table>
+          </div>
+        ) : entries.length === 0 ? (
+          <EmptyState
+              icon={<ArrowRightLeft className="h-10 w-10 text-zinc-300" />}
+              title="No transactions found"
+              description={`There are no ${tab !== 'all' ? tab : 'ledger'} entries to display.`}
+          />
+        ) : (
+          <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-x-auto">
+            <table className="w-full text-left min-w-[720px]">
+                <thead className="bg-zinc-50 border-b border-zinc-200">
+                <tr>
+                    <th className={COL}>Date & Time</th>
+                    <th className={COL}>Type</th>
+                    <th className={COL}>Description</th>
+                    <th className={COL}>Reference</th>
+                    <th className={`${COL} text-right`}>Amount</th>
+                </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                {entries.map(entry => {
+                    const isCredit = entry.direction === 'credit'
+                    const config = getEntryTypeConfig(entry.entry_type, entry.direction)
+                    
+                    return (
+                    <tr key={entry.id} className="hover:bg-zinc-50/50 transition-colors group">
+                        
+                        {/* Date & ID */}
+                        <td className={CELL}>
+                            <div className="font-medium text-zinc-900">{formatDateTime(entry.created_at)}</div>
+                            <div className="text-[11px] text-zinc-400 font-mono mt-1 flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                                <FileText className="w-3 h-3" />
+                                {entry.id.split('-')[0]}...
+                            </div>
+                        </td>
+
+                        {/* Type */}
+                        <td className={CELL}>
+                            <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${config.bg}`}>
+                                {config.label}
+                            </span>
+                        </td>
+
+                        {/* Description (Venue & User) */}
+                        <td className={CELL}>
+                            {entry.venue_name && (
+                                <div className="flex items-center gap-1.5 text-zinc-900 font-medium">
+                                    <Building2 className="w-3.5 h-3.5 text-zinc-400" />
+                                    {entry.venue_name}
+                                </div>
+                            )}
+                            {entry.user_full_name && (
+                                <div className="flex items-center gap-1.5 text-zinc-500 text-xs mt-1">
+                                    <User className="w-3 h-3" />
+                                    {entry.user_full_name}
+                                </div>
+                            )}
+                        </td>
+
+                        {/* Reference (Booking link + Stripe Ref) */}
+                        <td className={CELL}>
+                            <Link 
+                                to={`/bookings/${entry.booking_id}`}
+                                className="text-brand-600 hover:text-brand-700 hover:underline text-xs font-medium transition-colors"
+                            >
+                                View Booking
+                            </Link>
+                            {entry.stripe_pi_ref && (
+                                <div className="text-[11px] text-zinc-400 font-mono mt-1">
+                                    {entry.stripe_pi_ref.startsWith('pi_') ? 'Stripe PI' : 'Stripe Ref'}: {entry.stripe_pi_ref.substring(0, 10)}...
+                                </div>
+                            )}
+                        </td>
+
+                        {/* Amount */}
+                        <td className={`${CELL} text-right`}>
+                            <div className={`font-semibold tracking-tight ${isCredit ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                                {isCredit ? '+' : '-'}{inr(entry.amount_paise)}
+                            </div>
+                            <div className="text-[10px] text-zinc-400 uppercase tracking-wider mt-0.5">
+                                {entry.direction}
+                            </div>
+                        </td>
+
+                    </tr>
+                    )
+                })}
+                </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

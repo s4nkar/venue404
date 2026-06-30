@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_EVEN
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.exceptions import NotFoundError, ForbiddenError, ConflictError
 from app.modules.venue.models import Venue, VenueCategory, VenueStatus, VenueAvailability, VenueBlockedDate, VenueCancellationPolicy, VenueAmenity, Amenity, VenuePhoto
@@ -208,6 +208,12 @@ def list_owner_venues(db: Session, owner_id: UUID) -> list[Venue]:
  
     return (
         db.query(Venue)
+        .options(
+            joinedload(Venue.category),
+            selectinload(Venue.photos),
+            selectinload(Venue.amenities),
+            joinedload(Venue.cancellation_policy)
+        )
         .filter(
             Venue.owner_id == owner_id,
             Venue.deleted_at.is_(None),

@@ -9,8 +9,11 @@ const MAP: Record<string, { label: string; variant: Variant }> = {
   pending: { label: 'Pending', variant: 'pending' },
   succeeded: { label: 'Paid', variant: 'success' },
   paid: { label: 'Paid', variant: 'success' },
+  fully_paid: { label: 'Fully Paid', variant: 'success' },
+  advance_paid: { label: 'Advance Paid', variant: 'success' },
   failed: { label: 'Failed', variant: 'danger' },
   refunded: { label: 'Refunded', variant: 'info' },
+  partially_refunded: { label: 'Partially Refunded', variant: 'info' },
   // booking status
   requested: { label: 'Requested', variant: 'neutral' },
   accepted: { label: 'Accepted', variant: 'pending' },
