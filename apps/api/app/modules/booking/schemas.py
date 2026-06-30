@@ -44,6 +44,7 @@ class BookingOut(BaseModel):
     payment_status: str
     starts_at: datetime
     ends_at: datetime
+    created_at: datetime | None = None
     effective_starts_at: datetime
     effective_ends_at: datetime
     guest_count: int

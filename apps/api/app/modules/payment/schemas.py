@@ -43,3 +43,5 @@ class RefundResponse(BaseModel):
 class OwnerFinancialStatsResponse(BaseModel):
     total_collected_paise: int
     pending_collection_paise: int
+    refunds_issued_paise: int = 0
+    net_revenue_paise: int = 0

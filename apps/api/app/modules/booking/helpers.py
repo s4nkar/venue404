@@ -162,6 +162,7 @@ def _booking_out(booking: Booking) -> BookingOut:
         deadline_extension_count=booking.deadline_extension_count,
         balance_overdue_at=booking.balance_overdue_at,
         owner_action_deadline=booking.owner_action_deadline,
+        created_at=booking.created_at,
         display=BookingDisplay(
             quoted_price=_format_inr(booking.quoted_price_paise),
             advance_due=_format_inr(booking.advance_due_paise),

@@ -387,6 +387,14 @@ def get_owner_financial_stats(db: Session, current_user: AuthContext) -> OwnerFi
         .filter(Venue.owner_id == current_user.user_id) \
         .scalar() or 0
         
+    # Total refunds: sum of refund_amount_paise for bookings in venues owned by this user
+    total_refunds = db.query(func.sum(Booking.refund_amount_paise)) \
+        .join(Venue, Booking.venue_id == Venue.id) \
+        .filter(Venue.owner_id == current_user.user_id) \
+        .scalar() or 0
+        
+    net_revenue = total_collected - total_refunds
+        
     # Pending collection: sum of balance_due_paise for active bookings where full payment isn't done
     active_statuses = [BookingStatus.confirmed, BookingStatus.owner_accepted, BookingStatus.completed]
     pending_collection = db.query(func.sum(Booking.balance_due_paise)) \
@@ -400,7 +408,9 @@ def get_owner_financial_stats(db: Session, current_user: AuthContext) -> OwnerFi
         
     return OwnerFinancialStatsResponse(
         total_collected_paise=total_collected,
-        pending_collection_paise=pending_collection
+        pending_collection_paise=pending_collection,
+        refunds_issued_paise=total_refunds,
+        net_revenue_paise=net_revenue
     )
 
 
@@ -421,8 +431,13 @@ def list_owner_financial_bookings(db: Session, current_user: AuthContext, paymen
     
     if payment_status:
         # map custom tabs to real statuses if needed, otherwise exact match
-        if payment_status == "unpaid_overdue":
-            query = query.filter(Booking.payment_status.in_([PaymentStatus.unpaid]))
+        if payment_status == "overdue":
+            now = datetime.now(timezone.utc)
+            query = query.filter(
+                Booking.payment_status.in_([PaymentStatus.unpaid, PaymentStatus.advance_paid]),
+                Booking.balance_overdue_at.isnot(None),
+                Booking.balance_overdue_at < now
+            )
         elif payment_status == "refunded":
             query = query.filter(Booking.payment_status.in_([PaymentStatus.refunded, PaymentStatus.partially_refunded]))
         else:

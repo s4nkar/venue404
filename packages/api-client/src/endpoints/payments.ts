@@ -31,6 +31,8 @@ export type RefundResult = {
 export type OwnerFinancialStats = {
   total_collected_paise: number
   pending_collection_paise: number
+  refunds_issued_paise: number
+  net_revenue_paise: number
 }
 
 export const paymentEndpoints = (client: ReturnType<typeof createClient>) => ({
