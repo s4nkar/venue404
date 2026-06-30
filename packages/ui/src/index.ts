@@ -1,3 +1,5 @@
+import { VenueLocationMap } from './components/VenueLocationMap'
+
 // Design tokens (JS mirror of theme.css)
 export * from './tokens'
 
@@ -58,3 +60,4 @@ export { CountdownTimer } from './components/dashboard/CountdownTimer'
 export { SectionHeader } from './components/dashboard/SectionHeader'
 export type { DashboardMetric, MetricCardAccent } from './components/dashboard/MetricCard'
 export { LocationPickerMap } from './LocationPickerMap'
+export { VenueLocationMap } from './components/VenueLocationMap'

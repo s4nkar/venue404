@@ -24,7 +24,9 @@ function toMinutes(timeStr: string): number {
 }
 
 function minutesToISO(date: string, minutes: number): string {
-  const h = Math.floor(minutes / 60).toString().padStart(2, '0')
+  const h = Math.floor(minutes / 60)
+    .toString()
+    .padStart(2, '0')
   const m = (minutes % 60).toString().padStart(2, '0')
   return `${date}T${h}:${m}:00`
 }
@@ -48,11 +50,13 @@ export function TimeSlotPicker({
   onClear,
 }: Props) {
   const { operating_window, blocked_slots = [] } = availability
-  const { slot_interval_minutes, min_booking_duration_minutes, max_booking_duration_minutes } = venueConfig
+  const { slot_interval_minutes, min_booking_duration_minutes, max_booking_duration_minutes } =
+    venueConfig
 
   // Unified list of all possible time points (start + potential ends)
   const allTimePoints = useMemo<number[]>(() => {
-    if (!operating_window.is_available || !operating_window.opens_at || !operating_window.closes_at) return []
+    if (!operating_window.is_available || !operating_window.opens_at || !operating_window.closes_at)
+      return []
     const openMin = toMinutes(operating_window.opens_at)
     const closeMin = toMinutes(operating_window.closes_at)
     const points: number[] = []
@@ -67,10 +71,12 @@ export function TimeSlotPicker({
     [blocked_slots]
   )
 
-
-  const isRangeBlocked = useCallback((startMin: number, endMin: number): boolean => {
-    return blockedRanges.some((r) => startMin < r.end && endMin > r.start)
-  }, [blockedRanges])
+  const isRangeBlocked = useCallback(
+    (startMin: number, endMin: number): boolean => {
+      return blockedRanges.some((r) => startMin < r.end && endMin > r.start)
+    },
+    [blockedRanges]
+  )
 
   const selectedStartMin = selectedStart ? toMinutes(selectedStart) : null
   const selectedEndMin = selectedEnd ? toMinutes(selectedEnd) : null
@@ -85,30 +91,45 @@ export function TimeSlotPicker({
       m += slot_interval_minutes
     }
     return valid
-  }, [selectedStartMin, min_booking_duration_minutes, max_booking_duration_minutes, closeMin, slot_interval_minutes, isRangeBlocked])
+  }, [
+    selectedStartMin,
+    min_booking_duration_minutes,
+    max_booking_duration_minutes,
+    closeMin,
+    slot_interval_minutes,
+    isRangeBlocked,
+  ])
 
-  const handleSlotClick = useCallback(
-    (minutes: number) => {
-      if (selectedStartMin == null) {
-        onSelect(minutesToISO(date, minutes), null)
-        return
-      }
-      if (minutes <= selectedStartMin) {
-        onSelect(minutesToISO(date, minutes), null)
-        return
-      }
-      if (validEndSlots.has(minutes)) {
-        onSelect(minutesToISO(date, selectedStartMin), minutesToISO(date, minutes))
-      }
-    },
-    [selectedStartMin, validEndSlots, date, onSelect]
-  )
+const handleSlotClick = useCallback(
+  (minutes: number) => {
+    if (selectedStartMin == null) {
+      onSelect(minutesToISO(date, minutes), null)
+      return
+    }
+    if (minutes <= selectedStartMin) {
+      // FIX: don't let a blocked slot become the new start via restart
+      if (isRangeBlocked(minutes, minutes + min_booking_duration_minutes)) return
+      onSelect(minutesToISO(date, minutes), null)
+      return
+    }
+    if (validEndSlots.has(minutes)) {
+      onSelect(minutesToISO(date, selectedStartMin), minutesToISO(date, minutes))
+    }
+  },
+  [selectedStartMin, validEndSlots, date, onSelect, isRangeBlocked, min_booking_duration_minutes]
+)
 
   if (!operating_window.is_available) {
-    return <p className="text-sm text-zinc-400 italic text-center py-4">Venue is closed on this date.</p>
+    return (
+      <p className="text-sm text-zinc-400 italic text-center py-4">Venue is closed on this date.</p>
+    )
   }
   if (allTimePoints.length === 0) {
-    return <p className="text-sm text-zinc-400 italic text-center py-4">No available time slots for this date.</p>
+    return (
+      <p className="text-sm text-zinc-400 italic text-center py-4">
+        No available time slots for this date.
+      </p>
+    )
   }
 
   const isSelectingEnd = selectedStartMin != null && selectedEndMin == null
@@ -120,7 +141,10 @@ export function TimeSlotPicker({
           {isSelectingEnd ? 'Select end time' : 'Select start time'}
         </p>
         {selectedStartMin != null && (
-          <button onClick={onClear} className="text-xs text-brand hover:text-brand-hover transition-colors">
+          <button
+            onClick={onClear}
+            className="text-xs text-brand hover:text-brand-hover transition-colors"
+          >
             Clear
           </button>
         )}
@@ -134,12 +158,24 @@ export function TimeSlotPicker({
 
       {selectedStartMin != null && selectedEndMin != null && (
         <div className="mb-3 flex items-center gap-2 text-xs text-zinc-500 bg-brand-light rounded-lg px-3 py-2">
-          <svg className="h-3.5 w-3.5 text-brand-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg
+            className="h-3.5 w-3.5 text-brand-secondary"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
           <span>
             {formatTime(selectedStart!)} – {formatTime(selectedEnd!)} ·{' '}
-            <strong className="text-brand">{durationLabel(selectedStartMin, selectedEndMin)}</strong>
+            <strong className="text-brand">
+              {durationLabel(selectedStartMin, selectedEndMin)}
+            </strong>
           </span>
         </div>
       )}
@@ -150,13 +186,21 @@ export function TimeSlotPicker({
           const isStart = selectedStartMin === minutes
           const isEnd = selectedEndMin === minutes
           const isInRange =
-            selectedStartMin != null && selectedEndMin != null && minutes > selectedStartMin && minutes < selectedEndMin
+            selectedStartMin != null &&
+            selectedEndMin != null &&
+            minutes > selectedStartMin &&
+            minutes < selectedEndMin
 
           let isDisabled = false
           if (selectedStartMin == null) {
             isDisabled = isRangeBlocked(minutes, minutes + min_booking_duration_minutes)
           } else if (selectedEndMin == null) {
-            isDisabled = minutes > selectedStartMin && !validEndSlots.has(minutes)
+            if (minutes <= selectedStartMin) {
+              // FIX: restarting the selection still needs the blocked check
+              isDisabled = isRangeBlocked(minutes, minutes + min_booking_duration_minutes)
+            } else {
+              isDisabled = !validEndSlots.has(minutes)
+            }
           } else {
             isDisabled = true
           }

@@ -254,12 +254,15 @@ function useVenueBooking(venue: VenueResponse) {
   }
 }
 
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function VenueDetails() {
   const { id }   = useParams<{ id: string }>()
   const navigate = useNavigate()
   const client   = createClient()
+
+
 
   const { data: venue, isLoading, isError } = useQuery({
     queryKey: ['venue', id],
@@ -294,6 +297,15 @@ export default function VenueDetails() {
 function VenueContent({ venue }: { venue: VenueResponse }) {
   const b = useVenueBooking(venue)
 
+    const [scrollTrigger, setScrollTrigger] = useState(0)
+
+    function scrollToAvailability() {
+      setScrollTrigger((n) => n + 1)
+      document
+        .getElementById('availability-section')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+
   return (
     <>
       {/* Gallery */}
@@ -304,10 +316,8 @@ function VenueContent({ venue }: { venue: VenueResponse }) {
           makes the right column div as tall as the left column. That lets
           the inner `sticky` element scroll properly through the full page. ── */}
       <div className="mt-10 flex flex-col gap-10 lg:flex-row lg:gap-16 xl:gap-20">
-
         {/* ════ LEFT ══════════════════════════════════════════ */}
         <div className="flex-1 min-w-0">
-
           <VenueInfo venue={venue} />
           <Divider />
 
@@ -315,21 +325,23 @@ function VenueContent({ venue }: { venue: VenueResponse }) {
           <Divider />
 
           {/* Two-month date range calendar */}
-          <VenueAvailabilitySection
-            venue={venue}
-            bookingType={b.bookingType}
-            startDate={b.startDate}
-            endDate={b.endDate}
-            selectedStart={b.selectedStart}
-            selectedEnd={b.selectedEnd}
-            availability={b.availability}
-            availLoading={b.availLoading}
-            availError={b.availError}
-            onRangeChange={b.handleRangeChange}
-            onSlotSelect={b.handleSlotSelect}
-            onClear={b.resetAll}
-            onClearSlot={b.resetSlot}
-          />
+          <div id="availability-section">
+            <VenueAvailabilitySection
+              venue={venue}
+              bookingType={b.bookingType}
+              startDate={b.startDate}
+              endDate={b.endDate}
+              selectedStart={b.selectedStart}
+              selectedEnd={b.selectedEnd}
+              availability={b.availability}
+              availLoading={b.availLoading}
+              availError={b.availError}
+              onRangeChange={b.handleRangeChange}
+              onSlotSelect={b.handleSlotSelect}
+              onClear={b.resetAll}
+              onClearSlot={b.resetSlot}
+            />
+          </div>
           <Divider />
 
           <VenueReviews />
@@ -365,17 +377,21 @@ function VenueContent({ venue }: { venue: VenueResponse }) {
               quoteError={b.quoteError}
               slotError={b.slotError}
               isPending={b.isPending}
-              onBookingTypeChange={b.handleBookingTypeChange}
+              onBookingTypeChange={(type) => {
+                b.handleBookingTypeChange(type)
+                scrollToAvailability() // FIX: jump to calendar the moment type changes
+              }}
               onReset={b.resetAll}
               onBook={b.handleBook}
+              onEditDates={scrollToAvailability} // FIX: from the earlier date-field fix
             />
 
             {/* Trust micro-copy */}
             <div className="mt-4 space-y-2.5 px-1">
               {[
                 { icon: '🛡️', text: 'No charge until the owner accepts' },
-                { icon: '✓',  text: 'Verified venue on Venue404' },
-                { icon: '↩',  text: 'Cancellation terms per policy below' },
+                { icon: '✓', text: 'Verified venue on Venue404' },
+                { icon: '↩', text: 'Cancellation terms per policy below' },
               ].map(({ icon, text }) => (
                 <div key={text} className="flex items-start gap-2.5 text-xs text-zinc-400">
                   <span>{icon}</span>
@@ -385,7 +401,6 @@ function VenueContent({ venue }: { venue: VenueResponse }) {
             </div>
           </div>
         </div>
-
       </div>
     </>
   )
