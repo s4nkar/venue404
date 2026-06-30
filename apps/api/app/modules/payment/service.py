@@ -30,6 +30,8 @@ from app.modules.booking.models import (
     Booking, BookingStatus, PaymentStatus, BookingSlot, BookingStatusHistory,
 )
 from app.modules.booking.service import _booking_out
+from sqlalchemy.orm import joinedload, selectinload
+from app.modules.profile.models import Profile
 from app.modules.booking.state_machine import can_transition
 from app.modules.venue.models import Venue
 from app.modules.payment.models import (
@@ -406,12 +408,23 @@ def list_owner_financial_bookings(db: Session, current_user: AuthContext, paymen
     if not current_user.is_owner():
         raise ForbiddenError("Must be a venue owner")
         
-    query = db.query(Booking).join(Venue, Booking.venue_id == Venue.id).filter(Venue.owner_id == current_user.user_id)
+    query = (
+        db.query(Booking)
+        .options(
+            joinedload(Booking.slot),
+            joinedload(Booking.user),
+            joinedload(Booking.venue).selectinload(Venue.photos)
+        )
+        .join(Venue, Booking.venue_id == Venue.id)
+        .filter(Venue.owner_id == current_user.user_id)
+    )
     
     if payment_status:
-        # map "overdue" or custom tabs to real statuses if needed, otherwise exact match
+        # map custom tabs to real statuses if needed, otherwise exact match
         if payment_status == "unpaid_overdue":
             query = query.filter(Booking.payment_status.in_([PaymentStatus.unpaid]))
+        elif payment_status == "refunded":
+            query = query.filter(Booking.payment_status.in_([PaymentStatus.refunded, PaymentStatus.partially_refunded]))
         else:
             try:
                 enum_val = PaymentStatus(payment_status)
