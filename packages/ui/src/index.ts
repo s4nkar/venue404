@@ -1,5 +1,3 @@
-import { VenueLocationMap } from './components/VenueLocationMap'
-
 // Design tokens (JS mirror of theme.css)
 export * from './tokens'
 
