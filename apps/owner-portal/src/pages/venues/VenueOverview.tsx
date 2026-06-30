@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Card, SectionHeader, StatusBadge, Button, MetricCard, Skeleton } from '@venue404/ui'
-import { Settings, Users, IndianRupee, CalendarDays, ArrowLeft, Info, Loader2 } from 'lucide-react'
+import { Card, StatusBadge, Button, MetricCard, Skeleton } from '@venue404/ui'
+import { Users, IndianRupee, CalendarDays, ArrowLeft, Info, Loader2 } from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
 
 export default function VenueOverview() {

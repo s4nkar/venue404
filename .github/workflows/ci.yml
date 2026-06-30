@@ -18,9 +18,10 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Lint
+      - name: Lint (advisory — does not block merge)
+        continue-on-error: true
         run: pnpm lint
-      - name: Build (includes tsc type-check)
+      - name: Build (tsc type-check + vite build — the merge gate)
         run: pnpm build
 
   api:

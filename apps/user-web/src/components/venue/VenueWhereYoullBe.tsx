@@ -8,17 +8,6 @@ export function VenueWhereYoullBe({ venue }: Props) {
   const lng = venue.longitude != null ? parseFloat(venue.longitude) : null
   const hasCoords = lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng)
 
-  const fullAddress = [
-    venue.address_line1,
-    venue.address_line2,
-    venue.city,
-    venue.state,
-    venue.postal_code,
-    venue.country,
-  ]
-    .filter(Boolean)
-    .join(', ')
-
   return (
     <div>
       <h2 className="mb-2 text-xl font-semibold text-zinc-900">Where you'll be</h2>

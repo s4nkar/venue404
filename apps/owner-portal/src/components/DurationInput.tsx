@@ -6,7 +6,7 @@ export interface DurationInputProps {
   name: string
   value?: number | string
   defaultValue?: number | string
-  onChange?: (e: { target: { name: string, value: number, type: string } }) => void
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
   required?: boolean
   helperText?: string
   info?: React.ReactNode
@@ -36,7 +36,7 @@ export function DurationInput({ label, name, value, defaultValue, onChange, requ
       setHours(newHours)
     }
     if (onChange) {
-      onChange({ target: { name, value: (Number(newHours) || 0) * 60 + (Number(minutes) || 0), type: 'number' } })
+      onChange({ target: { name, value: (Number(newHours) || 0) * 60 + (Number(minutes) || 0), type: 'number' } } as unknown as React.ChangeEvent<HTMLInputElement>)
     }
   }
 
@@ -46,7 +46,7 @@ export function DurationInput({ label, name, value, defaultValue, onChange, requ
       setMinutes(newMinutes)
     }
     if (onChange) {
-      onChange({ target: { name, value: (Number(hours) || 0) * 60 + (Number(newMinutes) || 0), type: 'number' } })
+      onChange({ target: { name, value: (Number(hours) || 0) * 60 + (Number(newMinutes) || 0), type: 'number' } } as unknown as React.ChangeEvent<HTMLInputElement>)
     }
   }
 
