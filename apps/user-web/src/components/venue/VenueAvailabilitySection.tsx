@@ -1,22 +1,24 @@
+import { useEffect, useState } from 'react'
 import { AvailabilityCalendarDouble } from './AvailabilityCalendar'
-import { TimeSlotPicker }             from './TimeSlotPicker'
+import { TimeSlotPicker } from './TimeSlotPicker'
 import type { VenueResponse, AvailabilityResponse, BookingType } from '../../types'
 import { formatDate } from '../../utils'
 
 type Props = {
-  venue:         VenueResponse
-  bookingType:   BookingType
-  startDate:     string | null
-  endDate:       string | null
+  venue: VenueResponse
+  bookingType: BookingType
+  startDate: string | null
+  endDate: string | null
   selectedStart: string | null
-  selectedEnd:   string | null
-  availability:  AvailabilityResponse | undefined
-  availLoading:  boolean
-  availError:    boolean
+  selectedEnd: string | null
+  availability: AvailabilityResponse | undefined
+  availLoading: boolean
+  availError: boolean
   onRangeChange: (start: string | null, end: string | null) => void
-  onSlotSelect:  (start: string, end: string | null) => void
-  onClear:       () => void
-  onClearSlot:   () => void
+  onSlotSelect: (start: string, end: string | null) => void
+  onClear: () => void
+  onClearSlot: () => void
+  scrollTrigger?: number // increment this any time you want a flash
 }
 
 function daysBetween(a: string, b: string): number {
@@ -38,10 +40,12 @@ export function VenueAvailabilitySection({
   onSlotSelect,
   onClear,
   onClearSlot,
+  scrollTrigger
 }: Props) {
   const startLabel = startDate ? formatDate(startDate + 'T00:00:00') : null
-  const endLabel   = endDate   ? formatDate(endDate   + 'T00:00:00') : null
-  const days       = startDate && endDate ? daysBetween(startDate, endDate) + 1 : null
+  const endLabel = endDate ? formatDate(endDate + 'T00:00:00') : null
+  const days = startDate && endDate ? daysBetween(startDate, endDate) + 1 : null
+  const [justArrived, setJustArrived] = useState(false)
 
   const headerText =
     startDate && endDate && bookingType === 'full_day'
@@ -49,22 +53,33 @@ export function VenueAvailabilitySection({
         ? `1 day in ${venue.city}`
         : `${days} days in ${venue.city}`
       : startDate && bookingType === 'full_day'
-      ? 'Select end date'
-      : startDate && bookingType === 'time_slot'
-      ? `1 day in ${venue.city}`
-      : bookingType === 'full_day'
-      ? 'Select event dates'
-      : 'Select event date'
+        ? 'Select end date'
+        : startDate && bookingType === 'time_slot'
+          ? 'Select your time'
+          : bookingType === 'full_day'
+            ? 'Select event dates'
+            : 'Select event date'
 
   const subText =
     startDate && endDate && bookingType === 'full_day'
       ? `${startLabel} — ${endLabel}`
       : startDate
-      ? startLabel ?? undefined
-      : undefined
+        ? (startLabel ?? undefined)
+        : undefined
+
+  // Detect arrival via the URL hash isn't reliable here since we use
+  // scrollIntoView, not hash navigation — instead, flash briefly whenever
+  // bookingType changes (the main trigger for scrolling here).
+  useEffect(() => {
+    setJustArrived(true)
+    const t = setTimeout(() => setJustArrived(false), 1200)
+    return () => clearTimeout(t)
+  }, [bookingType, scrollTrigger])
 
   return (
-    <div>
+    <div
+      className={`transition-shadow duration-700 rounded-2xl ${justArrived ? 'ring-2 ring-brand/30' : ''}`}
+    >
       {/* ── Header ───────────────────────────────────────── */}
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-zinc-900">{headerText}</h2>
