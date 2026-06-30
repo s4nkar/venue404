@@ -18,6 +18,7 @@ type Props = {
   onBookingTypeChange: (type: BookingType) => void
   onReset: () => void
   onBook: () => void
+  onEditDates: () => void
 }
 
 function Spinner() {
@@ -77,6 +78,7 @@ export function VenueReserveCard({
   onBookingTypeChange,
   onReset,
   onBook,
+  onEditDates,
 }: Props) {
   const startLabel = startDate ? formatDate(startDate + 'T00:00:00') : null
   const endLabel = endDate ? formatDate(endDate + 'T00:00:00') : null
@@ -191,7 +193,7 @@ export function VenueReserveCard({
                 label="Check-in"
                 value={startLabel}
                 placeholder="Add date"
-                onClick={onReset}
+                onClick={onEditDates}
                 borderRight
                 isInvalid={isInvalidRange}
               />
@@ -199,7 +201,7 @@ export function VenueReserveCard({
                 label="Check-out"
                 value={endLabel}
                 placeholder="Add date"
-                onClick={onReset}
+                onClick={onEditDates}
                 isInvalid={isInvalidRange}
               />
             </div>
@@ -209,14 +211,29 @@ export function VenueReserveCard({
                 label="Date"
                 value={startLabel}
                 placeholder="Add date"
-                onClick={onReset}
+                onClick={onEditDates}
                 borderRight
               />
-              <DateField label="Time" value={timeLabel} placeholder="Add time" />
+
+              <DateField
+                label="Time"
+                value={timeLabel}
+                placeholder="Add time"
+                onClick={onEditDates}
+              />
             </div>
           )}
         </div>
 
+        {(startDate || endDate || selectedStart) && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="mt-2 text-xs text-zinc-400 underline hover:text-zinc-600"
+          >
+            Clear dates
+          </button>
+        )}
         {/* Guests */}
         <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200">
           <div className="flex items-center px-4 py-3">
@@ -288,40 +305,49 @@ export function VenueReserveCard({
       )}
 
       {/* CTA */}
+      {/* CTA */}
       <div className="px-6 pb-6">
-        <button
-          onClick={onBook}
-          disabled={!readyToBook || isPending || isInvalidRange}
-          className="w-full rounded-xl bg-brand py-4 text-sm font-semibold text-white shadow-sm transition-all hover:bg-brand-hover active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {isPending ? (
-            <span className="flex items-center justify-center gap-2">
-              <Spinner /> Checking availability…
-            </span>
-          ) : !startDate ? (
-            'Select a date to continue'
-          ) : bookingType === 'full_day' && !endDate ? (
-            'Select end date'
-          ) : bookingType === 'time_slot' && !hasSlot ? (
-            'Select a time slot'
-          ) : quoteLoading ? (
-            <span className="flex items-center justify-center gap-2">
-              <Spinner /> Calculating…
-            </span>
-          ) : advanceLabel ? (
-            <span className="flex flex-col leading-tight">
-              <span>Reserve now</span>
-              <span className="text-xs font-normal opacity-80">
-                {advanceLabel} advance · no charge yet
+        {!startDate ? (
+          <button
+            type="button"
+            onClick={onEditDates}
+            className="w-full rounded-xl bg-zinc-900 py-4 text-sm font-semibold text-white shadow-sm transition-all hover:bg-zinc-800 active:scale-[0.99]"
+          >
+            Choose a date ↓
+          </button>
+        ) : (
+          <button
+            onClick={onBook}
+            disabled={!readyToBook || isPending || isInvalidRange}
+            className="w-full rounded-xl bg-brand py-4 text-sm font-semibold text-white shadow-sm transition-all hover:bg-brand-hover active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isPending ? (
+              <span className="flex items-center justify-center gap-2">
+                <Spinner /> Checking availability…
               </span>
-            </span>
-          ) : (
-            'Reserve'
-          )}
-        </button>
+            ) : bookingType === 'full_day' && !endDate ? (
+              'Select end date'
+            ) : bookingType === 'time_slot' && !hasSlot ? (
+              'Select a time slot'
+            ) : quoteLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <Spinner /> Calculating…
+              </span>
+            ) : advanceLabel ? (
+              <span className="flex flex-col leading-tight">
+                <span>Reserve now</span>
+                <span className="text-xs font-normal opacity-80">
+                  {advanceLabel} advance · no charge yet
+                </span>
+              </span>
+            ) : (
+              'Reserve'
+            )}
+          </button>
+        )}
 
         <p className="mt-3 text-center text-xs text-zinc-400">
-          You won’t be charged yet · Owner must confirm first
+          You won't be charged yet · Owner must confirm first
         </p>
       </div>
     </div>
