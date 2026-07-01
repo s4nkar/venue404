@@ -17,7 +17,7 @@ on:
       jobs:
         description: "Comma-separated job names to run"
         required: true
-        default: "hold_expiry,payment_reminders,request_expiry,overdue_flag,overdue_autocancel,completion"
+        default: "hold_expiry,payment_reminders,request_expiry,overdue_flag,overdue_autocancel,completion,search_indexer"
 
 jobs:
   run:
@@ -27,7 +27,7 @@ jobs:
         id: select
         run: |
           case "${{ github.event.schedule }}" in
-            "0 * * * *")   JOBS="hold_expiry,payment_reminders" ;;
+            "0 * * * *")   JOBS="hold_expiry,payment_reminders,search_indexer" ;;
             "0 */6 * * *") JOBS="request_expiry,overdue_flag,overdue_autocancel" ;;
             "0 0 * * *")   JOBS="completion" ;;
             *)             JOBS="${{ github.event.inputs.jobs }}" ;;
