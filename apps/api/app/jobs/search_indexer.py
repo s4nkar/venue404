@@ -20,7 +20,7 @@ def _dequeue_from_upstash(limit: int) -> list[str]:
         return []
 
 
-def run() -> None:
+def run() -> int:
     db = SessionLocal()
     try:
         job_ids = _dequeue_from_upstash(limit=10)
@@ -28,10 +28,11 @@ def run() -> None:
             job_ids = retryable_job_ids(db, limit=10)
 
         if not job_ids:
-            return
+            return 0
 
         logger.info("search_indexer: processing %d job(s)", len(job_ids))
         for job_id in job_ids:
             process_job(db, job_id)
+        return len(job_ids)
     finally:
         db.close()
