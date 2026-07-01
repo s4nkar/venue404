@@ -284,7 +284,7 @@ export default function CreateVenueWizard() {
 
     if (currentStep < STEPS.length - 1) {
       const payload = buildPayload()
-      // @ts-ignore - appending dynamically
+      // @ts-expect-error - appending dynamically
       payload.last_completed_step = currentStep + 1
 
       try {
