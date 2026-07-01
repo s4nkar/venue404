@@ -444,12 +444,12 @@ export default function VenueEdit() {
                 <div className="pt-2">
                   <label className="block text-sm font-medium text-zinc-700 mb-1">Pinpoint Location on Map</label>
                   <LocationPickerMap
-                    latitude={venue.latitude ?? null}
-                    longitude={venue.longitude ?? null}
+                    latitude={venue.latitude ? parseFloat(venue.latitude) : null}
+                    longitude={venue.longitude ? parseFloat(venue.longitude) : null}
                     onChange={(lat, lng, addr) => {
                       setVenue(prev => {
                         if (!prev) return null
-                        const update: Venue = { ...prev, latitude: lat, longitude: lng }
+                        const update: Venue = { ...prev, latitude: String(lat), longitude: String(lng) }
                         if (addr) {
                           if (addr.address_line1) update.address_line1 = addr.address_line1
                           if (addr.address_line2) update.address_line2 = addr.address_line2

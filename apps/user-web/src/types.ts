@@ -2,8 +2,8 @@ export type VenueCategory = {
   id: string
   slug: string
   label: string
-  icon: string | null
-  banner_image: string | null
+  icon?: string | null
+  banner_image?: string | null
   is_active: boolean
   sort_order: number
 }
@@ -15,8 +15,8 @@ export type SearchResult = {
   category: VenueCategory
   capacity: number
   pricing_mode: string
-  starting_price_paise: number | null
-  cover_photo_url: string | null
+  starting_price_paise?: number | null
+  cover_photo_url?: string | null
 }
 
 // ─── API response shapes (mirrors OpenAPI schema) ────────────────────────────
@@ -170,7 +170,7 @@ export type BookingOut = {
   venue_id: string
   venue_name: string
   venue_city: string
-  venue_cover_photo_url: string | null
+  venue_cover_photo_url?: string | null
   user_id: string
   booking_type: string
   status: string

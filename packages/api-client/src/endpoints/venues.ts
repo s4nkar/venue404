@@ -1,6 +1,5 @@
 import { createClient } from '../client'
-import type { Venue, VenuePhoto, Amenity, VenueAvailability, BlockedDate } from '../types'
-import type { VenueCategory } from './adminCategories'
+import type { Venue, VenuePhoto, Amenity, VenueAvailability, BlockedDate, VenueCategory, CalendarResponse, AvailabilityResponse, PricingQuote, ValidationResponse, SearchPage } from '../model'
 
 export const venueEndpoints = (client: ReturnType<typeof createClient>) => ({
   getVenueCategories: () => client.get<VenueCategory[]>('/api/venues/categories'),
@@ -23,21 +22,23 @@ export const venueEndpoints = (client: ReturnType<typeof createClient>) => ({
   createBlockedDate: (id: string, body: unknown) => client.post<BlockedDate>(`/api/venues/${id}/blocked-dates`, body),
   deleteBlockedDate: (venueId: string, blockedId: string) => client.delete<void>(`/api/venues/${venueId}/blocked-dates/${blockedId}`),
   submitVenue: (id: string) => client.post<Venue>(`/api/venues/${id}/submit`, {}),
-  search: (params: Record<string, string>) => {
-    const qs = new URLSearchParams(params).toString()
-    return client.get<unknown>(`/api/search/?${qs}`)
+  search: (params: Record<string, string | number>) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
+    ).toString()
+    return client.get<SearchPage>(`/api/search/?${qs}`)
   },
   getCancellationPolicy: (id: string) =>
     client.get<unknown>(`/api/venues/${id}/cancellation-policy`),
   getCalendar: (id: string, params: { start_date: string; end_date: string }) => {
     const qs = new URLSearchParams(params).toString()
-    return client.get<unknown>(`/api/availability/venues/${id}/calendar?${qs}`)
+    return client.get<CalendarResponse>(`/api/availability/venues/${id}/calendar?${qs}`)
   },
   getDateAvailability: (id: string, booking_date: string) =>
-    client.get<unknown>(`/api/availability/venues/${id}/date/${booking_date}`),
+    client.get<AvailabilityResponse>(`/api/availability/venues/${id}/date/${booking_date}`),
   getQuote: (id: string, params: { starts_at: string; ends_at: string; booking_type: string }) => {
     const qs = new URLSearchParams(params).toString()
-    return client.get<unknown>(`/api/availability/venues/${id}/quote?${qs}`)
+    return client.get<PricingQuote>(`/api/availability/venues/${id}/quote?${qs}`)
   },
   validateSlot: (
     id: string,
@@ -55,7 +56,7 @@ export const venueEndpoints = (client: ReturnType<typeof createClient>) => ({
     if (params.booking_date) query.booking_date = params.booking_date
     if (params.guest_count) query.guest_count = String(params.guest_count)
     const qs = new URLSearchParams(query).toString()
-    return client.post<unknown>(
+    return client.post<ValidationResponse>(
       `/api/availability/venues/${id}/validate?booking_type=${params.booking_type}&${qs}`,
       {}
     )

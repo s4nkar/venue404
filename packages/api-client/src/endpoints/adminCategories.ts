@@ -1,14 +1,6 @@
 import { createClient } from '../client'
 
-export type VenueCategory = {
-  id: string
-  slug: string
-  label: string
-  icon: string | null
-  banner_image: string | null
-  is_active: boolean
-  sort_order: number
-}
+export type { VenueCategory } from '../model'
 
 export type AdminCategory = {
   id: string

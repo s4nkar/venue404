@@ -1,5 +1,5 @@
 import { createClient } from '../client'
-import type { Booking } from '../types'
+import type { Booking } from '../model'
 
 export const bookingEndpoints = (client: ReturnType<typeof createClient>) => ({
   getBooking: (id: string) => client.get<Booking>(`/api/bookings/${id}`),
