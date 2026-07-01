@@ -1,4 +1,5 @@
 import time
+from datetime import date, timedelta
 from datetime import time as dt_time
 from uuid import UUID, uuid4
 
@@ -84,6 +85,24 @@ def seed_user(db: Session, role: str) -> tuple[UUID, str]:
     db.add(UserRoleAssignment(user_id=user_id, role=UserRole(role)))
     db.commit()
     return user_id, make_token(user_id, email)
+
+
+def create_booking(client, token: str, venue_id: UUID, booking_date: date | None = None):
+    """POST /api/bookings/ and return the raw response."""
+    return client.post(
+        "/api/bookings/",
+        json={
+            "venue_id": str(venue_id),
+            "venue_name": "Test Venue",
+            "venue_cover_image": None,
+            "booking_type": "full_day",
+            "booking_date": (booking_date or date.today() + timedelta(days=30)).isoformat(),
+            "guest_count": 10,
+            "event_type": "corporate",
+            "user_notes": "test",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
 
 
 def seed_approved_venue(db: Session, owner_id: UUID, category_id: UUID) -> UUID:
