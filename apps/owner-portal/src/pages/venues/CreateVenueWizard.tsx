@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Input, SectionHeader, LocationPickerMap, InfoTooltip } from '@venue404/ui'
 import * as Icons from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
+import type { VenuePhoto, Amenity, VenueCategory } from '@venue404/api-client'
 import { StateSelect } from '../../components/StateSelect'
 import { DurationInput } from '../../components/DurationInput'
 import { TimeSelect } from '../../components/TimeSelect'
@@ -80,10 +81,10 @@ export default function CreateVenueWizard() {
   })
 
   const [photos, setPhotos] = useState<File[]>([])
-  const [existingPhotos, setExistingPhotos] = useState<any[]>([])
-  const [platformAmenities, setPlatformAmenities] = useState<any[]>([])
+  const [existingPhotos, setExistingPhotos] = useState<VenuePhoto[]>([])
+  const [platformAmenities, setPlatformAmenities] = useState<Amenity[]>([])
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([])
-  const [venueCategories, setVenueCategories] = useState<any[]>([])
+  const [venueCategories, setVenueCategories] = useState<VenueCategory[]>([])
   const [isLoadingDraft, setIsLoadingDraft] = useState<boolean>(!!venueId)
 
   useEffect(() => {
@@ -161,7 +162,7 @@ export default function CreateVenueWizard() {
         }))
 
         if (data.amenities) {
-          setSelectedAmenities(data.amenities.map((a: any) => a.id))
+          setSelectedAmenities(data.amenities.map(a => a.id))
         }
         
         if (data.photos) {
@@ -284,7 +285,6 @@ export default function CreateVenueWizard() {
 
     if (currentStep < STEPS.length - 1) {
       const payload = buildPayload()
-      // @ts-expect-error - appending dynamically
       payload.last_completed_step = currentStep + 1
 
       try {
@@ -321,8 +321,8 @@ export default function CreateVenueWizard() {
         }
 
         setCurrentStep(s => s + 1)
-      } catch (err: any) {
-        showError(err.message || 'Failed to save draft.')
+      } catch (err: unknown) {
+        showError(err instanceof Error ? err.message : 'Failed to save draft.')
         return
       } finally {
         setSubmitting(false)
@@ -341,7 +341,7 @@ export default function CreateVenueWizard() {
   }
 
   const buildPayload = () => {
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       name: formData.name,
       description: formData.description || null,
       category_id: formData.category_id || null,
@@ -378,7 +378,7 @@ export default function CreateVenueWizard() {
       payload.amenity_ids = selectedAmenities
     }
 
-    const policyPayload: any = {
+    const policyPayload: Record<string, unknown> = {
       no_show_refund_pct: parseFloat(formData.no_show_refund_pct.toString() || '0'),
       platform_fee_refundable: false,
       notes: formData.notes || null,
@@ -417,9 +417,9 @@ export default function CreateVenueWizard() {
         const newVenue = await venueEndpoints(client).createVenue(payload)
         navigate(`/venues/${newVenue.id}/overview`)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to submit venue', err)
-      showError(err.message || 'Failed to submit venue. Check your inputs.')
+      showError(err instanceof Error ? err.message : 'Failed to submit venue. Check your inputs.')
     } finally {
       setSubmitting(false)
     }
@@ -496,7 +496,7 @@ export default function CreateVenueWizard() {
                   disabled={venueCategories.length === 0}
                   className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:opacity-50">
                   <option value="">{venueCategories.length === 0 ? 'Loading categories…' : 'Select a category…'}</option>
-                  {venueCategories.map((cat: any) => (
+                  {venueCategories.map((cat) => (
                     <option key={cat.id} value={cat.id}>
                       {cat.icon ? `${cat.icon} ` : ''}{cat.label}
                     </option>
@@ -731,7 +731,7 @@ export default function CreateVenueWizard() {
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {platformAmenities.map(amenity => {
-                  const Icon = (Icons as any)[amenity.icon || 'Check'] || Icons.Check
+                  const Icon = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[amenity.icon || 'Check'] ?? Icons.Check
                   const isSelected = selectedAmenities.includes(amenity.id)
                   
                   return (

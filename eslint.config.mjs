@@ -12,8 +12,7 @@ export default [
     },
     rules: {
       ...tsPlugin.configs.recommended.rules,
-      // Downgraded to warn — 54 pre-existing violations in owner-portal to fix incrementally
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
     },
   },
 ]

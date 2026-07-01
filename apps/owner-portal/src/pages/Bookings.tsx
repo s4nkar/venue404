@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { StatusBadge, SectionHeader, PaymentStatusBadge, EmptyState, Skeleton } from '@venue404/ui'
 import { Search, Calendar, Users, ChevronDown } from 'lucide-react'
 import { createClient, venueEndpoints, bookingEndpoints } from '@venue404/api-client'
+import type { Booking, Venue } from '@venue404/api-client'
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
@@ -12,7 +13,7 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(diff / 86400)}d ago`
 }
 
-function formatEventDate(booking: any): string {
+function formatEventDate(booking: Booking): string {
   if (!booking.starts_at) return '—'
   const d = new Date(booking.starts_at)
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -48,8 +49,8 @@ const CELL = 'px-4 py-4 text-sm text-zinc-700 align-middle'
 export default function Bookings() {
   const [searchParams] = useSearchParams()
   const [tab, setTab] = useState('all')
-  const [bookings, setBookings] = useState<any[]>([])
-  const [venues, setVenues] = useState<any[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [venues, setVenues] = useState<Venue[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedVenue, setSelectedVenue] = useState(searchParams.get('venue_id') || 'all')
@@ -78,7 +79,7 @@ export default function Bookings() {
         ])
         if (!isCurrent) return
         setBookings(allBookings || [])
-        setVenues((venuesData || []).filter((v: any) => v.is_active && v.status === 'approved'))
+        setVenues((venuesData || []).filter(v => v.is_active && v.status === 'approved'))
       } catch (err) {
         if (!isCurrent) return
         console.error('Failed to fetch bookings', err)
@@ -273,7 +274,7 @@ export default function Bookings() {
 
                   {/* Payment */}
                   <td className={CELL}>
-                    <PaymentStatusBadge status={booking.payment_status} />
+                    <PaymentStatusBadge status={booking.payment_status ?? ''} />
                   </td>
 
                   {/* Guests */}

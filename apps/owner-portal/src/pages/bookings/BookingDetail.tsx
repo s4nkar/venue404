@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Card, Button, StatusBadge, PaymentStatusBadge, Modal, Skeleton } from '@venue404/ui'
 import { createClient, bookingEndpoints } from '@venue404/api-client'
+import type { Booking } from '@venue404/api-client'
 import { Calendar, MapPin, User, Clock, ArrowLeft, Check, CheckCircle2, X, AlertTriangle, History, AlignLeft, Info, Receipt, MessageSquare, Lock } from 'lucide-react'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -162,7 +163,7 @@ function DoubleMonthCalendar({
 export default function BookingDetail() {
   const { bookingId } = useParams<{ bookingId: string }>()
   const navigate = useNavigate()
-  const [booking, setBooking] = useState<any>(null)
+  const [booking, setBooking] = useState<Booking | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('overview')
   const [actionLoading, setActionLoading] = useState(false)
@@ -192,7 +193,7 @@ export default function BookingDetail() {
     fetchBooking()
   }, [bookingId])
 
-  const handleAction = async (action: 'accept' | 'reject' | 'cancelForfeit' | 'cancelGoodwill' | 'extendBalanceDeadline' | 'updateOwnerNotes', payload?: any) => {
+  const handleAction = async (action: 'accept' | 'reject' | 'cancelForfeit' | 'cancelGoodwill' | 'extendBalanceDeadline' | 'updateOwnerNotes', payload?: Record<string, unknown>) => {
     if (!bookingId) return
     setActionLoading(true)
     try {
@@ -200,16 +201,16 @@ export default function BookingDetail() {
       if (action === 'accept') {
         await bookingEndpoints(client).acceptBooking(bookingId)
       } else if (action === 'reject') {
-        await bookingEndpoints(client).rejectBooking(bookingId, payload?.reason || 'No reason provided')
+        await bookingEndpoints(client).rejectBooking(bookingId, (payload?.reason as string) || 'No reason provided')
         setRejectModalOpen(false)
       } else if (action === 'cancelForfeit') {
         await bookingEndpoints(client).cancelForfeit(bookingId)
       } else if (action === 'cancelGoodwill') {
         await bookingEndpoints(client).cancelGoodwill(bookingId)
       } else if (action === 'extendBalanceDeadline') {
-        await bookingEndpoints(client).extendBalanceDeadline(bookingId, payload?.new_due_date)
+        await bookingEndpoints(client).extendBalanceDeadline(bookingId, payload?.new_due_date as string)
       } else if (action === 'updateOwnerNotes') {
-        await bookingEndpoints(client).updateOwnerNotes(bookingId, payload?.notes || null)
+        await bookingEndpoints(client).updateOwnerNotes(bookingId, (payload?.notes as string) || null)
         setIsEditingNotes(false)
       }
       await fetchBooking()

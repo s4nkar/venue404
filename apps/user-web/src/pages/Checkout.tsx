@@ -462,7 +462,7 @@ export default function Checkout() {
                 <div>
                   <p className="font-medium">Failed to send booking request</p>
                   <p className="mt-0.5">
-                    {(createBooking.error as any)?.message || 'Please try again.'}
+                    {(createBooking.error instanceof Error ? createBooking.error.message : null) || 'Please try again.'}
                   </p>
                 </div>
               </div>

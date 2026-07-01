@@ -176,9 +176,9 @@ function useVenueBooking(venue: VenueResponse) {
         },
       })
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       console.error('Validation error:', err)
-      setSlotError(err?.message ?? 'Unable to book.')
+      setSlotError(err instanceof Error ? err.message : 'Unable to book.')
     },
   })
 

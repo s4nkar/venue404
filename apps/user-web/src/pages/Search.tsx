@@ -10,11 +10,11 @@ import { HomeFooter } from '../components/home/HomeFooter'
 
 async function searchVenues(params: URLSearchParams) {
   const client = createClient()
-  const query: Record<string, any> = { page: 1, page_size: 100 }
-  if (params.get('q')) query.q = params.get('q')
-  if (params.get('city')) query.city = params.get('city')
-  if (params.get('venue_type')) query.venue_type = params.get('venue_type')
-  if (params.get('capacity')) query.capacity = Number(params.get('capacity'))
+  const query: Record<string, string> = { page: '1', page_size: '100' }
+  if (params.get('q')) query.q = params.get('q')!
+  if (params.get('city')) query.city = params.get('city')!
+  if (params.get('venue_type')) query.venue_type = params.get('venue_type')!
+  if (params.get('capacity')) query.capacity = params.get('capacity')!
   return venueEndpoints(client).search(query)
 }
 
@@ -101,7 +101,7 @@ export default function Search() {
         venues={venues}
         total={total}
         loading={isLoading}
-        error={isError ? ((error as any)?.message ?? 'Failed to load venues.') : null}
+        error={isError ? ((error as Error)?.message ?? 'Failed to load venues.') : null}
         hasFilters={true}
         venueType={venueType}
         capacity={capacity}

@@ -12,8 +12,8 @@ import {
   AlertCircle,
   Building2,
 } from 'lucide-react'
-import { createClient } from '@venue404/api-client'
-import { venueEndpoints } from '@venue404/api-client'
+import { createClient, venueEndpoints } from '@venue404/api-client'
+import type { Venue } from '@venue404/api-client'
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -42,7 +42,7 @@ const TABS = [
 
 export default function ManageVenues() {
   const [filter, setFilter] = useState('all')
-  const [venues, setVenues]   = useState<any[]>([])
+  const [venues, setVenues]   = useState<Venue[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -148,7 +148,7 @@ export default function ManageVenues() {
           {filteredVenues.map(venue => {
             const s = STATUS[venue.status as StatusKey] ?? STATUS.draft
             const coverPhoto =
-              venue.photos?.find((p: any) => p.is_cover)?.image_url ||
+              venue.photos?.find(p => p.is_cover)?.image_url ||
               venue.photos?.[0]?.image_url
             const step             = venue.last_completed_step || 0
             const isDraftIncomplete = venue.status === 'draft' && step < TOTAL_STEPS

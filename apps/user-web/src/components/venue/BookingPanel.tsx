@@ -167,7 +167,7 @@ export function BookingPanel({ venue }: Props) {
         },
       })
     },
-    onError: (err: any) => setSlotError(err?.message ?? 'Unable to book. Please try again.'),
+    onError: (err: unknown) => setSlotError(err instanceof Error ? err.message : 'Unable to book. Please try again.'),
   })
 
   function handleBookingTypeChange(next: BookingType) {
