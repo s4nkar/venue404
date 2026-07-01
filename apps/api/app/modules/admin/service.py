@@ -287,6 +287,9 @@ def approve_venue(
     ))
     db.commit()
 
+    from app.modules.search.indexer import enqueue_job
+    enqueue_job(db, venue_id, "update")
+
 
 def reject_venue(
     db: Session,
@@ -345,6 +348,9 @@ def reactivate_venue(
         target_type="venue", target_id=venue_id, reason=reason or None,
     ))
     db.commit()
+
+    from app.modules.search.indexer import enqueue_job
+    enqueue_job(db, venue_id, "update")
 
 
 def approve_owner(

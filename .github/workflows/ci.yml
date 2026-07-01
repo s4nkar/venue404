@@ -18,17 +18,29 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Lint (advisory — does not block merge)
-        continue-on-error: true
+      - name: Lint
         run: pnpm lint
       - name: Build (tsc type-check + vite build — the merge gate)
         run: pnpm build
+      - name: Security audit
+        run: pnpm audit --audit-level=high
 
   api:
     runs-on: ubuntu-latest
-    # Migrations are deliberately NOT run here — they are applied manually
-    # against the production DB. These dummy values just let Settings() load so
-    # the app imports cleanly (create_engine is lazy; the tests don't hit a DB).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: pass
+          POSTGRES_DB: venue404
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U user -d venue404"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     env:
       DATABASE_URL: postgresql://user:pass@localhost:5432/venue404
       SUPABASE_URL: https://example.supabase.co
@@ -41,12 +53,18 @@ jobs:
         working-directory: apps/api
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v4
         with:
+          enable-cache: true
+          cache-dependency-glob: "apps/api/pyproject.toml"
           python-version: "3.12"
       - name: Install dependencies
-        run: |
-          pip install uv
-          uv pip install --system -e ".[dev]"
+        run: uv pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check .
+      - name: Migrate
+        run: alembic upgrade head
       - name: Tests
         run: pytest -q
+      - name: Security audit
+        run: uvx pip-audit

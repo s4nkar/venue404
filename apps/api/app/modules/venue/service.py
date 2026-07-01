@@ -337,6 +337,10 @@ def create_venue(db: Session, owner_id: UUID, body: CreateVenueRequest) -> Venue
 
     db.commit()
     db.refresh(venue)
+
+    from app.modules.search.indexer import enqueue_job
+    enqueue_job(db, venue.id, "create")
+
     return venue
 
 
@@ -385,6 +389,10 @@ def update_venue(
 
     db.commit()
     db.refresh(venue)
+
+    from app.modules.search.indexer import enqueue_job
+    enqueue_job(db, venue.id, "update")
+
     return venue
 
 

@@ -1,28 +1,14 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Card, SectionHeader, Button, Input, Skeleton } from '@venue404/ui'
 import { ArrowLeft, ArrowRight, Loader2, Save, Trash2, Clock, Ban } from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
+import type { VenueAvailability as Availability, BlockedDate } from '@venue404/api-client'
 import { TimeSelect } from '../../components/TimeSelect'
 
 const DAYS_OF_WEEK = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
 ]
-
-type Availability = {
-  day_of_week: number
-  is_available: boolean
-  opens_at: string | null
-  closes_at: string | null
-  spans_next_day: boolean
-}
-
-type BlockedDate = {
-  id: string
-  starts_at: string
-  ends_at: string
-  reason: string | null
-}
 
 export default function VenueCalendarManagement() {
   const { venueId } = useParams()
@@ -63,7 +49,7 @@ export default function VenueCalendarManagement() {
         }))
 
         const merged = defaults.map(def => {
-          const existing = availData?.find((a: any) => a.day_of_week === def.day_of_week)
+          const existing = availData?.find(a => a.day_of_week === def.day_of_week)
           return existing ? {
             day_of_week: existing.day_of_week,
             is_available: existing.is_available,
@@ -78,9 +64,9 @@ export default function VenueCalendarManagement() {
         if (blockedData) {
           setBlockedDates(blockedData)
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to fetch calendar data", err)
-        setError(err.message || 'Failed to load calendar data.')
+        setError(err instanceof Error ? err.message : 'Failed to load calendar data.')
       } finally {
         setLoading(false)
       }
@@ -88,7 +74,7 @@ export default function VenueCalendarManagement() {
     loadData()
   }, [venueId])
 
-  const handleWeeklyChange = (index: number, field: keyof Availability, value: any) => {
+  const handleWeeklyChange = (index: number, field: keyof Availability, value: string | boolean | null) => {
     setAvailabilities(prev => {
       const next = [...prev]
       next[index] = { ...next[index], [field]: value }
@@ -136,7 +122,7 @@ export default function VenueCalendarManagement() {
         spans_next_day: false,
       }))
       const merged = defaults.map(def => {
-        const saved = data?.find((a: any) => a.day_of_week === def.day_of_week)
+        const saved = data?.find(a => a.day_of_week === def.day_of_week)
         return saved ? {
           day_of_week: saved.day_of_week,
           is_available: saved.is_available,
@@ -147,8 +133,8 @@ export default function VenueCalendarManagement() {
       })
       setAvailabilities(merged)
       alert("Weekly schedule saved successfully.")
-    } catch (err: any) {
-      setError(err.message || "Failed to save schedule")
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save schedule")
     } finally {
       setSavingWeekly(false)
     }
@@ -188,8 +174,8 @@ export default function VenueCalendarManagement() {
       })
       setBlockedDates(prev => [...prev, newBlock].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()))
       ;(e.target as HTMLFormElement).reset()
-    } catch (err: any) {
-      setError(err.message || "Failed to block date")
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to block date")
     } finally {
       setAddingBlock(false)
     }
@@ -202,8 +188,8 @@ export default function VenueCalendarManagement() {
       const client = createClient()
       await venueEndpoints(client).deleteBlockedDate(venueId, id)
       setBlockedDates(prev => prev.filter(b => b.id !== id))
-    } catch (err: any) {
-      setError(err.message || "Failed to unblock date")
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to unblock date")
     }
   }
 

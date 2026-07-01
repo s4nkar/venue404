@@ -8,10 +8,11 @@ from app.core.database import Base
 import app.modules.profile.models  # noqa: F401
 import app.modules.admin.models  # noqa: F401
 import app.modules.venue.models  # noqa: F401
-import app.modules.booking.models  
+import app.modules.booking.models  # noqa: F401
 import app.modules.availability.models  # noqa: F401
 import app.modules.payment.models  # noqa: F401
 import app.modules.notification.models  # noqa: F401
+import app.modules.search.models  # noqa: F401
 
 config = context.config
 

@@ -3,10 +3,11 @@ import { useParams, Link } from 'react-router-dom'
 import { Card, StatusBadge, Button, MetricCard, Skeleton } from '@venue404/ui'
 import { Users, IndianRupee, CalendarDays, ArrowLeft, Info, Loader2 } from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
+import type { Venue } from '@venue404/api-client'
 
 export default function VenueOverview() {
   const { venueId } = useParams()
-  const [venue, setVenue] = useState<any>(null)
+  const [venue, setVenue] = useState<Venue | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -89,8 +90,8 @@ export default function VenueOverview() {
                 const client = createClient()
                 const data = await venueEndpoints(client).submitVenue(venueId)
                 setVenue(data)
-              } catch (err: any) {
-                setError(err.message || "Failed to submit venue")
+              } catch (err: unknown) {
+                setError(err instanceof Error ? err.message : "Failed to submit venue")
               } finally {
                 setSubmitting(false)
               }

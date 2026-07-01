@@ -48,6 +48,17 @@ class Settings(BaseSettings):
     cloudinary_api_key: str = ""
     cloudinary_api_secret: str = ""
 
+    # Upstash Redis — used as a fast delivery channel for search index jobs.
+    # If unset, the worker falls back to polling search_index_jobs directly.
+    upstash_redis_url: str = ""
+    upstash_redis_token: str = ""
+    upstash_search_queue_key: str = "search_index_jobs"
+
+    # Jina AI — used to generate venue embeddings for semantic search.
+    jina_api_key: str = ""
+    jina_embedding_model: str = "jina-embeddings-v3"
+    embedding_dimensions: int = 1024
+
     log_level: str = "INFO"  # DEBUG / INFO / WARNING / ERROR
 
     class Config:

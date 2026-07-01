@@ -1,14 +1,27 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom'
 import { Card, SectionHeader, Button, Input, LocationPickerMap, InfoTooltip, Skeleton } from '@venue404/ui'
 import { ArrowLeft } from 'lucide-react'
 import * as Icons from 'lucide-react'
 import { createClient, venueEndpoints } from '@venue404/api-client'
+import type { Venue, VenuePhoto, Amenity, VenueCategory } from '@venue404/api-client'
 import { StateSelect } from '../../components/StateSelect'
 import { DurationInput } from '../../components/DurationInput'
 import { TimeSelect } from '../../components/TimeSelect'
 
-function HoursToDaysInput({ defaultValue, ...props }: any) {
+interface HoursToDaysInputProps {
+  defaultValue?: string | number
+  label?: string
+  name?: string
+  type?: string
+  min?: number | string
+  placeholder?: string
+  required?: boolean
+  info?: string
+  onChange?: React.ChangeEventHandler<HTMLInputElement>
+}
+
+function HoursToDaysInput({ defaultValue, ...props }: HoursToDaysInputProps) {
   const [val, setVal] = useState<string | number>(defaultValue || '');
   const h = Number(val);
   const suffix = (!isNaN(h) && h > 0) ? `≈ ${parseFloat((h / 24).toFixed(2))} days` : undefined;
@@ -31,17 +44,17 @@ export default function VenueEdit() {
   const location = useLocation()
   const navigate = useNavigate()
   
-  const [venue, setVenue] = useState<any>(null)
+  const [venue, setVenue] = useState<Venue | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [localPhotos, setLocalPhotos] = useState<any[]>([])
+  const [localPhotos, setLocalPhotos] = useState<VenuePhoto[]>([])
 
   const [allowFullDay, setAllowFullDay] = useState(false)
   const [allowTimeSlot, setAllowTimeSlot] = useState(false)
 
-  const [platformAmenities, setPlatformAmenities] = useState<any[]>([])
+  const [platformAmenities, setPlatformAmenities] = useState<Amenity[]>([])
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([])
-  const [venueCategories, setVenueCategories] = useState<any[]>([])
+  const [venueCategories, setVenueCategories] = useState<VenueCategory[]>([])
 
   // E.g. /venues/123/edit/pricing -> 'pricing'
   const editSection = location.pathname.split('/').pop() || 'details'
@@ -54,14 +67,14 @@ export default function VenueEdit() {
 
   useEffect(() => {
     if (venue?.photos) {
-      setLocalPhotos([...venue.photos].sort((a: any, b: any) => a.sort_order - b.sort_order))
+      setLocalPhotos([...venue.photos].sort((a, b) => a.sort_order - b.sort_order))
     }
     if (venue?.allowed_booking_types) {
       setAllowFullDay(venue.allowed_booking_types.includes('full_day'))
       setAllowTimeSlot(venue.allowed_booking_types.includes('time_slot'))
     }
     if (venue?.amenities) {
-      setSelectedAmenities(venue.amenities.map((a: any) => a.id))
+      setSelectedAmenities(venue.amenities.map(a => a.id))
     }
   }, [venue])
 
@@ -139,7 +152,7 @@ export default function VenueEdit() {
 
     setSaving(true)
     const formData = new FormData(e.currentTarget)
-    const updates: any = {}
+    const updates: Record<string, unknown> = {}
 
     // Extract form data based on current section
     if (editSection === 'details') {
@@ -272,7 +285,7 @@ export default function VenueEdit() {
           return
         }
 
-        const policyPayload: any = {
+        const policyPayload: Record<string, unknown> = {
           no_show_refund_pct: parseFloat(formData.get('no_show_refund_pct') as string || '0'),
           platform_fee_refundable: false,
           notes: formData.get('notes') as string || null,
@@ -314,7 +327,7 @@ export default function VenueEdit() {
       } else if (editSection === 'amenities') {
         await venueEndpoints(client).updateVenueAmenities(venueId, { amenity_ids: selectedAmenities })
         const currentPlatformAmenities = platformAmenities.length ? platformAmenities : []
-        const updatedAmenities = selectedAmenities.map(id => currentPlatformAmenities.find(pa => pa.id === id)).filter(Boolean)
+        const updatedAmenities = selectedAmenities.map(id => currentPlatformAmenities.find(pa => pa.id === id)).filter((a): a is Amenity => !!a)
         setVenue({ ...venue, amenities: updatedAmenities })
       } else if (editSection === 'blocked-dates') {
         // Blocked dates are managed immediately via inline actions. No overarching save needed.
@@ -390,7 +403,7 @@ export default function VenueEdit() {
                   disabled={venueCategories.length === 0}
                   className="w-full h-10 px-3 py-2 rounded-md border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:opacity-50">
                   <option value="">{venueCategories.length === 0 ? 'Loading categories…' : 'Select a category…'}</option>
-                  {venueCategories.map((cat: any) => (
+                  {venueCategories.map((cat) => (
                     <option key={cat.id} value={cat.id}>
                       {cat.icon ? `${cat.icon} ` : ''}{cat.label}
                     </option>
@@ -415,27 +428,28 @@ export default function VenueEdit() {
 
               <div className="space-y-4 pt-4 border-t border-zinc-100">
                 <h4 className="font-medium text-zinc-900">Location</h4>
-                <Input label="Address Line 1" name="address_line1" value={venue.address_line1 || ''} onChange={e => setVenue((prev: any) => ({...prev, address_line1: e.target.value}))} required />
-                <Input label="Address Line 2" name="address_line2" value={venue.address_line2 || ''} onChange={e => setVenue((prev: any) => ({...prev, address_line2: e.target.value}))} />
+                <Input label="Address Line 1" name="address_line1" value={venue.address_line1 || ''} onChange={e => setVenue(prev => prev ? { ...prev, address_line1: e.target.value } : null)} required />
+                <Input label="Address Line 2" name="address_line2" value={venue.address_line2 || ''} onChange={e => setVenue(prev => prev ? { ...prev, address_line2: e.target.value } : null)} />
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="City" name="city" value={venue.city || ''} onChange={e => setVenue((prev: any) => ({...prev, city: e.target.value}))} required />
-                  <StateSelect 
-                    value={venue.state} 
-                    onChange={(val) => setVenue((prev: any) => ({ ...prev, state: val }))} 
+                  <Input label="City" name="city" value={venue.city || ''} onChange={e => setVenue(prev => prev ? { ...prev, city: e.target.value } : null)} required />
+                  <StateSelect
+                    value={venue.state ?? ''}
+                    onChange={(val) => setVenue(prev => prev ? { ...prev, state: val } : null)}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <Input label="Country" name="country" value="India" disabled required />
-                  <Input label="Postal Code" name="postal_code" value={venue.postal_code || ''} onChange={e => setVenue((prev: any) => ({...prev, postal_code: e.target.value}))} />
+                  <Input label="Postal Code" name="postal_code" value={venue.postal_code || ''} onChange={e => setVenue(prev => prev ? { ...prev, postal_code: e.target.value } : null)} />
                 </div>
                 <div className="pt-2">
                   <label className="block text-sm font-medium text-zinc-700 mb-1">Pinpoint Location on Map</label>
                   <LocationPickerMap
-                    latitude={venue.latitude}
-                    longitude={venue.longitude}
+                    latitude={venue.latitude ? parseFloat(venue.latitude) : null}
+                    longitude={venue.longitude ? parseFloat(venue.longitude) : null}
                     onChange={(lat, lng, addr) => {
-                      setVenue((prev: any) => {
-                        const update = { ...prev, latitude: lat, longitude: lng }
+                      setVenue(prev => {
+                        if (!prev) return null
+                        const update: Venue = { ...prev, latitude: String(lat), longitude: String(lng) }
                         if (addr) {
                           if (addr.address_line1) update.address_line1 = addr.address_line1
                           if (addr.address_line2) update.address_line2 = addr.address_line2
@@ -551,9 +565,9 @@ export default function VenueEdit() {
                       
                       setSaving(true)
                       try {
-                        const newPhotos: any[] = []
+                        const newPhotos: VenuePhoto[] = []
                         const client = createClient()
-                        
+
                         // Upload all selected files sequentially to avoid overwhelming the server/Cloudinary
                         for (let i = 0; i < files.length; i++) {
                           const formData = new FormData()
@@ -561,12 +575,12 @@ export default function VenueEdit() {
                           const newPhoto = await venueEndpoints(client).addVenuePhoto(venueId, formData)
                           newPhotos.push(newPhoto)
                         }
-                        
+
                         // Update local venue state
-                        setVenue((prev: any) => ({
+                        setVenue(prev => prev ? ({
                           ...prev,
-                          photos: [...(prev.photos || []), ...newPhotos]
-                        }))
+                          photos: [...(prev.photos ?? []), ...newPhotos]
+                        }) : null)
                       } catch (err) {
                         console.error('Failed to upload photos', err)
                         alert('Upload failed for one or more images. Ensure they are valid images.')
@@ -590,7 +604,7 @@ export default function VenueEdit() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {localPhotos.map((photo: any, index: number) => (
+                  {localPhotos.map((photo, index) => (
                     <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-zinc-200 aspect-video bg-zinc-100 flex flex-col shadow-sm hover:shadow-md transition-all duration-300">
                       <img src={photo.image_url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt="Venue" />
                       
@@ -624,11 +638,11 @@ export default function VenueEdit() {
                             try {
                               const client = createClient()
                               await venueEndpoints(client).deleteVenuePhoto(venueId, photo.id)
-                              setLocalPhotos(prev => prev.filter((p: any) => p.id !== photo.id))
-                              setVenue((prev: any) => ({
+                              setLocalPhotos(prev => prev.filter(p => p.id !== photo.id))
+                              setVenue(prev => prev ? ({
                                 ...prev,
-                                photos: prev.photos.filter((p: any) => p.id !== photo.id)
-                              }))
+                                photos: prev.photos?.filter(p => p.id !== photo.id)
+                              }) : null)
                             } catch (err) {
                               console.error('Failed to delete photo', err)
                               alert('Deletion failed.')
@@ -680,7 +694,7 @@ export default function VenueEdit() {
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {platformAmenities.map(amenity => {
-                    const Icon = (Icons as any)[amenity.icon || 'Check'] || Icons.Check
+                    const Icon = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[amenity.icon || 'Check'] ?? Icons.Check
                     const isSelected = selectedAmenities.includes(amenity.id)
                     
                     return (
@@ -764,8 +778,8 @@ export default function VenueEdit() {
               <div className="space-y-6">
                 <h4 className="font-medium text-zinc-900">Base Schedule</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <TimeSelect label="Opening Time" name="open_time" value={venue.open_time || ''} onChange={e => setVenue((prev: any) => ({...prev, open_time: e.target.value}))} required />
-                  <TimeSelect label="Closing Time" name="close_time" value={venue.close_time || ''} onChange={e => setVenue((prev: any) => ({...prev, close_time: e.target.value}))} required />
+                  <TimeSelect label="Opening Time" name="open_time" value={venue.open_time || ''} onChange={e => setVenue(prev => prev ? { ...prev, open_time: e.target.value } : null)} required />
+                  <TimeSelect label="Closing Time" name="close_time" value={venue.close_time || ''} onChange={e => setVenue(prev => prev ? { ...prev, close_time: e.target.value } : null)} required />
                 </div>
                 <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
                   <input type="checkbox" name="spans_next_day" defaultChecked={venue.spans_next_day} className="rounded text-brand focus:ring-brand" />

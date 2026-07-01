@@ -1,12 +1,14 @@
 import enum
 import uuid
 from datetime import datetime, time
+from typing import Any
 from sqlalchemy import (
     Integer, Boolean, Numeric, BigInteger, Text, Time, DateTime,
     ForeignKey, CheckConstraint, Index, func, Enum, text
 )
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy.dialects.postgresql import UUID, ARRAY, TSVECTOR
 from sqlalchemy.orm import mapped_column, Mapped, relationship
+from pgvector.sqlalchemy import Vector
 from app.core.database import Base
 
 
@@ -92,6 +94,10 @@ class Venue(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     last_completed_step: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+    search_vector: Mapped[Any | None] = mapped_column(TSVECTOR, nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1024), nullable=True)
+    embedding_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
